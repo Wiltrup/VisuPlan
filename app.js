@@ -261,7 +261,7 @@ function renderStaffManager() {
   el('staffManager').innerHTML = state.staff.map(person => `<div class="staff-manage-row">
     ${person.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}
     <strong>${escapeHtml(person.name)}</strong>
-    <label class="upload-button">${person.photo_url ? 'Skift billede' : 'Tilføj billede'}<input type="file" accept="image/jpeg,image/png,image/webp" capture="environment" data-staff-photo="${person.id}"></label>
+    <label class="upload-button">${person.photo_url ? 'Skift billede' : 'Tilføj billede'}<input type="file" accept="image/jpeg,image/png,image/webp" data-staff-photo="${person.id}"></label>
   </div>`).join('');
   document.querySelectorAll('[data-staff-photo]').forEach(input => input.addEventListener('change', async () => {
     if (!input.files?.[0]) return;
