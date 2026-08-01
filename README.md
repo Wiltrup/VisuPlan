@@ -1,22 +1,22 @@
 # VisuPlanner
 
-Første fungerende prototype af VisuPlanner til Team 2.
+Visuel og fælles ugeplan til Team 2.
 
 ## Funktioner
 - Én dag ad gangen
 - Fast farve for hver ugedag
-- To medarbejdere morgen, aften og nat
-- Aftensmad
-- Aktiviteter med tidspunkt
+- Fleksibel bemanding på morgen, aften og nat
+- Aftensmad med billede og Pexels-billedsøgning
+- Aktiviteter med tidspunkt og billede
 - Fælles personalelogin
-- Tilføjelse af medarbejdere og vikarer
+- Tilføjelse og fjernelse af medarbejdere og vikarer
+- Fælles synkronisering gennem Supabase
+- Ugeudgivelse og løbende ændringer
 - Mobilvenlig PWA
 
-## Demo-login
-PIN: `2468`
+## Pexels
 
-## Vigtigt
-Denne første version gemmer data i browserens localStorage. Ændringer synkroniseres derfor endnu ikke mellem forskellige telefoner eller touchskærme. Supabase-database og fælles synkronisering er næste udviklingstrin.
+Vercel-projektet skal have miljøvariablen `PEXELS_API_KEY`. Nøglen bruges kun i serverfunktionerne under `api/` og må ikke lægges i GitHub eller i `app.js`.
 
 ## Udgivelse på Vercel
-Upload alle filer i denne mappe til roden af GitHub-repository'et `visuplan`. Importér derefter repository'et i Vercel. Framework preset kan stå som `Other`, og der kræves ingen build command.
+Upload alle filer og mapper i denne mappe til roden af GitHub-repository'et. Framework preset kan stå som `Other`, og der kræves ingen build command. Vercel udgiver automatisk efter commit.

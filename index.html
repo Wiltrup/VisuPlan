@@ -117,6 +117,7 @@
       <div class="form-section">
         <h3>Aftensmad</h3>
         <input id="dinnerInput" placeholder="Fx Mad i TAK" />
+        <button id="openDinnerImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede</button>
         <label class="photo-field">Billede af aftensmaden
           <input id="dinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" />
         </label>
@@ -173,6 +174,22 @@
       <button id="closeImageDialog" class="image-dialog-close" aria-label="Luk billede">✕</button>
       <img id="largeImage" alt="" />
       <p id="largeImageCaption"></p>
+    </div>
+  </dialog>
+
+  <dialog id="imageSearchDialog">
+    <div class="dialog-card image-search-card">
+      <div class="admin-heading">
+        <div><p class="eyebrow">PEXELS</p><h2>Find et madbillede</h2></div>
+        <button id="closeImageSearch" class="icon-button" aria-label="Luk">✕</button>
+      </div>
+      <form id="imageSearchForm" class="image-search-form">
+        <input id="imageSearchInput" placeholder="Fx lasagne" autocomplete="off" required />
+        <button id="imageSearchSubmit" type="submit">Søg</button>
+      </form>
+      <p class="note">Vælg ét billede. Det gemmes kun til denne dags aftensmad.</p>
+      <div id="imageSearchResults" class="image-search-results"></div>
+      <p class="pexels-credit">Billeder leveret af <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></p>
     </div>
   </dialog>
 

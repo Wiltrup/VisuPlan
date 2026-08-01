@@ -30,6 +30,7 @@ let refreshTimer = null;
 let editingWeekStart = null;
 let editingWeek = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
 let editingShifts = { morning: [], evening: [], night: [] };
+let selectedPexelsPhoto = null;
 
 const el = id => document.getElementById(id);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, character => ({
@@ -338,8 +339,46 @@ function loadAdminDay() {
   el('dinnerPhotoInput').value = '';
   el('dinnerPhotoName').textContent = data.dinnerPhotoUrl ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
   pendingDinnerPhoto = null;
+  selectedPexelsPhoto = null;
   editingActivities = structuredClone(data.activities || []);
   renderActivityEditor();
+}
+
+async function searchPexels(query) {
+  if (!state.session?.access_token) throw new Error('Log ind som personale først.');
+  const response = await fetch(`/api/pexels-search?q=${encodeURIComponent(query)}`, { headers: { Authorization: `Bearer ${state.session.access_token}` } });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Billedsøgningen fejlede.');
+  return data.photos || [];
+}
+
+function renderPexelsResults(photos) {
+  const target = el('imageSearchResults');
+  if (!photos.length) {
+    target.innerHTML = '<p class="image-search-message">Ingen billeder fundet. Prøv et andet eller mere enkelt søgeord.</p>';
+    return;
+  }
+  target.innerHTML = photos.map((photo, index) => `<button type="button" class="image-search-result" data-pexels-index="${index}"><img src="${escapeHtml(photo.thumbnail)}" alt="${escapeHtml(photo.alt)}" loading="lazy"><span>Foto: ${escapeHtml(photo.photographer)}</span></button>`).join('');
+  document.querySelectorAll('[data-pexels-index]').forEach(button => button.addEventListener('click', async () => {
+    const photo = photos[Number(button.dataset.pexelsIndex)];
+    button.disabled = true;
+    setStatus('Henter billedet…');
+    try {
+      const imageResponse = await fetch(`/api/pexels-image?id=${encodeURIComponent(photo.id)}`, { headers: { Authorization: `Bearer ${state.session.access_token}` } });
+      if (!imageResponse.ok) throw new Error('Billedet kunne ikke hentes.');
+      const blob = await imageResponse.blob();
+      selectedPexelsPhoto = photo;
+      pendingDinnerPhoto = new File([blob], `pexels-${photo.id}.jpg`, { type: blob.type || 'image/jpeg' });
+      el('dinnerPhotoInput').value = '';
+      el('dinnerPhotoName').textContent = `Billede valgt fra Pexels · Foto: ${photo.photographer}`;
+      el('imageSearchDialog').close();
+      setStatus('Billedet er valgt – husk Gem dagen', 'success');
+    } catch (error) {
+      console.error(error);
+      setStatus('Billedet kunne ikke hentes. Prøv et andet.', 'error');
+      button.disabled = false;
+    }
+  }));
 }
 
 function renderShiftEditors() {
@@ -682,7 +721,25 @@ el('saveDayButton').addEventListener('click', saveDay);
 el('addStaffButton').addEventListener('click', addStaff);
 el('dinnerPhotoInput').addEventListener('change', event => {
   pendingDinnerPhoto = event.target.files?.[0] || null;
+  selectedPexelsPhoto = null;
   el('dinnerPhotoName').textContent = pendingDinnerPhoto ? pendingDinnerPhoto.name : 'Intet billede valgt.';
+});
+el('openDinnerImageSearch').addEventListener('click', () => {
+  el('imageSearchInput').value = el('dinnerInput').value.trim();
+  el('imageSearchResults').innerHTML = '<p class="image-search-message">Skriv fx “lasagne”, “frikadeller” eller “kylling med ris”.</p>';
+  el('imageSearchDialog').showModal();
+  el('imageSearchInput').focus();
+});
+el('closeImageSearch').addEventListener('click', () => el('imageSearchDialog').close());
+el('imageSearchForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = el('imageSearchSubmit');
+  button.disabled = true;
+  button.textContent = 'Søger…';
+  el('imageSearchResults').innerHTML = '<p class="image-search-message">Finder billeder…</p>';
+  try { renderPexelsResults(await searchPexels(el('imageSearchInput').value.trim())); }
+  catch (error) { el('imageSearchResults').innerHTML = `<p class="image-search-message error">${escapeHtml(error.message)}</p>`; }
+  finally { button.disabled = false; button.textContent = 'Søg'; }
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadData({ quiet: true }); });
 
