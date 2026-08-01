@@ -77,7 +77,10 @@
           <p class="eyebrow">PERSONALE</p>
           <h2>Rediger ugeplan</h2>
         </div>
-        <button id="closeAdmin" class="icon-button" aria-label="Luk">✕</button>
+        <div class="admin-header-actions">
+          <button id="openSettingsButton" class="secondary settings-button" type="button">⚙ Grundindstillinger</button>
+          <button id="closeAdmin" class="icon-button" aria-label="Luk">✕</button>
+        </div>
       </div>
 
       <div class="week-editor-bar">
@@ -95,13 +98,19 @@
 
       <div class="form-section">
         <h3>Personale</h3>
-        <div class="form-grid">
-          <label>Morgen 1<select id="morning1"></select></label>
-          <label>Morgen 2<select id="morning2"></select></label>
-          <label>Aften 1<select id="evening1"></select></label>
-          <label>Aften 2<select id="evening2"></select></label>
-          <label>Nat 1<select id="night1"></select></label>
-          <label>Nat 2<select id="night2"></select></label>
+        <div class="shift-editor-grid">
+          <section class="shift-editor-group">
+            <div class="section-title-row"><h4>☀️ Morgen</h4><button class="secondary small" data-add-shift="morning" type="button">+ Medarbejder</button></div>
+            <div id="morningEditors" class="shift-editor-rows"></div>
+          </section>
+          <section class="shift-editor-group">
+            <div class="section-title-row"><h4>🌙 Aften</h4><button class="secondary small" data-add-shift="evening" type="button">+ Medarbejder</button></div>
+            <div id="eveningEditors" class="shift-editor-rows"></div>
+          </section>
+          <section class="shift-editor-group">
+            <div class="section-title-row"><h4>🌑 Nat</h4><button class="secondary small" data-add-shift="night" type="button">+ Medarbejder</button></div>
+            <div id="nightEditors" class="shift-editor-rows"></div>
+          </section>
         </div>
       </div>
 
@@ -139,6 +148,22 @@
         <button id="saveDayButton" type="button">Gem dagen</button>
       </div>
       <p class="note">Gem dagene løbende. Når hele ugen er klar, vælger du “Vis denne uge på tavlen”.</p>
+    </div>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <div class="dialog-card settings-card">
+      <div class="admin-heading">
+        <div><p class="eyebrow">TEAM 2</p><h2>Grundindstillinger</h2></div>
+        <button id="closeSettingsButton" class="icon-button" aria-label="Luk">✕</button>
+      </div>
+      <p class="note">Vælg hvor mange medarbejderfelter der normalt skal vises på hver vagt. Der kan altid tilføjes ekstra på den enkelte dag.</p>
+      <div class="settings-fields">
+        <label>Normal morgenbemanding<input id="morningDefault" type="number" min="1" max="10"></label>
+        <label>Normal aftenbemanding<input id="eveningDefault" type="number" min="1" max="10"></label>
+        <label>Normal natbemanding<input id="nightDefault" type="number" min="1" max="10"></label>
+      </div>
+      <div class="dialog-actions"><button id="saveSettingsButton" type="button">Gem indstillinger</button></div>
     </div>
   </dialog>
 

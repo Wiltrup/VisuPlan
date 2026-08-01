@@ -18,6 +18,7 @@ const state = {
   staff: [],
   week: Object.fromEntries(DAYS.map(day => [day.key, emptyDay()])),
   activeWeekStart: null,
+  staffingDefaults: { morning: 2, evening: 2, night: 2 },
   session: null
 };
 
@@ -27,6 +28,7 @@ let pendingDinnerPhoto = null;
 let refreshTimer = null;
 let editingWeekStart = null;
 let editingWeek = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
+let editingShifts = { morning: [], evening: [], night: [] };
 
 const el = id => document.getElementById(id);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, character => ({
@@ -189,10 +191,15 @@ async function loadData({ quiet = false } = {}) {
   try {
     const [staff, settings] = await Promise.all([
       apiFetch('/rest/v1/staff?select=*&active=eq.true&order=sort_order.asc,name.asc'),
-      apiFetch('/rest/v1/team_settings?select=active_week_start&id=eq.team2')
+      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count&id=eq.team2')
     ]);
     state.staff = staff || [];
     state.activeWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
+    state.staffingDefaults = {
+      morning: settings?.[0]?.morning_staff_count || 2,
+      evening: settings?.[0]?.evening_staff_count || 2,
+      night: settings?.[0]?.night_staff_count || 2
+    };
     if (state.activeWeekStart !== currentCalendarWeekStart()) selectedIndex = 0;
     state.week = await fetchWeek(state.activeWeekStart);
     render();
@@ -277,6 +284,10 @@ function fillStaffSelect(select, value) {
   select.innerHTML = '<option value="">Vælg medarbejder</option>' + state.staff.map(person => `<option ${person.name === value ? 'selected' : ''}>${escapeHtml(person.name)}</option>`).join('');
 }
 
+function staffOptions(value) {
+  return '<option value="">Vælg medarbejder</option>' + state.staff.map(person => `<option ${person.name === value ? 'selected' : ''}>${escapeHtml(person.name)}</option>`).join('');
+}
+
 function formatWeekRange(weekStart) {
   const start = dateFromIso(weekStart);
   const end = dateForIndex(6, weekStart);
@@ -315,13 +326,39 @@ async function openAdmin() {
 function loadAdminDay() {
   const index = Number(el('adminDaySelect').value || selectedIndex);
   const data = editingWeek[DAYS[index].key];
-  [['morning1', data.morning[0]], ['morning2', data.morning[1]], ['evening1', data.evening[0]], ['evening2', data.evening[1]], ['night1', data.night[0]], ['night2', data.night[1]]].forEach(([id, value]) => fillStaffSelect(el(id), value));
+  editingShifts = {};
+  ['morning', 'evening', 'night'].forEach(type => {
+    editingShifts[type] = (data[type] || []).filter(Boolean);
+    while (editingShifts[type].length < state.staffingDefaults[type]) editingShifts[type].push('');
+  });
+  renderShiftEditors();
   el('dinnerInput').value = data.dinner || '';
   el('dinnerPhotoInput').value = '';
   el('dinnerPhotoName').textContent = data.dinnerPhotoUrl ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
   pendingDinnerPhoto = null;
   editingActivities = structuredClone(data.activities || []);
   renderActivityEditor();
+}
+
+function renderShiftEditors() {
+  const labels = { morning: 'Morgen', evening: 'Aften', night: 'Nat' };
+  ['morning', 'evening', 'night'].forEach(type => {
+    const values = editingShifts[type];
+    el(`${type}Editors`).innerHTML = values.map((value, index) => `<div class="shift-person-row">
+      <select data-shift-type="${type}" data-shift-index="${index}" aria-label="${labels[type]} medarbejder ${index + 1}">${staffOptions(value)}</select>
+      ${index >= state.staffingDefaults[type] ? `<button type="button" class="remove-shift-person" data-remove-shift="${type}" data-remove-index="${index}" aria-label="Fjern medarbejderfelt">✕</button>` : ''}
+    </div>`).join('');
+  });
+  document.querySelectorAll('[data-shift-type]').forEach(select => select.addEventListener('change', () => {
+    editingShifts[select.dataset.shiftType][Number(select.dataset.shiftIndex)] = select.value;
+  }));
+  document.querySelectorAll('[data-remove-shift]').forEach(button => button.addEventListener('click', () => {
+    editingShifts[button.dataset.removeShift].splice(Number(button.dataset.removeIndex), 1);
+    renderShiftEditors();
+  }));
+  document.querySelectorAll('[data-add-shift]').forEach(button => {
+    button.disabled = editingShifts[button.dataset.addShift].length >= 10;
+  });
 }
 
 function renderActivityEditor() {
@@ -444,15 +481,10 @@ async function saveDay() {
     }, true);
 
     await apiFetch(`/rest/v1/shifts?plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
-    const shiftInputs = [
-      ['morning', 1, 'morning1'], ['morning', 2, 'morning2'],
-      ['evening', 1, 'evening1'], ['evening', 2, 'evening2'],
-      ['night', 1, 'night1'], ['night', 2, 'night2']
-    ];
-    const shifts = shiftInputs.map(([shiftType, slot, inputId]) => {
-      const person = staffByName(el(inputId).value);
-      return person ? { plan_date: planDate, shift_type: shiftType, slot, staff_id: person.id } : null;
-    }).filter(Boolean);
+    const shifts = ['morning', 'evening', 'night'].flatMap(shiftType => editingShifts[shiftType].map((name, index) => {
+      const person = staffByName(name);
+      return person ? { plan_date: planDate, shift_type: shiftType, slot: index + 1, staff_id: person.id } : null;
+    })).filter(Boolean);
     if (shifts.length) {
       await apiFetch('/rest/v1/shifts', {
         method: 'POST',
@@ -527,6 +559,46 @@ async function publishEditingWeek() {
   }
 }
 
+function openSettings() {
+  el('morningDefault').value = state.staffingDefaults.morning;
+  el('eveningDefault').value = state.staffingDefaults.evening;
+  el('nightDefault').value = state.staffingDefaults.night;
+  el('settingsDialog').showModal();
+}
+
+async function saveSettings() {
+  const button = el('saveSettingsButton');
+  const defaults = {
+    morning: Math.min(10, Math.max(1, Number(el('morningDefault').value) || 1)),
+    evening: Math.min(10, Math.max(1, Number(el('eveningDefault').value) || 1)),
+    night: Math.min(10, Math.max(1, Number(el('nightDefault').value) || 1))
+  };
+  button.disabled = true;
+  button.textContent = 'Gemmer…';
+  try {
+    await apiFetch('/rest/v1/team_settings?id=eq.team2', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({
+        morning_staff_count: defaults.morning,
+        evening_staff_count: defaults.evening,
+        night_staff_count: defaults.night,
+        updated_at: new Date().toISOString()
+      })
+    }, true);
+    state.staffingDefaults = defaults;
+    el('settingsDialog').close();
+    loadAdminDay();
+    setStatus('Grundindstillingerne er gemt', 'success');
+  } catch (error) {
+    console.error(error);
+    setStatus('Indstillingerne kunne ikke gemmes.', 'error');
+  } finally {
+    button.disabled = false;
+    button.textContent = 'Gem indstillinger';
+  }
+}
+
 el('prevDay').addEventListener('click', () => { selectedIndex = (selectedIndex + 6) % 7; render(); });
 el('nextDay').addEventListener('click', () => { selectedIndex = (selectedIndex + 1) % 7; render(); });
 el('adminButton').addEventListener('click', () => {
@@ -560,6 +632,14 @@ el('adminDaySelect').addEventListener('change', loadAdminDay);
 el('previousEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, -7), 0));
 el('nextEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, 7), 0));
 el('publishWeekButton').addEventListener('click', publishEditingWeek);
+document.querySelectorAll('[data-add-shift]').forEach(button => button.addEventListener('click', () => {
+  const type = button.dataset.addShift;
+  if (editingShifts[type].length < 10) editingShifts[type].push('');
+  renderShiftEditors();
+}));
+el('openSettingsButton').addEventListener('click', openSettings);
+el('closeSettingsButton').addEventListener('click', () => el('settingsDialog').close());
+el('saveSettingsButton').addEventListener('click', saveSettings);
 el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', name: '' }); renderActivityEditor(); });
 el('saveDayButton').addEventListener('click', saveDay);
 el('addStaffButton').addEventListener('click', addStaff);

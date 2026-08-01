@@ -57,12 +57,22 @@ input, select { width:100%; border:1px solid #d8dee8; background:#fff; padding:1
 .error { min-height:20px; color:#b42318; font-weight:800; }
 .admin-card { max-height:90vh; overflow:auto; }
 .admin-heading, .section-title-row { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.admin-header-actions { display:flex; align-items:center; gap:8px; }
+.settings-button { border:0; border-radius:11px; padding:10px 12px; font-weight:850; }
 .week-editor-bar { display:grid; grid-template-columns:48px 1fr 48px; gap:10px; align-items:center; text-align:center; background:#f2f5f9; border-radius:16px; padding:10px; margin:12px 0 18px; }
 .week-editor-bar strong { display:block; font-size:1.08rem; margin-top:2px; }
 .week-editor-caption { color:#667085; font-size:.72rem; font-weight:900; letter-spacing:.08em; }
 .week-arrow { border:0; border-radius:11px; height:44px; font-size:1.6rem; font-weight:900; }
 .form-section { border-top:1px solid #edf0f4; margin-top:20px; padding-top:18px; }
 .form-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
+.shift-editor-grid { display:grid; grid-template-columns:repeat(3, 1fr); gap:12px; }
+.shift-editor-group { background:#f7f9fc; border-radius:15px; padding:12px; }
+.shift-editor-group h4 { margin:0; }
+.shift-editor-rows { display:grid; gap:8px; margin-top:10px; }
+.shift-person-row { display:grid; grid-template-columns:1fr 42px; gap:7px; }
+.shift-person-row:not(:has(.remove-shift-person)) { grid-template-columns:1fr; }
+.remove-shift-person { border:0; border-radius:10px; background:#fff0ee; color:#b42318; font-weight:900; }
+.settings-fields { display:grid; gap:12px; margin-top:18px; }
 .inline-form { display:grid; grid-template-columns:1fr auto; gap:10px; }
 .small { padding:9px 12px !important; border:0; border-radius:10px; font-weight:800; }
 .activity-edit-row { display:grid; grid-template-columns:120px 1fr 46px; gap:8px; margin-bottom:12px; padding-bottom:12px; border-bottom:1px solid #edf0f4; }
@@ -95,6 +105,10 @@ button:disabled { opacity:.6; cursor:wait; }
   .dinner-panel, .activities-panel { grid-column:span 1; }
   .panel { min-height:0; }
   .form-grid { grid-template-columns:1fr; }
+  .shift-editor-grid { grid-template-columns:1fr; }
+  .admin-heading { align-items:flex-start; }
+  .admin-header-actions { flex-direction:column-reverse; align-items:flex-end; }
+  .settings-button { font-size:.8rem; }
   .day-header { padding:20px 12px; grid-template-columns:48px 1fr 48px; }
   .activity-edit-row { grid-template-columns:105px 1fr 42px; }
   .staff-manage-row { grid-template-columns:42px 1fr; }
