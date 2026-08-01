@@ -1,0 +1,132 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="manifest.webmanifest" />
+  <link rel="stylesheet" href="styles.css" />
+  <title>VisuPlan</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">TEAM 2</p>
+        <h1>VisuPlan</h1>
+      </div>
+      <button id="adminButton" class="icon-button" aria-label="Åbn redigering">⚙️</button>
+    </header>
+
+    <nav id="dayTabs" class="day-tabs" aria-label="Vælg dag"></nav>
+
+    <main>
+      <section id="dayHeader" class="day-header">
+        <button id="prevDay" class="nav-button" aria-label="Forrige dag">‹</button>
+        <div>
+          <p id="dateLabel" class="date-label"></p>
+          <h2 id="dayLabel"></h2>
+        </div>
+        <button id="nextDay" class="nav-button" aria-label="Næste dag">›</button>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h3>☀️ Morgen</h3>
+          <div id="morningStaff" class="people"></div>
+        </article>
+        <article class="panel">
+          <h3>🌙 Aften</h3>
+          <div id="eveningStaff" class="people"></div>
+        </article>
+        <article class="panel">
+          <h3>🌑 Nat</h3>
+          <div id="nightStaff" class="people"></div>
+        </article>
+        <article class="panel dinner-panel">
+          <h3>🍽️ Aftensmad</h3>
+          <p id="dinnerText" class="large-text"></p>
+        </article>
+        <article class="panel activities-panel">
+          <h3>🎯 Aktiviteter</h3>
+          <div id="activitiesList" class="activities"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <dialog id="loginDialog">
+    <form method="dialog" id="loginForm" class="dialog-card">
+      <h2>Personalelogin</h2>
+      <label>Fælles PIN
+        <input id="pinInput" inputmode="numeric" type="password" maxlength="8" required />
+      </label>
+      <p id="loginError" class="error"></p>
+      <div class="dialog-actions">
+        <button value="cancel" class="secondary">Luk</button>
+        <button value="default" id="loginSubmit">Log ind</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="adminDialog">
+    <div class="dialog-card admin-card">
+      <div class="admin-heading">
+        <div>
+          <p class="eyebrow">PERSONALE</p>
+          <h2>Rediger ugeplan</h2>
+        </div>
+        <button id="closeAdmin" class="icon-button" aria-label="Luk">✕</button>
+      </div>
+
+      <label>Vælg dag
+        <select id="adminDaySelect"></select>
+      </label>
+
+      <div class="form-section">
+        <h3>Personale</h3>
+        <div class="form-grid">
+          <label>Morgen 1<select id="morning1"></select></label>
+          <label>Morgen 2<select id="morning2"></select></label>
+          <label>Aften 1<select id="evening1"></select></label>
+          <label>Aften 2<select id="evening2"></select></label>
+          <label>Nat 1<select id="night1"></select></label>
+          <label>Nat 2<select id="night2"></select></label>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Aftensmad</h3>
+        <input id="dinnerInput" placeholder="Fx Mad i TAK" />
+      </div>
+
+      <div class="form-section">
+        <div class="section-title-row">
+          <h3>Aktiviteter</h3>
+          <button id="addActivityRow" class="secondary small" type="button">+ Aktivitet</button>
+        </div>
+        <div id="activityEditor"></div>
+      </div>
+
+      <div class="form-section">
+        <div class="section-title-row">
+          <h3>Medarbejdere</h3>
+        </div>
+        <div class="inline-form">
+          <input id="newStaffName" placeholder="Navn på medarbejder eller vikar" />
+          <button id="addStaffButton" type="button">Tilføj</button>
+        </div>
+        <div id="staffChips" class="chips"></div>
+      </div>
+
+      <div class="dialog-actions sticky-actions">
+        <button id="resetButton" class="danger secondary" type="button">Nulstil demo</button>
+        <button id="saveDayButton" type="button">Gem dagen</button>
+      </div>
+      <p class="note">Denne første version gemmer på den enkelte enhed. Fælles synkronisering mellem telefoner kobles på i næste trin.</p>
+    </div>
+  </dialog>
+
+  <script src="app.js"></script>
+</body>
+</html>

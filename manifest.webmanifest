@@ -1,0 +1,10 @@
+{
+  "name": "VisuPlan - Team 2",
+  "short_name": "VisuPlan",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#eef2f7",
+  "theme_color": "#2563eb",
+  "lang": "da-DK",
+  "description": "En enkel og visuel ugeplan for Team 2"
+}
