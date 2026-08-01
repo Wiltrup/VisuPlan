@@ -200,7 +200,8 @@ function renderPeople(target, names) {
   const people = names.filter(Boolean);
   el(target).innerHTML = people.length ? people.map(name => {
     const person = staffByName(name);
-    return `<div class="person">${person?.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}<span>${escapeHtml(name)}</span></div>`;
+    const imageAttributes = person?.photo_url ? `data-enlarge-image="${escapeHtml(person.photo_url)}" data-image-caption="${escapeHtml(name)}" role="button" tabindex="0" aria-label="Vis stort billede af ${escapeHtml(name)}"` : '';
+    return `<div class="person ${person?.photo_url ? 'has-photo' : ''}" ${imageAttributes}>${person?.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}<span>${escapeHtml(name)}</span></div>`;
   }).join('') : '<p class="empty">Ikke udfyldt</p>';
 }
 
@@ -214,9 +215,32 @@ function render() {
   renderPeople('eveningStaff', data.evening);
   renderPeople('nightStaff', data.night);
   el('dinnerText').textContent = data.dinner || 'Ikke udfyldt';
-  el('dinnerPhoto').innerHTML = data.dinnerPhotoUrl ? `<img src="${escapeHtml(data.dinnerPhotoUrl)}" alt="${escapeHtml(data.dinner || 'Aftensmad')}">` : '';
-  el('activitiesList').innerHTML = data.activities.length ? data.activities.map(activity => `<div class="activity"><div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
+  el('dinnerPhoto').innerHTML = data.dinnerPhotoUrl ? `<button class="image-button" data-enlarge-image="${escapeHtml(data.dinnerPhotoUrl)}" data-image-caption="${escapeHtml(data.dinner || 'Aftensmad')}" aria-label="Vis stort billede af aftensmaden"><img src="${escapeHtml(data.dinnerPhotoUrl)}" alt="${escapeHtml(data.dinner || 'Aftensmad')}"></button>` : '';
+  el('activitiesList').innerHTML = data.activities.length ? data.activities.map(activity => `<div class="activity">
+    ${activity.photoUrl ? `<button class="activity-photo image-button" data-enlarge-image="${escapeHtml(activity.photoUrl)}" data-image-caption="${escapeHtml(activity.name)}" aria-label="Vis stort billede af ${escapeHtml(activity.name)}"><img src="${escapeHtml(activity.photoUrl)}" alt=""></button>` : ''}
+    <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>
+  </div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
   renderTabs();
+  bindImageEnlargement();
+}
+
+function openLargeImage(url, caption) {
+  el('largeImage').src = url;
+  el('largeImage').alt = caption || 'Forstørret billede';
+  el('largeImageCaption').textContent = caption || '';
+  el('imageDialog').showModal();
+}
+
+function bindImageEnlargement() {
+  document.querySelectorAll('[data-enlarge-image]').forEach(target => {
+    target.addEventListener('click', () => openLargeImage(target.dataset.enlargeImage, target.dataset.imageCaption));
+    target.addEventListener('keydown', event => {
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        openLargeImage(target.dataset.enlargeImage, target.dataset.imageCaption);
+      }
+    });
+  });
 }
 
 function renderLoginState() {
@@ -247,12 +271,23 @@ function loadAdminDay() {
 }
 
 function renderActivityEditor() {
-  el('activityEditor').innerHTML = editingActivities.length ? editingActivities.map((activity, index) => `<div class="activity-edit-row"><input type="time" value="${escapeHtml(activity.time)}" data-index="${index}" data-field="time"><input value="${escapeHtml(activity.name)}" placeholder="Aktivitet" data-index="${index}" data-field="name"><button class="remove-row" data-remove="${index}" type="button">✕</button></div>`).join('') : '<p class="empty">Ingen aktiviteter endnu.</p>';
+  el('activityEditor').innerHTML = editingActivities.length ? editingActivities.map((activity, index) => `<div class="activity-edit-row">
+    <input type="time" value="${escapeHtml(activity.time)}" data-index="${index}" data-field="time">
+    <input value="${escapeHtml(activity.name)}" placeholder="Aktivitet" data-index="${index}" data-field="name">
+    <button class="remove-row" data-remove="${index}" type="button">✕</button>
+    <label class="activity-upload-button">${activity.photoFile ? 'Nyt billede valgt ✓' : activity.photoUrl ? 'Skift aktivitetsbillede' : '+ Billede til aktiviteten'}<input type="file" accept="image/jpeg,image/png,image/webp" data-activity-photo="${index}"></label>
+  </div>`).join('') : '<p class="empty">Ingen aktiviteter endnu.</p>';
   document.querySelectorAll('[data-field]').forEach(input => input.addEventListener('input', () => {
     editingActivities[Number(input.dataset.index)][input.dataset.field] = input.value;
   }));
   document.querySelectorAll('[data-remove]').forEach(button => button.addEventListener('click', () => {
     editingActivities.splice(Number(button.dataset.remove), 1);
+    renderActivityEditor();
+  }));
+  document.querySelectorAll('[data-activity-photo]').forEach(input => input.addEventListener('change', () => {
+    const file = input.files?.[0];
+    if (!file) return;
+    editingActivities[Number(input.dataset.activityPhoto)].photoFile = file;
     renderActivityEditor();
   }));
 }
@@ -371,11 +406,17 @@ async function saveDay() {
     }
 
     await apiFetch(`/rest/v1/activities?plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
-    const activities = editingActivities.filter(activity => activity.name.trim()).map((activity, order) => ({
-      plan_date: planDate,
-      activity_time: activity.time || null,
-      name: activity.name.trim(),
-      sort_order: order
+    const validActivities = editingActivities.filter(activity => activity.name.trim());
+    const activities = await Promise.all(validActivities.map(async (activity, order) => {
+      let photoUrl = activity.photoUrl || '';
+      if (activity.photoFile) photoUrl = await uploadImage(activity.photoFile, `activities/${planDate}-${order}-${Date.now()}.jpg`);
+      return {
+        plan_date: planDate,
+        activity_time: activity.time || null,
+        name: activity.name.trim(),
+        photo_url: photoUrl || null,
+        sort_order: order
+      };
     }));
     if (activities.length) {
       await apiFetch('/rest/v1/activities', {
@@ -426,6 +467,8 @@ el('loginSubmit').addEventListener('click', async event => {
   }
 });
 el('closeAdmin').addEventListener('click', () => el('adminDialog').close());
+el('closeImageDialog').addEventListener('click', () => el('imageDialog').close());
+el('imageDialog').addEventListener('click', event => { if (event.target === el('imageDialog')) el('imageDialog').close(); });
 el('logoutButton').addEventListener('click', signOut);
 el('adminDaySelect').addEventListener('change', loadAdminDay);
 el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', name: '' }); renderActivityEditor(); });
