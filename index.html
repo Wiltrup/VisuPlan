@@ -64,8 +64,8 @@
       </label>
       <p id="loginError" class="error"></p>
       <div class="dialog-actions">
-        <button value="cancel" class="secondary">Luk</button>
-        <button value="default" id="loginSubmit">Log ind</button>
+        <button id="closeLoginButton" type="button" class="secondary">Luk</button>
+        <button type="submit" id="loginSubmit">Log ind</button>
       </div>
     </form>
   </dialog>
@@ -162,6 +162,7 @@
         <label>Normal morgenbemanding<input id="morningDefault" type="number" min="1" max="10"></label>
         <label>Normal aftenbemanding<input id="eveningDefault" type="number" min="1" max="10"></label>
         <label>Normal natbemanding<input id="nightDefault" type="number" min="1" max="10"></label>
+        <label class="toggle-setting"><input id="showDatesPublic" type="checkbox"><span><strong>Vis datoer på beboertavlen</strong><small>Viser datoen under hver ugedag.</small></span></label>
       </div>
       <div class="dialog-actions"><button id="saveSettingsButton" type="button">Gem indstillinger</button></div>
     </div>

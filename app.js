@@ -19,6 +19,7 @@ const state = {
   week: Object.fromEntries(DAYS.map(day => [day.key, emptyDay()])),
   activeWeekStart: null,
   staffingDefaults: { morning: 2, evening: 2, night: 2 },
+  showDatesPublic: true,
   session: null
 };
 
@@ -190,8 +191,8 @@ async function loadData({ quiet = false } = {}) {
   if (!quiet) setStatus('Henter ugeplan…');
   try {
     const [staff, settings] = await Promise.all([
-      apiFetch('/rest/v1/staff?select=*&active=eq.true&order=sort_order.asc,name.asc'),
-      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count&id=eq.team2')
+      apiFetch('/rest/v1/staff?select=*&order=sort_order.asc,name.asc'),
+      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public&id=eq.team2')
     ]);
     state.staff = staff || [];
     state.activeWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
@@ -200,6 +201,7 @@ async function loadData({ quiet = false } = {}) {
       evening: settings?.[0]?.evening_staff_count || 2,
       night: settings?.[0]?.night_staff_count || 2
     };
+    state.showDatesPublic = settings?.[0]?.show_dates_public ?? true;
     if (state.activeWeekStart !== currentCalendarWeekStart()) selectedIndex = 0;
     state.week = await fetchWeek(state.activeWeekStart);
     render();
@@ -218,7 +220,7 @@ function setStatus(message, type = '') {
 }
 
 function renderTabs() {
-  el('dayTabs').innerHTML = DAYS.map((day, index) => `<button class="day-tab ${index === selectedIndex ? 'active' : ''}" data-index="${index}">${day.short}</button>`).join('');
+  el('dayTabs').innerHTML = DAYS.map((day, index) => `<button class="day-tab ${index === selectedIndex ? 'active' : ''}" data-index="${index}"><span>${day.short}</span>${state.showDatesPublic ? `<small>${new Intl.DateTimeFormat('da-DK', { day: 'numeric', month: 'numeric' }).format(dateForIndex(index, state.activeWeekStart))}</small>` : ''}</button>`).join('');
   document.querySelectorAll('.day-tab').forEach(button => button.addEventListener('click', () => {
     selectedIndex = Number(button.dataset.index);
     render();
@@ -285,7 +287,7 @@ function fillStaffSelect(select, value) {
 }
 
 function staffOptions(value) {
-  return '<option value="">Vælg medarbejder</option>' + state.staff.map(person => `<option ${person.name === value ? 'selected' : ''}>${escapeHtml(person.name)}</option>`).join('');
+  return '<option value="">Vælg medarbejder</option>' + state.staff.filter(person => person.active || person.name === value).map(person => `<option ${person.name === value ? 'selected' : ''}>${escapeHtml(person.name)}</option>`).join('');
 }
 
 function formatWeekRange(weekStart) {
@@ -384,15 +386,36 @@ function renderActivityEditor() {
 }
 
 function renderStaffManager() {
-  el('staffManager').innerHTML = state.staff.map(person => `<div class="staff-manage-row">
+  el('staffManager').innerHTML = state.staff.filter(person => person.active).map(person => `<div class="staff-manage-row">
     ${person.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}
     <strong>${escapeHtml(person.name)}</strong>
     <label class="upload-button">${person.photo_url ? 'Skift billede' : 'Tilføj billede'}<input type="file" accept="image/jpeg,image/png,image/webp" data-staff-photo="${person.id}"></label>
+    <button class="remove-staff-button" type="button" data-deactivate-staff="${person.id}" data-staff-name="${escapeHtml(person.name)}">Fjern</button>
   </div>`).join('');
   document.querySelectorAll('[data-staff-photo]').forEach(input => input.addEventListener('change', async () => {
     if (!input.files?.[0]) return;
     await uploadStaffPhoto(input.dataset.staffPhoto, input.files[0]);
   }));
+  document.querySelectorAll('[data-deactivate-staff]').forEach(button => button.addEventListener('click', () => deactivateStaff(button.dataset.deactivateStaff, button.dataset.staffName)));
+}
+
+async function deactivateStaff(staffId, name) {
+  if (!confirm(`Vil du fjerne ${name} fra listen over tilgængelige medarbejdere? Personen bevares på allerede gemte planer.`)) return;
+  try {
+    await apiFetch(`/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ active: false })
+    }, true);
+    await loadData({ quiet: true });
+    editingWeek = await fetchWeek(editingWeekStart);
+    renderStaffManager();
+    loadAdminDay();
+    setStatus(`${name} er fjernet fra valglisterne`, 'success');
+  } catch (error) {
+    console.error(error);
+    setStatus('Medarbejderen kunne ikke fjernes.', 'error');
+  }
 }
 
 async function compressImage(file) {
@@ -440,16 +463,25 @@ async function uploadStaffPhoto(staffId, file) {
 async function addStaff() {
   const name = el('newStaffName').value.trim();
   if (!name) return;
-  if (state.staff.some(person => person.name.toLowerCase() === name.toLowerCase())) {
+  const existing = state.staff.find(person => person.name.toLowerCase() === name.toLowerCase());
+  if (existing?.active) {
     setStatus('Medarbejderen findes allerede.', 'error');
     return;
   }
   try {
-    await apiFetch('/rest/v1/staff', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({ name, sort_order: state.staff.length + 1 })
-    }, true);
+    if (existing) {
+      await apiFetch(`/rest/v1/staff?id=eq.${encodeURIComponent(existing.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ active: true })
+      }, true);
+    } else {
+      await apiFetch('/rest/v1/staff', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+        body: JSON.stringify({ name, sort_order: state.staff.length + 1 })
+      }, true);
+    }
     el('newStaffName').value = '';
     await loadData({ quiet: true });
     editingWeek = await fetchWeek(editingWeekStart);
@@ -563,6 +595,7 @@ function openSettings() {
   el('morningDefault').value = state.staffingDefaults.morning;
   el('eveningDefault').value = state.staffingDefaults.evening;
   el('nightDefault').value = state.staffingDefaults.night;
+  el('showDatesPublic').checked = state.showDatesPublic;
   el('settingsDialog').showModal();
 }
 
@@ -583,10 +616,13 @@ async function saveSettings() {
         morning_staff_count: defaults.morning,
         evening_staff_count: defaults.evening,
         night_staff_count: defaults.night,
+        show_dates_public: el('showDatesPublic').checked,
         updated_at: new Date().toISOString()
       })
     }, true);
     state.staffingDefaults = defaults;
+    state.showDatesPublic = el('showDatesPublic').checked;
+    render();
     el('settingsDialog').close();
     loadAdminDay();
     setStatus('Grundindstillingerne er gemt', 'success');
@@ -607,7 +643,7 @@ el('adminButton').addEventListener('click', () => {
   el('loginError').textContent = '';
   el('loginDialog').showModal();
 });
-el('loginSubmit').addEventListener('click', async event => {
+el('loginForm').addEventListener('submit', async event => {
   event.preventDefault();
   const button = el('loginSubmit');
   button.disabled = true;
@@ -624,6 +660,7 @@ el('loginSubmit').addEventListener('click', async event => {
     button.textContent = 'Log ind';
   }
 });
+el('closeLoginButton').addEventListener('click', () => el('loginDialog').close());
 el('closeAdmin').addEventListener('click', () => el('adminDialog').close());
 el('closeImageDialog').addEventListener('click', () => el('imageDialog').close());
 el('imageDialog').addEventListener('click', event => { if (event.target === el('imageDialog')) el('imageDialog').close(); });
