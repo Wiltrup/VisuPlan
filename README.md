@@ -1,6 +1,6 @@
-# VisuPlan
+# VisuPlanner
 
-Første fungerende prototype af VisuPlan til Team 2.
+Første fungerende prototype af VisuPlanner til Team 2.
 
 ## Funktioner
 - Én dag ad gangen

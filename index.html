@@ -6,14 +6,14 @@
   <meta name="theme-color" content="#2563eb" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="stylesheet" href="styles.css" />
-  <title>VisuPlan</title>
+  <title>VisuPlanner</title>
 </head>
 <body>
   <div class="app-shell">
     <header class="topbar">
       <div>
         <p class="eyebrow">TEAM 2</p>
-        <h1>VisuPlan</h1>
+        <h1>VisuPlanner</h1>
       </div>
       <button id="adminButton" class="icon-button" aria-label="Åbn redigering">⚙️</button>
     </header>
@@ -45,6 +45,7 @@
         </article>
         <article class="panel dinner-panel">
           <h3>🍽️ Aftensmad</h3>
+          <div id="dinnerPhoto" class="dinner-photo"></div>
           <p id="dinnerText" class="large-text"></p>
         </article>
         <article class="panel activities-panel">
@@ -58,8 +59,8 @@
   <dialog id="loginDialog">
     <form method="dialog" id="loginForm" class="dialog-card">
       <h2>Personalelogin</h2>
-      <label>Fælles PIN
-        <input id="pinInput" inputmode="numeric" type="password" maxlength="8" required />
+      <label>Personale-kode
+        <input id="pinInput" type="password" autocomplete="current-password" required />
       </label>
       <p id="loginError" class="error"></p>
       <div class="dialog-actions">
@@ -98,6 +99,10 @@
       <div class="form-section">
         <h3>Aftensmad</h3>
         <input id="dinnerInput" placeholder="Fx Mad i TAK" />
+        <label class="photo-field">Billede af aftensmaden
+          <input id="dinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" capture="environment" />
+        </label>
+        <p id="dinnerPhotoName" class="file-note">Intet billede valgt.</p>
       </div>
 
       <div class="form-section">
@@ -116,16 +121,18 @@
           <input id="newStaffName" placeholder="Navn på medarbejder eller vikar" />
           <button id="addStaffButton" type="button">Tilføj</button>
         </div>
-        <div id="staffChips" class="chips"></div>
+        <div id="staffManager" class="staff-manager"></div>
       </div>
 
       <div class="dialog-actions sticky-actions">
-        <button id="resetButton" class="danger secondary" type="button">Nulstil demo</button>
+        <button id="logoutButton" class="danger secondary" type="button">Log ud</button>
         <button id="saveDayButton" type="button">Gem dagen</button>
       </div>
-      <p class="note">Denne første version gemmer på den enkelte enhed. Fælles synkronisering mellem telefoner kobles på i næste trin.</p>
+      <p class="note">Ændringer gemmes fælles og vises automatisk på alle enheder.</p>
     </div>
   </dialog>
+
+  <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
   <script src="app.js"></script>
 </body>

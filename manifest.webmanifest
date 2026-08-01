@@ -1,6 +1,6 @@
 {
-  "name": "VisuPlan - Team 2",
-  "short_name": "VisuPlan",
+  "name": "VisuPlanner - Team 2",
+  "short_name": "VisuPlanner",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#eef2f7",
