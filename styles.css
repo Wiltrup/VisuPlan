@@ -57,6 +57,10 @@ input, select { width:100%; border:1px solid #d8dee8; background:#fff; padding:1
 .error { min-height:20px; color:#b42318; font-weight:800; }
 .admin-card { max-height:90vh; overflow:auto; }
 .admin-heading, .section-title-row { display:flex; justify-content:space-between; align-items:center; gap:12px; }
+.week-editor-bar { display:grid; grid-template-columns:48px 1fr 48px; gap:10px; align-items:center; text-align:center; background:#f2f5f9; border-radius:16px; padding:10px; margin:12px 0 18px; }
+.week-editor-bar strong { display:block; font-size:1.08rem; margin-top:2px; }
+.week-editor-caption { color:#667085; font-size:.72rem; font-weight:900; letter-spacing:.08em; }
+.week-arrow { border:0; border-radius:11px; height:44px; font-size:1.6rem; font-weight:900; }
 .form-section { border-top:1px solid #edf0f4; margin-top:20px; padding-top:18px; }
 .form-grid { display:grid; grid-template-columns:repeat(2, 1fr); gap:12px; }
 .inline-form { display:grid; grid-template-columns:1fr auto; gap:10px; }
@@ -73,6 +77,7 @@ input, select { width:100%; border:1px solid #d8dee8; background:#fff; padding:1
 .file-note { color:#667085; font-size:.85rem; margin:7px 2px 0; }
 .note { color:#667085; font-size:.92rem; line-height:1.45; }
 .sticky-actions { position:sticky; bottom:-24px; background:white; padding:14px 0 4px; border-top:1px solid #edf0f4; }
+.publish-button { background:#7c3aed !important; }
 .sync-status { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:20; background:#172033; color:#fff; border-radius:999px; padding:10px 16px; font-weight:800; box-shadow:0 10px 30px rgba(0,0,0,.2); opacity:1; transition:opacity .2s; }
 .sync-status:empty { opacity:0; pointer-events:none; }
 .sync-status.success { background:#15803d; }
@@ -94,4 +99,6 @@ button:disabled { opacity:.6; cursor:wait; }
   .activity-edit-row { grid-template-columns:105px 1fr 42px; }
   .staff-manage-row { grid-template-columns:42px 1fr; }
   .staff-manage-row .upload-button { grid-column:1 / -1; }
+  .sticky-actions { flex-wrap:wrap; }
+  .sticky-actions .publish-button { order:-1; width:100%; }
 }

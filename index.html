@@ -80,6 +80,15 @@
         <button id="closeAdmin" class="icon-button" aria-label="Luk">✕</button>
       </div>
 
+      <div class="week-editor-bar">
+        <button id="previousEditWeek" class="secondary week-arrow" type="button" aria-label="Forrige uge">‹</button>
+        <div>
+          <span class="week-editor-caption">UGE DER REDIGERES</span>
+          <strong id="adminWeekLabel"></strong>
+        </div>
+        <button id="nextEditWeek" class="secondary week-arrow" type="button" aria-label="Næste uge">›</button>
+      </div>
+
       <label>Vælg dag
         <select id="adminDaySelect"></select>
       </label>
@@ -126,9 +135,10 @@
 
       <div class="dialog-actions sticky-actions">
         <button id="logoutButton" class="danger secondary" type="button">Log ud</button>
+        <button id="publishWeekButton" class="publish-button" type="button">Vis denne uge på tavlen</button>
         <button id="saveDayButton" type="button">Gem dagen</button>
       </div>
-      <p class="note">Ændringer gemmes fælles og vises automatisk på alle enheder.</p>
+      <p class="note">Gem dagene løbende. Når hele ugen er klar, vælger du “Vis denne uge på tavlen”.</p>
     </div>
   </dialog>
 

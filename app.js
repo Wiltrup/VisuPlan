@@ -17,6 +17,7 @@ const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''],
 const state = {
   staff: [],
   week: Object.fromEntries(DAYS.map(day => [day.key, emptyDay()])),
+  activeWeekStart: null,
   session: null
 };
 
@@ -24,6 +25,8 @@ let selectedIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
 let editingActivities = [];
 let pendingDinnerPhoto = null;
 let refreshTimer = null;
+let editingWeekStart = null;
+let editingWeek = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
 
 const el = id => document.getElementById(id);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, character => ({
@@ -39,8 +42,23 @@ function mondayOfCurrentWeek() {
   return monday;
 }
 
-function dateForIndex(index) {
-  const date = mondayOfCurrentWeek();
+function dateFromIso(value) {
+  const [year, month, day] = value.split('-').map(Number);
+  return new Date(year, month - 1, day, 12, 0, 0);
+}
+
+function addDaysIso(value, days) {
+  const date = dateFromIso(value);
+  date.setDate(date.getDate() + days);
+  return isoDate(date);
+}
+
+function currentCalendarWeekStart() {
+  return isoDate(mondayOfCurrentWeek());
+}
+
+function dateForIndex(index, weekStart = state.activeWeekStart || currentCalendarWeekStart()) {
+  const date = dateFromIso(weekStart);
   date.setDate(date.getDate() + index);
   return date;
 }
@@ -52,8 +70,8 @@ function isoDate(date) {
   return `${year}-${month}-${day}`;
 }
 
-function weekDates() {
-  return DAYS.map((_, index) => isoDate(dateForIndex(index)));
+function weekDates(weekStart = state.activeWeekStart || currentCalendarWeekStart()) {
+  return DAYS.map((_, index) => isoDate(dateForIndex(index, weekStart)));
 }
 
 function formatDate(date) {
@@ -133,24 +151,19 @@ async function signOut() {
   }
 }
 
-async function loadData({ quiet = false } = {}) {
-  if (!quiet) setStatus('Henter ugeplan…');
-  const dates = weekDates();
+async function fetchWeek(weekStart) {
+  const dates = weekDates(weekStart);
   const dateFilter = `(${dates.join(',')})`;
-  try {
-    const [staff, plans, shifts, activities] = await Promise.all([
-      apiFetch('/rest/v1/staff?select=*&active=eq.true&order=sort_order.asc,name.asc'),
-      apiFetch(`/rest/v1/day_plans?select=*&plan_date=in.${dateFilter}`),
-      apiFetch(`/rest/v1/shifts?select=*&plan_date=in.${dateFilter}`),
-      apiFetch(`/rest/v1/activities?select=*&plan_date=in.${dateFilter}&order=activity_time.asc,sort_order.asc`)
-    ]);
+  const [plans, shifts, activities] = await Promise.all([
+    apiFetch(`/rest/v1/day_plans?select=*&plan_date=in.${dateFilter}`),
+    apiFetch(`/rest/v1/shifts?select=*&plan_date=in.${dateFilter}`),
+    apiFetch(`/rest/v1/activities?select=*&plan_date=in.${dateFilter}&order=activity_time.asc,sort_order.asc`)
+  ]);
+  const week = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
+  const staffById = new Map(state.staff.map(person => [person.id, person]));
 
-    state.staff = staff || [];
-    state.week = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
-    const staffById = new Map(state.staff.map(person => [person.id, person]));
-
-    dates.forEach((date, index) => {
-      const data = state.week[DAYS[index].key];
+  dates.forEach((date, index) => {
+      const data = week[DAYS[index].key];
       const plan = (plans || []).find(item => item.plan_date === date);
       if (plan) {
         data.dinner = plan.dinner_name || '';
@@ -167,8 +180,21 @@ async function loadData({ quiet = false } = {}) {
         name: item.name,
         photoUrl: item.photo_url || ''
       }));
-    });
+  });
+  return week;
+}
 
+async function loadData({ quiet = false } = {}) {
+  if (!quiet) setStatus('Henter ugeplan…');
+  try {
+    const [staff, settings] = await Promise.all([
+      apiFetch('/rest/v1/staff?select=*&active=eq.true&order=sort_order.asc,name.asc'),
+      apiFetch('/rest/v1/team_settings?select=active_week_start&id=eq.team2')
+    ]);
+    state.staff = staff || [];
+    state.activeWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
+    if (state.activeWeekStart !== currentCalendarWeekStart()) selectedIndex = 0;
+    state.week = await fetchWeek(state.activeWeekStart);
     render();
     setStatus('Opdateret', 'success');
   } catch (error) {
@@ -210,7 +236,7 @@ function render() {
   const data = currentDayData();
   document.documentElement.style.setProperty('--day-color', day.color);
   el('dayLabel').textContent = day.name;
-  el('dateLabel').textContent = formatDate(dateForIndex(selectedIndex));
+  el('dateLabel').textContent = formatDate(dateForIndex(selectedIndex, state.activeWeekStart));
   renderPeople('morningStaff', data.morning);
   renderPeople('eveningStaff', data.evening);
   renderPeople('nightStaff', data.night);
@@ -251,16 +277,44 @@ function fillStaffSelect(select, value) {
   select.innerHTML = '<option value="">Vælg medarbejder</option>' + state.staff.map(person => `<option ${person.name === value ? 'selected' : ''}>${escapeHtml(person.name)}</option>`).join('');
 }
 
-function openAdmin() {
-  el('adminDaySelect').innerHTML = DAYS.map((day, index) => `<option value="${index}" ${index === selectedIndex ? 'selected' : ''}>${day.name}</option>`).join('');
+function formatWeekRange(weekStart) {
+  const start = dateFromIso(weekStart);
+  const end = dateForIndex(6, weekStart);
+  return `${formatDate(start)} – ${formatDate(end)}`;
+}
+
+function defaultEditingWeekStart() {
+  const calendarWeek = currentCalendarWeekStart();
+  if (new Date().getDay() === 0 && state.activeWeekStart === calendarWeek) return addDaysIso(calendarWeek, 7);
+  return state.activeWeekStart;
+}
+
+async function setEditingWeek(weekStart, preferredDay = 0) {
+  setStatus('Henter ugen…');
+  editingWeekStart = weekStart;
+  editingWeek = await fetchWeek(editingWeekStart);
+  el('adminWeekLabel').textContent = formatWeekRange(editingWeekStart);
+  el('adminDaySelect').innerHTML = DAYS.map((day, index) => `<option value="${index}" ${index === preferredDay ? 'selected' : ''}>${day.name} ${formatDate(dateForIndex(index, editingWeekStart))}</option>`).join('');
   loadAdminDay();
+  setStatus('Ugen er hentet', 'success');
+}
+
+async function openAdmin() {
+  const start = defaultEditingWeekStart();
+  const preferredDay = start === state.activeWeekStart ? selectedIndex : 0;
   renderStaffManager();
   el('adminDialog').showModal();
+  try {
+    await setEditingWeek(start, preferredDay);
+  } catch (error) {
+    console.error(error);
+    setStatus('Ugen kunne ikke hentes.', 'error');
+  }
 }
 
 function loadAdminDay() {
   const index = Number(el('adminDaySelect').value || selectedIndex);
-  const data = state.week[DAYS[index].key];
+  const data = editingWeek[DAYS[index].key];
   [['morning1', data.morning[0]], ['morning2', data.morning[1]], ['evening1', data.evening[0]], ['evening2', data.evening[1]], ['night1', data.night[0]], ['night2', data.night[1]]].forEach(([id, value]) => fillStaffSelect(el(id), value));
   el('dinnerInput').value = data.dinner || '';
   el('dinnerPhotoInput').value = '';
@@ -336,6 +390,7 @@ async function uploadStaffPhoto(staffId, file) {
       body: JSON.stringify({ photo_url: photoUrl })
     }, true);
     await loadData({ quiet: true });
+    editingWeek = await fetchWeek(editingWeekStart);
     renderStaffManager();
     loadAdminDay();
     setStatus('Billedet er gemt', 'success');
@@ -360,6 +415,7 @@ async function addStaff() {
     }, true);
     el('newStaffName').value = '';
     await loadData({ quiet: true });
+    editingWeek = await fetchWeek(editingWeekStart);
     renderStaffManager();
     loadAdminDay();
     setStatus('Medarbejderen er tilføjet', 'success');
@@ -374,8 +430,8 @@ async function saveDay() {
   button.disabled = true;
   button.textContent = 'Gemmer…';
   const index = Number(el('adminDaySelect').value);
-  const planDate = weekDates()[index];
-  const existing = state.week[DAYS[index].key];
+  const planDate = weekDates(editingWeekStart)[index];
+  const existing = editingWeek[DAYS[index].key];
 
   try {
     let dinnerPhotoUrl = existing.dinnerPhotoUrl || '';
@@ -426,8 +482,12 @@ async function saveDay() {
       }, true);
     }
 
-    selectedIndex = index;
-    await loadData({ quiet: true });
+    editingWeek = await fetchWeek(editingWeekStart);
+    if (editingWeekStart === state.activeWeekStart) {
+      state.week = editingWeek;
+      selectedIndex = index;
+      render();
+    }
     loadAdminDay();
     button.textContent = 'Gemt ✓';
     setStatus('Dagen er gemt på alle enheder', 'success');
@@ -438,6 +498,32 @@ async function saveDay() {
   } finally {
     button.disabled = false;
     setTimeout(() => { button.textContent = 'Gem dagen'; }, 1600);
+  }
+}
+
+async function publishEditingWeek() {
+  const button = el('publishWeekButton');
+  button.disabled = true;
+  button.textContent = 'Udgiver…';
+  try {
+    await apiFetch('/rest/v1/team_settings?on_conflict=id', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({ id: 'team2', active_week_start: editingWeekStart, updated_at: new Date().toISOString() })
+    }, true);
+    state.activeWeekStart = editingWeekStart;
+    state.week = editingWeek;
+    selectedIndex = 0;
+    render();
+    button.textContent = 'Ugen vises nu ✓';
+    setStatus('Tavlen viser nu den valgte uge', 'success');
+  } catch (error) {
+    console.error(error);
+    button.textContent = 'Prøv igen';
+    setStatus('Ugen kunne ikke udgives.', 'error');
+  } finally {
+    button.disabled = false;
+    setTimeout(() => { button.textContent = 'Vis denne uge på tavlen'; }, 1800);
   }
 }
 
@@ -471,6 +557,9 @@ el('closeImageDialog').addEventListener('click', () => el('imageDialog').close()
 el('imageDialog').addEventListener('click', event => { if (event.target === el('imageDialog')) el('imageDialog').close(); });
 el('logoutButton').addEventListener('click', signOut);
 el('adminDaySelect').addEventListener('change', loadAdminDay);
+el('previousEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, -7), 0));
+el('nextEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, 7), 0));
+el('publishWeekButton').addEventListener('click', publishEditingWeek);
 el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', name: '' }); renderActivityEditor(); });
 el('saveDayButton').addEventListener('click', saveDay);
 el('addStaffButton').addEventListener('click', addStaff);
