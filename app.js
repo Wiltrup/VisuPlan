@@ -87,8 +87,8 @@ function currentDayData() {
 }
 
 function apiHeaders(authenticated = false, extra = {}) {
-  const headers = { apikey: SUPABASE_KEY, ...extra };
-  if (authenticated && state.session?.access_token) headers.Authorization = `Bearer ${state.session.access_token}`;
+  const token = authenticated && state.session?.access_token ? state.session.access_token : SUPABASE_KEY;
+  const headers = { apikey: SUPABASE_KEY, Authorization: `Bearer ${token}`, ...extra };
   return headers;
 }
 
