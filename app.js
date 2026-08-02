@@ -207,9 +207,11 @@ async function loadData({ quiet = false } = {}) {
     state.week = await fetchWeek(state.activeWeekStart);
     render();
     setStatus('Opdateret', 'success');
+    return true;
   } catch (error) {
     console.error(error);
     setStatus('Kunne ikke hente ugeplanen. Prøv igen.', 'error');
+    return false;
   }
 }
 
@@ -742,12 +744,14 @@ el('imageSearchForm').addEventListener('submit', async event => {
   finally { button.disabled = false; button.textContent = 'Søg'; }
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadData({ quiet: true }); });
+window.addEventListener('pageshow', () => loadData({ quiet: true }));
 
 async function init() {
-  render();
   renderLoginState();
   await restoreSession();
-  await loadData();
+  const loaded = await loadData();
+  if (!loaded) setTimeout(() => loadData({ quiet: true }), 700);
+  setTimeout(() => loadData({ quiet: true }), 1500);
   refreshTimer = setInterval(() => loadData({ quiet: true }), 30000);
 }
 
