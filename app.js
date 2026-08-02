@@ -196,7 +196,11 @@ async function loadData({ quiet = false } = {}) {
       apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public&id=eq.team2')
     ]);
     state.staff = staff || [];
-    state.activeWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
+    const savedWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
+    const calendarWeekStart = currentCalendarWeekStart();
+    // En fremtidig uge kan vises allerede søndag. En gammel uge må aldrig
+    // blive hængende, når kalenderen skifter til en ny mandag.
+    state.activeWeekStart = savedWeekStart < calendarWeekStart ? calendarWeekStart : savedWeekStart;
     state.staffingDefaults = {
       morning: settings?.[0]?.morning_staff_count || 2,
       evening: settings?.[0]?.evening_staff_count || 2,
@@ -607,6 +611,8 @@ async function saveDay() {
 }
 
 async function publishEditingWeek() {
+  const confirmed = confirm('Du er ved at vise den valgte uge på tavlen. Tavlen går automatisk frem til den aktuelle kalenderuge hver mandag. Vil du fortsætte?');
+  if (!confirmed) return;
   const button = el('publishWeekButton');
   button.disabled = true;
   button.textContent = 'Udgiver…';
@@ -628,7 +634,7 @@ async function publishEditingWeek() {
     setStatus('Ugen kunne ikke udgives.', 'error');
   } finally {
     button.disabled = false;
-    setTimeout(() => { button.textContent = 'Vis denne uge på tavlen'; }, 1800);
+    setTimeout(() => { button.textContent = 'Vis valgte uge på tavlen'; }, 1800);
   }
 }
 

@@ -109,6 +109,9 @@ input, select { width:100%; border:1px solid #d8dee8; background:#fff; padding:1
 .sync-status:empty { opacity:0; pointer-events:none; }
 .sync-status.success { background:#15803d; }
 .sync-status.error { background:#b42318; }
+.site-footer { margin:28px 0 6px; padding:18px 12px 4px; border-top:1px solid #d8dee8; color:#667085; text-align:center; font-size:.78rem; line-height:1.45; }
+.site-footer p { margin:2px 0; }
+.site-footer a { color:#475467; }
 button:disabled { opacity:.6; cursor:wait; }
 .image-dialog { width:min(900px, calc(100% - 20px)); max-width:none; background:transparent; box-shadow:none; border-radius:0; }
 .image-dialog-card { position:relative; display:grid; place-items:center; min-height:50vh; padding:42px 12px 14px; }
