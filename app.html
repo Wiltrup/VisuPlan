@@ -15,7 +15,7 @@
         <p class="eyebrow">TEAM 2</p>
         <h1 class="app-wordmark-heading"><img class="app-wordmark" src="/assets/brand/wordmark.png" alt="VisuPlanner"></h1>
       </div>
-      <button id="adminButton" class="icon-button" aria-label="Åbn redigering">⚙️</button>
+      <div class="topbar-actions"><button id="viewerLogoutButton" class="board-logout-button" type="button">Log ud</button><button id="adminButton" class="icon-button" aria-label="Åbn redigering">⚙️</button></div>
     </header>
 
     <nav id="dayTabs" class="day-tabs" aria-label="Vælg dag"></nav>
@@ -66,8 +66,9 @@
       <img class="viewer-login-logo" src="/assets/brand/wordmark.png" alt="VisuPlanner">
       <p class="eyebrow">TEAM 2</p>
       <h2>Åbn jeres tavle</h2>
-      <p class="note">Indtast Team 2's fælles kode. Denne enhed husker login, så tavlen åbner direkte næste gang.</p>
-      <label>Teamkode<input id="viewerPinInput" type="password" autocomplete="current-password" required autofocus></label>
+      <p class="note">Indtast Team 2's fælles kode. Browseren kan selv tilbyde at gemme koden på enheder, du stoler på.</p>
+      <label>Team<input id="viewerUsername" name="username" value="Team 2" autocomplete="username" readonly></label>
+      <label>Teamkode<input id="viewerPinInput" name="password" type="password" autocomplete="current-password" required autofocus></label>
       <p id="viewerLoginError" class="error"></p>
       <button id="viewerLoginSubmit" type="submit">Åbn tavlen</button>
       <a class="viewer-back-link" href="/login">← Vælg et andet team</a>
@@ -77,8 +78,9 @@
   <dialog id="loginDialog">
     <form method="dialog" id="loginForm" class="dialog-card">
       <h2>Personalelogin</h2>
+      <label>Team<input name="username" value="Team 2 – personale" autocomplete="username" readonly></label>
       <label>Personale-kode
-        <input id="pinInput" type="password" autocomplete="current-password" required />
+        <input id="pinInput" name="password" type="password" autocomplete="current-password" required />
       </label>
       <p id="loginError" class="error"></p>
       <div class="dialog-actions">

@@ -25,5 +25,19 @@ Vercel-projektet skal have miljøvariablen `PEXELS_API_KEY`. Nøglen bruges kun 
 
 SQL-filen beskytter både tavledata og billeder bag login. Kun personalekontoen `team2@visuplanner.invalid` får skriverettigheder.
 
+## Administratorpanel
+
+Administratorpanelet findes på `/administration` og benytter kontoen `wiltrup@wiltrup.com`.
+
+Før panelet bruges:
+1. Opret og bekræft `wiltrup@wiltrup.com` i Supabase Authentication.
+2. Kør `supabase-admin-foundation.sql` én gang i SQL Editor.
+3. Tilføj Vercel-miljøvariablen `SUPABASE_SECRET_KEY` med projektets hemmelige Supabase-nøgle til Production, Preview og Development.
+4. Redeploy seneste deployment i Vercel.
+
+Den hemmelige nøgle må aldrig lægges i GitHub eller sendes til andre. Den anvendes kun i serverfunktionen `api/platform-admin.js`.
+
+Team- og personalelogin gemmes kun i `sessionStorage`. Chrome, Safari og andre browsere kan selv tilbyde at huske loginoplysningerne. På en midlertidig computer kan brugeren derfor afslå browserens tilbud, og VisuPlanner-login forsvinder, når browsersessionen afsluttes.
+
 ## Udgivelse på Vercel
 Upload alle filer og mapper i denne mappe til roden af GitHub-repository'et. Framework preset kan stå som `Other`, og der kræves ingen build command. Vercel udgiver automatisk efter commit.

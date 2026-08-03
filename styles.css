@@ -10,6 +10,7 @@ button, input, select { font: inherit; }
 button { cursor: pointer; }
 .app-shell { width: min(1040px, 100%); margin: 0 auto; padding: 18px; }
 .topbar { display:flex; justify-content:space-between; align-items:center; gap:16px; margin-bottom:16px; }
+.topbar-actions{display:flex;align-items:center;gap:9px}.board-logout-button{border:0;background:#e8edf4;color:#526074;border-radius:12px;padding:10px 12px;font-weight:850}
 .eyebrow { margin:0; font-size:.78rem; font-weight:800; letter-spacing:.16em; color:#667085; }
 h1 { margin:2px 0 0; font-size:clamp(2rem, 5vw, 3.3rem); }
 .app-wordmark-heading { line-height:0; }

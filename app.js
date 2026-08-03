@@ -2,6 +2,7 @@ const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 const STAFF_LOGIN_EMAIL = 'team2@visuplanner.invalid';
 const VIEWER_LOGIN_EMAIL = 'team2-viewer@visuplanner.invalid';
+const PLATFORM_ADMIN_EMAIL = 'wiltrup@wiltrup.com';
 const SESSION_KEY = 'visuplanner-session';
 const VIEWER_SESSION_KEY = 'visuplanner-viewer-session';
 
@@ -95,7 +96,7 @@ function apiHeaders(authenticated = false, extra = {}) {
   return headers;
 }
 
-function isStaffSession() { return state.session?.user?.email === STAFF_LOGIN_EMAIL; }
+function isStaffSession() { return [STAFF_LOGIN_EMAIL, PLATFORM_ADMIN_EMAIL].includes(state.session?.user?.email); }
 function isViewerSession() { return state.session?.user?.email === VIEWER_LOGIN_EMAIL; }
 
 async function apiFetch(path, options = {}, authenticated = false) {
@@ -114,19 +115,19 @@ async function apiFetch(path, options = {}, authenticated = false) {
 
 function saveSession(session, rememberViewer = false) {
   state.session = session;
-  localStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  if (rememberViewer || session?.user?.email === VIEWER_LOGIN_EMAIL) localStorage.setItem(VIEWER_SESSION_KEY, JSON.stringify(session));
+  sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  if (rememberViewer || session?.user?.email === VIEWER_LOGIN_EMAIL) sessionStorage.setItem(VIEWER_SESSION_KEY, JSON.stringify(session));
   renderLoginState();
 }
 
 function clearSession() {
   state.session = null;
-  localStorage.removeItem(SESSION_KEY);
+  sessionStorage.removeItem(SESSION_KEY);
   renderLoginState();
 }
 
 async function refreshSavedSession(storageKey) {
-  const saved = JSON.parse(localStorage.getItem(storageKey));
+  const saved = JSON.parse(sessionStorage.getItem(storageKey));
   if (!saved?.refresh_token) return null;
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
     method: 'POST', headers: apiHeaders(false, { 'Content-Type': 'application/json' }),
@@ -172,7 +173,20 @@ async function signOut() {
     try {
       const viewerSession = await refreshSavedSession(VIEWER_SESSION_KEY);
       if (viewerSession) { saveSession(viewerSession, true); await loadData({ quiet: true }); return; }
-    } catch { localStorage.removeItem(VIEWER_SESSION_KEY); }
+    } catch { sessionStorage.removeItem(VIEWER_SESSION_KEY); }
+    el('viewerLoginDialog').showModal();
+  }
+}
+
+async function leaveBoard() {
+  try {
+    if (state.session?.access_token) await fetch(`${SUPABASE_URL}/auth/v1/logout?scope=local`, { method: 'POST', headers: apiHeaders(true) });
+  } finally {
+    state.session = null;
+    sessionStorage.removeItem(SESSION_KEY);
+    sessionStorage.removeItem(VIEWER_SESSION_KEY);
+    renderLoginState();
+    el('viewerPinInput').value = '';
     el('viewerLoginDialog').showModal();
   }
 }
@@ -771,6 +785,7 @@ el('closeAdmin').addEventListener('click', () => el('adminDialog').close());
 el('closeImageDialog').addEventListener('click', () => el('imageDialog').close());
 el('imageDialog').addEventListener('click', event => { if (event.target === el('imageDialog')) el('imageDialog').close(); });
 el('logoutButton').addEventListener('click', signOut);
+el('viewerLogoutButton').addEventListener('click', leaveBoard);
 el('adminDaySelect').addEventListener('change', loadAdminDay);
 el('previousEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, -7), 0));
 el('nextEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, 7), 0));

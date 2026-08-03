@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <link rel="stylesheet" href="/admin.css"><title>Administration – VisuPlanner</title>
+</head>
+<body>
+  <header><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a><a href="/">Til forsiden</a></header>
+  <main>
+    <section class="admin-intro"><p class="eyebrow">PLATFORMSADMINISTRATION</p><h1>VisuPlanner administration</h1><p>Opret og hjælp teams uden at kende deres nuværende adgangskoder.</p></section>
+    <section id="adminLoginCard" class="card login-card">
+      <h2>Administratorlogin</h2>
+      <form id="platformLoginForm">
+        <label>Din mail<input id="platformEmail" name="username" type="email" autocomplete="username" value="wiltrup@wiltrup.com" required></label>
+        <label>Din adgangskode<input id="platformPassword" name="password" type="password" autocomplete="current-password" required></label>
+        <p id="platformLoginError" class="error"></p><button type="submit">Log ind</button>
+      </form>
+    </section>
+    <section id="adminDashboard" hidden>
+      <div class="dashboard-head"><div><p class="eyebrow">TEAMS</p><h2>Oprettede tavler</h2></div><button id="platformLogout" class="secondary">Log ud</button></div>
+      <div id="teamCards"></div>
+    </section>
+  </main>
+  <div id="adminStatus" role="status"></div><script src="/admin.js"></script>
+</body>
+</html>

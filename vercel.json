@@ -3,6 +3,7 @@
   "trailingSlash": false,
   "rewrites": [
     { "source": "/team-2", "destination": "/app" },
-    { "source": "/team-2/", "destination": "/app" }
+    { "source": "/team-2/", "destination": "/app" },
+    { "source": "/administration", "destination": "/admin" }
   ]
 }
