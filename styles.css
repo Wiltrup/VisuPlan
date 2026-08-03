@@ -38,6 +38,7 @@ h1 { margin:2px 0 0; font-size:clamp(2rem, 5vw, 3.3rem); }
 .person.has-photo { cursor:pointer; transition:transform .15s, background .15s; }
 .person.has-photo:hover { transform:translateY(-1px); background:#e9eef5; }
 .person img, .staff-manage-row img, .avatar-placeholder { width:46px; height:46px; border-radius:50%; object-fit:cover; flex:0 0 46px; }
+img.image-load-error{display:none!important}
 .avatar-placeholder { display:grid; place-items:center; background:#e1e7ef; font-size:1.35rem; }
 .dinner-panel { grid-column:span 1; }
 .activities-panel { grid-column:span 2; }

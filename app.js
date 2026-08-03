@@ -193,18 +193,34 @@ async function leaveBoard() {
 
 async function resolvePhotoUrl(url) {
   if (!url) return '';
-  const marker = '/storage/v1/object/public/visuplan-images/';
-  const path = url.includes(marker) ? url.split(marker)[1] : '';
+  const markers = [
+    '/storage/v1/object/public/visuplan-images/',
+    '/storage/v1/object/sign/visuplan-images/',
+    '/storage/v1/object/authenticated/visuplan-images/'
+  ];
+  const marker = markers.find(item => url.includes(item));
+  const path = marker ? url.split(marker)[1].split('?')[0] : '';
   if (!path) return url;
-  if (signedImageCache.has(path)) return signedImageCache.get(path);
+  const cached = signedImageCache.get(path);
+  if (cached?.expiresAt > Date.now()) return cached.url;
   try {
     const result = await apiFetch(`/storage/v1/object/sign/visuplan-images/${path}`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 3600 })
     }, true);
-    const signed = result?.signedURL ? `${SUPABASE_URL}${result.signedURL}` : url;
-    signedImageCache.set(path, signed);
+    const raw = result?.signedURL || result?.signedUrl || result?.signed_url || '';
+    let signed = '';
+    if (/^https?:\/\//i.test(raw)) signed = raw;
+    else if (raw.startsWith('/storage/v1/')) signed = `${SUPABASE_URL}${raw}`;
+    else if (raw.startsWith('/object/')) signed = `${SUPABASE_URL}/storage/v1${raw}`;
+    else if (raw) signed = `${SUPABASE_URL}/storage/v1/object/sign/visuplan-images/${path}?token=${encodeURIComponent(raw)}`;
+    if (!signed && result?.token) signed = `${SUPABASE_URL}/storage/v1/object/sign/visuplan-images/${path}?token=${encodeURIComponent(result.token)}`;
+    if (!signed) throw new Error('Supabase returnerede ikke et billedlink.');
+    signedImageCache.set(path, { url: signed, expiresAt: Date.now() + 50 * 60 * 1000 });
     return signed;
-  } catch { return url; }
+  } catch (error) {
+    console.error('Kunne ikke oprette privat billedlink', error);
+    return '';
+  }
 }
 
 function stablePhotoUrl(url) {
@@ -853,6 +869,7 @@ el('imageSearchForm').addEventListener('submit', async event => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadData({ quiet: true }); });
 window.addEventListener('pageshow', () => loadData({ quiet: true }));
+document.addEventListener('error', event => { if (event.target instanceof HTMLImageElement) event.target.classList.add('image-load-error'); }, true);
 
 async function init() {
   renderLoginState();
