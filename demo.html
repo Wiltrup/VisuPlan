@@ -5,7 +5,7 @@
   <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/demo.css"><title>Prøv VisuPlanner</title>
 </head>
 <body>
-  <div class="demo-banner"><strong>DEMOVERSION</strong><span>Alt gemmes kun i denne browserfane</span><a href="/">Til forsiden</a></div>
+  <div class="demo-banner"><strong>DEMOVERSION</strong><span>Alt behandles lokalt i denne browserfane</span><a href="/">Til forsiden</a></div>
   <div class="app-shell">
     <header class="topbar"><div><p class="eyebrow">EKSEMPELTEAM</p><h1 class="app-wordmark-heading"><img class="app-wordmark" src="/assets/brand/wordmark.png" alt="VisuPlanner"></h1></div><button id="demoAdminButton" class="icon-button" aria-label="Rediger demo">⚙️</button></header>
     <nav id="demoDayTabs" class="day-tabs" aria-label="Vælg dag"></nav>
@@ -15,23 +15,32 @@
         <article class="panel"><h3>☀️ Morgen</h3><div id="demoMorning" class="people"></div></article>
         <article class="panel"><h3>🌙 Aften</h3><div id="demoEvening" class="people"></div></article>
         <article class="panel"><h3>🌑 Nat</h3><div id="demoNight" class="people"></div></article>
-        <article class="panel dinner-panel"><h3>🍽️ Aftensmad</h3><p id="demoDinner" class="large-text"></p></article>
+        <article class="panel dinner-panel"><h3>🍽️ Aftensmad</h3><div id="demoDinnerPhoto" class="dinner-photo"></div><p id="demoDinner" class="large-text"></p></article>
         <article class="panel activities-panel"><h3>🎯 Aktiviteter</h3><div id="demoActivities" class="activities"></div></article>
       </section>
     </main>
-    <footer class="site-footer"><p>VisuPlanner demo · Ændringer slettes, når browserfanens session afsluttes.</p><p>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></p></footer>
+    <footer class="site-footer"><p>VisuPlanner demo · Tekst og billeder sendes ikke til VisuPlanner og slettes ved nulstilling eller afsluttet demosession.</p><p>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></p></footer>
   </div>
 
-  <dialog id="demoLoginDialog"><form id="demoLoginForm" class="dialog-card"><p class="demo-code-note">Alle må prøve demoen<br><strong>Koden er 1234</strong></p><h2>Åbn redigering</h2><label>Demokode<input id="demoPin" type="password" inputmode="numeric" required></label><p id="demoLoginError" class="error"></p><div class="dialog-actions"><button id="demoLoginClose" type="button" class="secondary">Luk</button><button type="submit">Log ind</button></div></form></dialog>
+  <dialog id="demoLoginDialog"><form id="demoLoginForm" class="dialog-card"><p class="demo-code-note">Alle må prøve demoen<br><strong>Koden er 1234</strong></p><h2>Åbn redigering</h2><label>Demokode<input id="demoPin" name="password" type="password" inputmode="numeric" required></label><p id="demoLoginError" class="error"></p><div class="dialog-actions"><button id="demoLoginClose" type="button" class="secondary">Luk</button><button type="submit">Log ind</button></div></form></dialog>
 
-  <dialog id="demoEditorDialog"><div class="dialog-card admin-card"><div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Rediger dagen</h2></div><button id="demoEditorClose" class="icon-button">✕</button></div>
+  <dialog id="demoEditorDialog"><div class="dialog-card admin-card">
+    <div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Rediger dagen</h2></div><div class="admin-header-actions"><button id="demoOpenSettings" class="secondary settings-button" type="button">⚙ Grundindstillinger</button><button id="demoEditorClose" class="icon-button" aria-label="Luk">✕</button></div></div>
     <label>Vælg dag<select id="demoEditDay"></select></label>
-    <div class="form-section"><h3>Personale</h3><div class="form-grid"><label>☀️ Morgen<select id="demoMorning1"></select><select id="demoMorning2"></select></label><label>🌙 Aften<select id="demoEvening1"></select><select id="demoEvening2"></select></label><label>🌑 Nat<select id="demoNight1"></select><select id="demoNight2"></select></label></div></div>
-    <div class="form-section"><h3>Aftensmad</h3><input id="demoDinnerInput" placeholder="Fx lasagne"></div>
+    <div class="form-section"><h3>Personale</h3><div class="shift-editor-grid">
+      <section class="shift-editor-group"><div class="section-title-row"><h4>☀️ Morgen</h4><button class="secondary small" data-demo-add-shift="morning" type="button">+ Medarbejder</button></div><div id="demoMorningEditors" class="shift-editor-rows"></div></section>
+      <section class="shift-editor-group"><div class="section-title-row"><h4>🌙 Aften</h4><button class="secondary small" data-demo-add-shift="evening" type="button">+ Medarbejder</button></div><div id="demoEveningEditors" class="shift-editor-rows"></div></section>
+      <section class="shift-editor-group"><div class="section-title-row"><h4>🌑 Nat</h4><button class="secondary small" data-demo-add-shift="night" type="button">+ Medarbejder</button></div><div id="demoNightEditors" class="shift-editor-rows"></div></section>
+    </div></div>
+    <div class="form-section"><h3>Aftensmad</h3><input id="demoDinnerInput" placeholder="Fx lasagne"><button id="demoImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede <small>– tilgængelig med oprettet bruger</small></button><label class="photo-field">Upload eget madbillede<input id="demoDinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><p id="demoDinnerPhotoNote" class="file-note">Billedet behandles kun på denne enhed.</p></div>
     <div class="form-section"><div class="section-title-row"><h3>Aktiviteter</h3><button id="demoAddActivity" class="secondary small" type="button">+ Aktivitet</button></div><div id="demoActivityEditor"></div></div>
+    <div class="form-section"><div class="section-title-row"><h3>Tilgængelige medarbejdere</h3><button class="secondary small" type="button" disabled>+ Tilføj</button></div><p class="demo-feature-note">I en oprettet tavle kan teamet selv tilføje vikarer og fjerne medarbejdere.</p><div id="demoStaffManager" class="staff-manager"></div></div>
     <div class="dialog-actions sticky-actions"><button id="demoReset" class="danger secondary" type="button">Nulstil demo</button><button id="demoSave" type="button">Gem dagen</button></div>
   </div></dialog>
-  <div id="demoStatus" class="sync-status" role="status"></div>
-  <script src="/demo.js"></script>
+
+  <dialog id="demoSettingsDialog"><div class="dialog-card settings-card"><div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Grundindstillinger</h2></div><button id="demoSettingsClose" class="icon-button" aria-label="Luk">✕</button></div><p class="note">Vælg hvor mange medarbejderfelter der normalt vises på hver vagt.</p><div class="settings-fields"><label>Normal morgenbemanding<input id="demoMorningDefault" type="number" min="1" max="10"></label><label>Normal aftenbemanding<input id="demoEveningDefault" type="number" min="1" max="10"></label><label>Normal natbemanding<input id="demoNightDefault" type="number" min="1" max="10"></label><label class="toggle-setting"><input id="demoShowDates" type="checkbox"><span><strong>Vis datoer på tavlen</strong><small>Viser dato under hver ugedag.</small></span></label></div><div class="dialog-actions"><button id="demoSettingsSave" type="button">Gem indstillinger</button></div></div></dialog>
+
+  <dialog id="demoImageDialog" class="image-dialog"><div class="image-dialog-card"><button id="demoImageClose" class="image-dialog-close" aria-label="Luk billede">✕</button><img id="demoLargeImage" alt=""><p id="demoLargeCaption"></p></div></dialog>
+  <div id="demoStatus" class="sync-status" role="status"></div><script src="/demo.js"></script>
 </body>
 </html>
