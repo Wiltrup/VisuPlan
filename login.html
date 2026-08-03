@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#f8fafc">
+  <link rel="stylesheet" href="/finder.css">
+  <title>Find din tavle – VisuPlanner</title>
+</head>
+<body>
+  <header class="finder-header"><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a><a href="/">Til forsiden</a></header>
+  <main class="finder-shell">
+    <section class="finder-intro">
+      <img src="/assets/brand/calendar.png" alt="" class="finder-calendar">
+      <p class="eyebrow">FIND DIN TAVLE</p>
+      <h1>Hvor arbejder eller bor du?</h1>
+      <p>Vælg kommune, arbejdsplads og team. Derefter kommer du videre til teamets sikre login.</p>
+    </section>
+    <form id="teamFinder" class="finder-card">
+      <label><span><b>1</b>Kommune</span><select id="municipality" required><option value="">Vælg kommune</option><option value="halsnaes">Halsnæs Kommune</option></select></label>
+      <label><span><b>2</b>Arbejdsplads</span><select id="workplace" required disabled><option value="">Vælg arbejdsplads</option></select></label>
+      <label><span><b>3</b>Team</span><select id="team" required disabled><option value="">Vælg team</option></select></label>
+      <p id="finderMessage" class="finder-message" aria-live="polite"></p>
+      <button id="openTeam" type="submit" disabled>Fortsæt til login</button>
+    </form>
+  </main>
+  <footer>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></footer>
+  <script src="/finder.js"></script>
+</body>
+</html>

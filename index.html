@@ -6,21 +6,23 @@
   <meta name="theme-color" content="#f8fafc" />
   <meta name="description" content="VisuPlanner er en enkel og visuel ugeplan til bosteder, bofællesskaber og støttecentre." />
   <link rel="stylesheet" href="/landing.css" />
+  <link rel="stylesheet" href="/landing-overrides.css" />
   <title>VisuPlanner – visuel ugeplan til bosteder</title>
 </head>
 <body>
   <header class="landing-header">
-    <a class="brand" href="/" aria-label="VisuPlanner forside"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span>VisuPlanner</span></a>
-    <a class="header-link" href="mailto:wiltrup@wiltrup.com">Kontakt</a>
+    <a class="brand" href="/" aria-label="VisuPlanner forside"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a>
+    <nav class="header-actions" aria-label="Hovedmenu"><a class="header-link quiet" href="mailto:wiltrup@wiltrup.com">Kontakt</a><a class="header-link login-link" href="/login">Login</a></nav>
   </header>
 
   <main>
     <section class="hero">
       <div class="hero-copy">
+        <div class="hero-logo"><img class="calendar-logo" src="/assets/brand/calendar.png" alt=""><img class="wordmark-logo" src="/assets/brand/wordmark.png" alt="VisuPlanner"></div>
         <p class="kicker">VISUEL STØTTE I HVERDAGEN</p>
         <h1>Ugens vigtigste overblik.<br><span>Enkelt og genkendeligt.</span></h1>
         <p class="hero-text">VisuPlanner samler personale, aftensmad og aktiviteter i én rolig ugeplan, der er nem at se for beboere og nem at opdatere for personalet.</p>
-        <div class="hero-actions"><a class="primary-button" href="/team-2">Se VisuPlanner i brug</a><a class="secondary-button" href="#om">Læs mere</a></div>
+        <div class="hero-actions"><a class="primary-button" href="/demo">Se VisuPlanner i brug</a><a class="secondary-button" href="#om">Læs mere</a></div>
         <p class="availability">Fungerer i browseren på telefon, tablet, computer og fælles touchskærm.</p>
       </div>
       <div class="product-preview" aria-label="Eksempel på VisuPlanner">
@@ -49,7 +51,7 @@
       <article><span class="feature-icon green">📱</span><h3>Samme plan overalt</h3><p>Ændringer deles automatisk på telefoner, tablets og fælles skærme.</p></article>
       <article><span class="feature-icon orange">🖼️</span><h3>Rigtige billeder</h3><p>Tilføj fotos af personale, måltider og aktiviteter – også via billedsøgning.</p></article>
       <article><span class="feature-icon pink">📅</span><h3>Planlæg frem</h3><p>Klargør kommende uger på forhånd og vis næste uge allerede søndag.</p></article>
-      <article><span class="feature-icon navy">🔒</span><h3>Adskilt redigering</h3><p>Tavlen kan ses enkelt, mens ændringer kræver personalelogin.</p></article>
+      <article><span class="feature-icon navy">🔒</span><h3>Sikker adgang</h3><p>Hvert team får fælles adgang til sin tavle, mens ændringer kræver et særskilt personalelogin.</p></article>
     </section>
 
     <section class="audience-section">
@@ -65,7 +67,7 @@
   </main>
 
   <footer class="landing-footer">
-    <a class="brand footer-brand" href="/"><span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span>VisuPlanner</span></a>
+    <a class="brand footer-brand" href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a>
     <p>Designet og udviklet af Jakob Wiltrup © 2026.<br>Alle rettigheder tilhører Jakob Wiltrup.</p>
     <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a>
   </footer>

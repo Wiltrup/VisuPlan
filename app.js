@@ -1,7 +1,9 @@
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 const STAFF_LOGIN_EMAIL = 'team2@visuplanner.invalid';
+const VIEWER_LOGIN_EMAIL = 'team2-viewer@visuplanner.invalid';
 const SESSION_KEY = 'visuplanner-session';
+const VIEWER_SESSION_KEY = 'visuplanner-viewer-session';
 
 const DAYS = [
   { key: 'monday', short: 'Man', name: 'MANDAG', color: '#eab308' },
@@ -31,6 +33,7 @@ let editingWeekStart = null;
 let editingWeek = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
 let editingShifts = { morning: [], evening: [], night: [] };
 let selectedPexelsPhoto = null;
+const signedImageCache = new Map();
 
 const el = id => document.getElementById(id);
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, character => ({
@@ -92,6 +95,9 @@ function apiHeaders(authenticated = false, extra = {}) {
   return headers;
 }
 
+function isStaffSession() { return state.session?.user?.email === STAFF_LOGIN_EMAIL; }
+function isViewerSession() { return state.session?.user?.email === VIEWER_LOGIN_EMAIL; }
+
 async function apiFetch(path, options = {}, authenticated = false) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
     ...options,
@@ -106,9 +112,10 @@ async function apiFetch(path, options = {}, authenticated = false) {
   return text ? JSON.parse(text) : null;
 }
 
-function saveSession(session) {
+function saveSession(session, rememberViewer = false) {
   state.session = session;
   localStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  if (rememberViewer || session?.user?.email === VIEWER_LOGIN_EMAIL) localStorage.setItem(VIEWER_SESSION_KEY, JSON.stringify(session));
   renderLoginState();
 }
 
@@ -118,30 +125,40 @@ function clearSession() {
   renderLoginState();
 }
 
+async function refreshSavedSession(storageKey) {
+  const saved = JSON.parse(localStorage.getItem(storageKey));
+  if (!saved?.refresh_token) return null;
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+    method: 'POST', headers: apiHeaders(false, { 'Content-Type': 'application/json' }),
+    body: JSON.stringify({ refresh_token: saved.refresh_token })
+  });
+  if (!response.ok) throw new Error('Sessionen er udløbet');
+  return response.json();
+}
+
 async function restoreSession() {
   try {
-    const saved = JSON.parse(localStorage.getItem(SESSION_KEY));
-    if (!saved?.refresh_token) return;
-    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
-      method: 'POST',
-      headers: apiHeaders(false, { 'Content-Type': 'application/json' }),
-      body: JSON.stringify({ refresh_token: saved.refresh_token })
-    });
-    if (!response.ok) throw new Error('Sessionen er udløbet');
-    saveSession(await response.json());
+    const session = await refreshSavedSession(SESSION_KEY);
+    if (session) saveSession(session, session.user?.email === VIEWER_LOGIN_EMAIL);
   } catch {
     clearSession();
   }
 }
 
-async function signIn(password) {
+async function authenticate(email, password, errorMessage) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST',
-    headers: apiHeaders(false, { 'Content-Type': 'application/json' }),
-    body: JSON.stringify({ email: STAFF_LOGIN_EMAIL, password })
+    method: 'POST', headers: apiHeaders(false, { 'Content-Type': 'application/json' }), body: JSON.stringify({ email, password })
   });
-  if (!response.ok) throw new Error('Forkert personalekode.');
-  saveSession(await response.json());
+  if (!response.ok) throw new Error(errorMessage);
+  return response.json();
+}
+
+async function signInViewer(password) {
+  saveSession(await authenticate(VIEWER_LOGIN_EMAIL, password, 'Forkert teamkode.'), true);
+}
+
+async function signIn(password) {
+  saveSession(await authenticate(STAFF_LOGIN_EMAIL, password, 'Forkert personalekode.'));
 }
 
 async function signOut() {
@@ -152,23 +169,54 @@ async function signOut() {
   } finally {
     clearSession();
     el('adminDialog').close();
+    try {
+      const viewerSession = await refreshSavedSession(VIEWER_SESSION_KEY);
+      if (viewerSession) { saveSession(viewerSession, true); await loadData({ quiet: true }); return; }
+    } catch { localStorage.removeItem(VIEWER_SESSION_KEY); }
+    el('viewerLoginDialog').showModal();
   }
+}
+
+async function resolvePhotoUrl(url) {
+  if (!url) return '';
+  const marker = '/storage/v1/object/public/visuplan-images/';
+  const path = url.includes(marker) ? url.split(marker)[1] : '';
+  if (!path) return url;
+  if (signedImageCache.has(path)) return signedImageCache.get(path);
+  try {
+    const result = await apiFetch(`/storage/v1/object/sign/visuplan-images/${path}`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expiresIn: 3600 })
+    }, true);
+    const signed = result?.signedURL ? `${SUPABASE_URL}${result.signedURL}` : url;
+    signedImageCache.set(path, signed);
+    return signed;
+  } catch { return url; }
+}
+
+function stablePhotoUrl(url) {
+  if (!url) return '';
+  const signedMarker = '/storage/v1/object/sign/visuplan-images/';
+  if (!url.includes(signedMarker)) return url;
+  const path = url.split(signedMarker)[1].split('?')[0];
+  return `${SUPABASE_URL}/storage/v1/object/public/visuplan-images/${path}`;
 }
 
 async function fetchWeek(weekStart) {
   const dates = weekDates(weekStart);
   const dateFilter = `(${dates.join(',')})`;
   const [plans, shifts, activities] = await Promise.all([
-    apiFetch(`/rest/v1/day_plans?select=*&plan_date=in.${dateFilter}`),
-    apiFetch(`/rest/v1/shifts?select=*&plan_date=in.${dateFilter}`),
-    apiFetch(`/rest/v1/activities?select=*&plan_date=in.${dateFilter}&order=activity_time.asc,sort_order.asc`)
+    apiFetch(`/rest/v1/day_plans?select=*&plan_date=in.${dateFilter}`, {}, true),
+    apiFetch(`/rest/v1/shifts?select=*&plan_date=in.${dateFilter}`, {}, true),
+    apiFetch(`/rest/v1/activities?select=*&plan_date=in.${dateFilter}&order=activity_time.asc,sort_order.asc`, {}, true)
   ]);
+  const securePlans = await Promise.all((plans || []).map(async item => ({ ...item, dinner_photo_url: await resolvePhotoUrl(item.dinner_photo_url || '') })));
+  const secureActivities = await Promise.all((activities || []).map(async item => ({ ...item, photo_url: await resolvePhotoUrl(item.photo_url || '') })));
   const week = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
   const staffById = new Map(state.staff.map(person => [person.id, person]));
 
   dates.forEach((date, index) => {
       const data = week[DAYS[index].key];
-      const plan = (plans || []).find(item => item.plan_date === date);
+      const plan = securePlans.find(item => item.plan_date === date);
       if (plan) {
         data.dinner = plan.dinner_name || '';
         data.dinnerPhotoUrl = plan.dinner_photo_url || '';
@@ -178,7 +226,7 @@ async function fetchWeek(weekStart) {
         const person = staffById.get(shift.staff_id);
         if (target && person) data[target][shift.slot - 1] = person.name;
       });
-      data.activities = (activities || []).filter(item => item.plan_date === date).map(item => ({
+      data.activities = secureActivities.filter(item => item.plan_date === date).map(item => ({
         id: item.id,
         time: item.activity_time ? item.activity_time.slice(0, 5) : '',
         name: item.name,
@@ -192,10 +240,10 @@ async function loadData({ quiet = false } = {}) {
   if (!quiet) setStatus('Henter ugeplan…');
   try {
     const [staff, settings] = await Promise.all([
-      apiFetch('/rest/v1/staff?select=*&order=sort_order.asc,name.asc'),
-      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public&id=eq.team2')
+      apiFetch('/rest/v1/staff?select=*&order=sort_order.asc,name.asc', {}, true),
+      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public&id=eq.team2', {}, true)
     ]);
-    state.staff = staff || [];
+    state.staff = await Promise.all((staff || []).map(async person => ({ ...person, photo_url: await resolvePhotoUrl(person.photo_url || '') })));
     const savedWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
     const calendarWeekStart = currentCalendarWeekStart();
     // En fremtidig uge kan vises allerede søndag. En gammel uge må aldrig
@@ -286,7 +334,7 @@ function bindImageEnlargement() {
 }
 
 function renderLoginState() {
-  el('logoutButton').hidden = !state.session;
+  el('logoutButton').hidden = !isStaffSession();
 }
 
 function fillStaffSelect(select, value) {
@@ -548,7 +596,7 @@ async function saveDay() {
   const existing = editingWeek[DAYS[index].key];
 
   try {
-    let dinnerPhotoUrl = existing.dinnerPhotoUrl || '';
+    let dinnerPhotoUrl = stablePhotoUrl(existing.dinnerPhotoUrl || '');
     if (pendingDinnerPhoto) dinnerPhotoUrl = await uploadImage(pendingDinnerPhoto, `dinners/${planDate}-${Date.now()}.jpg`);
 
     await apiFetch('/rest/v1/day_plans?on_conflict=plan_date', {
@@ -573,7 +621,7 @@ async function saveDay() {
     await apiFetch(`/rest/v1/activities?plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
     const validActivities = editingActivities.filter(activity => activity.name.trim());
     const activities = await Promise.all(validActivities.map(async (activity, order) => {
-      let photoUrl = activity.photoUrl || '';
+      let photoUrl = stablePhotoUrl(activity.photoUrl || '');
       if (activity.photoFile) photoUrl = await uploadImage(activity.photoFile, `activities/${planDate}-${order}-${Date.now()}.jpg`);
       return {
         plan_date: planDate,
@@ -685,10 +733,21 @@ async function saveSettings() {
 el('prevDay').addEventListener('click', () => { selectedIndex = (selectedIndex + 6) % 7; render(); });
 el('nextDay').addEventListener('click', () => { selectedIndex = (selectedIndex + 1) % 7; render(); });
 el('adminButton').addEventListener('click', () => {
-  if (state.session) return openAdmin();
+  if (isStaffSession()) return openAdmin();
   el('pinInput').value = '';
   el('loginError').textContent = '';
   el('loginDialog').showModal();
+});
+el('viewerLoginForm').addEventListener('submit', async event => {
+  event.preventDefault();
+  const button = el('viewerLoginSubmit');
+  button.disabled = true; button.textContent = 'Åbner…'; el('viewerLoginError').textContent = '';
+  try {
+    await signInViewer(el('viewerPinInput').value);
+    el('viewerLoginDialog').close();
+    await loadData();
+  } catch (error) { el('viewerLoginError').textContent = error.message; }
+  finally { button.disabled = false; button.textContent = 'Åbn tavlen'; }
 });
 el('loginForm').addEventListener('submit', async event => {
   event.preventDefault();
@@ -755,6 +814,11 @@ window.addEventListener('pageshow', () => loadData({ quiet: true }));
 async function init() {
   renderLoginState();
   await restoreSession();
+  if (!state.session || (!isStaffSession() && !isViewerSession())) {
+    clearSession();
+    el('viewerLoginDialog').showModal();
+    return;
+  }
   const loaded = await loadData();
   if (!loaded) setTimeout(() => loadData({ quiet: true }), 700);
   setTimeout(() => loadData({ quiet: true }), 1500);
