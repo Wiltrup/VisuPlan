@@ -1,0 +1,205 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#2563eb" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <link rel="stylesheet" href="/styles.css" />
+  <title>VisuPlanner</title>
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <div>
+        <p class="eyebrow">TEAM 2</p>
+        <h1>VisuPlanner</h1>
+      </div>
+      <button id="adminButton" class="icon-button" aria-label="Åbn redigering">⚙️</button>
+    </header>
+
+    <nav id="dayTabs" class="day-tabs" aria-label="Vælg dag"></nav>
+
+    <main>
+      <section id="dayHeader" class="day-header">
+        <button id="prevDay" class="nav-button" aria-label="Forrige dag">‹</button>
+        <div>
+          <p id="dateLabel" class="date-label"></p>
+          <h2 id="dayLabel"></h2>
+        </div>
+        <button id="nextDay" class="nav-button" aria-label="Næste dag">›</button>
+      </section>
+
+      <section class="grid">
+        <article class="panel">
+          <h3>☀️ Morgen</h3>
+          <div id="morningStaff" class="people"></div>
+        </article>
+        <article class="panel">
+          <h3>🌙 Aften</h3>
+          <div id="eveningStaff" class="people"></div>
+        </article>
+        <article class="panel">
+          <h3>🌑 Nat</h3>
+          <div id="nightStaff" class="people"></div>
+        </article>
+        <article class="panel dinner-panel">
+          <h3>🍽️ Aftensmad</h3>
+          <div id="dinnerPhoto" class="dinner-photo"></div>
+          <p id="dinnerText" class="large-text"></p>
+        </article>
+        <article class="panel activities-panel">
+          <h3>🎯 Aktiviteter</h3>
+          <div id="activitiesList" class="activities"></div>
+        </article>
+      </section>
+    </main>
+
+    <footer class="site-footer">
+      <p>VisuPlanner er designet og udviklet af Jakob Wiltrup © 2026.</p>
+      <p>Alle rettigheder tilhører Jakob Wiltrup · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></p>
+    </footer>
+  </div>
+
+  <dialog id="loginDialog">
+    <form method="dialog" id="loginForm" class="dialog-card">
+      <h2>Personalelogin</h2>
+      <label>Personale-kode
+        <input id="pinInput" type="password" autocomplete="current-password" required />
+      </label>
+      <p id="loginError" class="error"></p>
+      <div class="dialog-actions">
+        <button id="closeLoginButton" type="button" class="secondary">Luk</button>
+        <button type="submit" id="loginSubmit">Log ind</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="adminDialog">
+    <div class="dialog-card admin-card">
+      <div class="admin-heading">
+        <div>
+          <p class="eyebrow">PERSONALE</p>
+          <h2>Rediger ugeplan</h2>
+        </div>
+        <div class="admin-header-actions">
+          <button id="openSettingsButton" class="secondary settings-button" type="button">⚙ Grundindstillinger</button>
+          <button id="closeAdmin" class="icon-button" aria-label="Luk">✕</button>
+        </div>
+      </div>
+
+      <div class="week-editor-bar">
+        <button id="previousEditWeek" class="secondary week-arrow" type="button" aria-label="Forrige uge">‹</button>
+        <div>
+          <span class="week-editor-caption">UGE DER REDIGERES</span>
+          <strong id="adminWeekLabel"></strong>
+        </div>
+        <button id="nextEditWeek" class="secondary week-arrow" type="button" aria-label="Næste uge">›</button>
+      </div>
+
+      <label>Vælg dag
+        <select id="adminDaySelect"></select>
+      </label>
+
+      <div class="form-section">
+        <h3>Personale</h3>
+        <div class="shift-editor-grid">
+          <section class="shift-editor-group">
+            <div class="section-title-row"><h4>☀️ Morgen</h4><button class="secondary small" data-add-shift="morning" type="button">+ Medarbejder</button></div>
+            <div id="morningEditors" class="shift-editor-rows"></div>
+          </section>
+          <section class="shift-editor-group">
+            <div class="section-title-row"><h4>🌙 Aften</h4><button class="secondary small" data-add-shift="evening" type="button">+ Medarbejder</button></div>
+            <div id="eveningEditors" class="shift-editor-rows"></div>
+          </section>
+          <section class="shift-editor-group">
+            <div class="section-title-row"><h4>🌑 Nat</h4><button class="secondary small" data-add-shift="night" type="button">+ Medarbejder</button></div>
+            <div id="nightEditors" class="shift-editor-rows"></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="form-section">
+        <h3>Aftensmad</h3>
+        <input id="dinnerInput" placeholder="Fx Mad i TAK" />
+        <button id="openDinnerImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede</button>
+        <label class="photo-field">Billede af aftensmaden
+          <input id="dinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" />
+        </label>
+        <p id="dinnerPhotoName" class="file-note">Intet billede valgt.</p>
+      </div>
+
+      <div class="form-section">
+        <div class="section-title-row">
+          <h3>Aktiviteter</h3>
+          <button id="addActivityRow" class="secondary small" type="button">+ Aktivitet</button>
+        </div>
+        <div id="activityEditor"></div>
+      </div>
+
+      <div class="form-section">
+        <div class="section-title-row">
+          <h3>Medarbejdere</h3>
+        </div>
+        <div class="inline-form">
+          <input id="newStaffName" placeholder="Navn på medarbejder eller vikar" />
+          <button id="addStaffButton" type="button">Tilføj</button>
+        </div>
+        <div id="staffManager" class="staff-manager"></div>
+      </div>
+
+      <div class="dialog-actions sticky-actions">
+        <button id="logoutButton" class="danger secondary" type="button">Log ud</button>
+        <button id="publishWeekButton" class="publish-button" type="button">Vis valgte uge på tavlen</button>
+        <button id="saveDayButton" type="button">Gem dagen</button>
+      </div>
+      <p class="note">Gem dagene løbende. Når hele ugen er klar, vælger du “Vis valgte uge på tavlen”. Tavlen går automatisk frem til den aktuelle kalenderuge hver mandag.</p>
+    </div>
+  </dialog>
+
+  <dialog id="settingsDialog">
+    <div class="dialog-card settings-card">
+      <div class="admin-heading">
+        <div><p class="eyebrow">TEAM 2</p><h2>Grundindstillinger</h2></div>
+        <button id="closeSettingsButton" class="icon-button" aria-label="Luk">✕</button>
+      </div>
+      <p class="note">Vælg hvor mange medarbejderfelter der normalt skal vises på hver vagt. Der kan altid tilføjes ekstra på den enkelte dag.</p>
+      <div class="settings-fields">
+        <label>Normal morgenbemanding<input id="morningDefault" type="number" min="1" max="10"></label>
+        <label>Normal aftenbemanding<input id="eveningDefault" type="number" min="1" max="10"></label>
+        <label>Normal natbemanding<input id="nightDefault" type="number" min="1" max="10"></label>
+        <label class="toggle-setting"><input id="showDatesPublic" type="checkbox"><span><strong>Vis datoer på beboertavlen</strong><small>Viser datoen under hver ugedag.</small></span></label>
+      </div>
+      <div class="dialog-actions"><button id="saveSettingsButton" type="button">Gem indstillinger</button></div>
+    </div>
+  </dialog>
+
+  <dialog id="imageDialog" class="image-dialog">
+    <div class="image-dialog-card">
+      <button id="closeImageDialog" class="image-dialog-close" aria-label="Luk billede">✕</button>
+      <img id="largeImage" alt="" />
+      <p id="largeImageCaption"></p>
+    </div>
+  </dialog>
+
+  <dialog id="imageSearchDialog">
+    <div class="dialog-card image-search-card">
+      <div class="admin-heading">
+        <div><p class="eyebrow">PEXELS</p><h2>Find et madbillede</h2></div>
+        <button id="closeImageSearch" class="icon-button" aria-label="Luk">✕</button>
+      </div>
+      <form id="imageSearchForm" class="image-search-form">
+        <input id="imageSearchInput" placeholder="Fx lasagne" autocomplete="off" required />
+        <button id="imageSearchSubmit" type="submit">Søg</button>
+      </form>
+      <p class="note">Vælg ét billede. Det gemmes kun til denne dags aftensmad.</p>
+      <div id="imageSearchResults" class="image-search-results"></div>
+      <p class="pexels-credit">Billeder leveret af <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></p>
+    </div>
+  </dialog>
+
+  <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
+
+  <script src="/app.js"></script>
+</body>
+</html>

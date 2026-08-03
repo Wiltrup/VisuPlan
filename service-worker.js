@@ -1,5 +1,5 @@
-const CACHE='visuplanner-v11';
-const ASSETS=['./','index.html','styles.css','app.js','manifest.webmanifest'];
+const CACHE='visuplanner-v12';
+const ASSETS=['/','/index.html','/landing.css','/app.html','/team-2','/styles.css','/app.js','/manifest.webmanifest'];
 self.addEventListener('install',event=>event.waitUntil(caches.open(CACHE).then(cache=>cache.addAll(ASSETS)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',event=>event.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(key=>key!==CACHE).map(key=>caches.delete(key)))).then(()=>self.clients.claim())));
 self.addEventListener('fetch',event=>{

@@ -761,5 +761,5 @@ async function init() {
   refreshTimer = setInterval(() => loadData({ quiet: true }), 30000);
 }
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('service-worker.js');
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js');
 init();
