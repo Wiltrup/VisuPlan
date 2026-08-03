@@ -497,13 +497,41 @@ function renderStaffManager() {
     ${person.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}
     <strong>${escapeHtml(person.name)}</strong>
     <label class="upload-button">${person.photo_url ? 'Skift billede' : 'Tilføj billede'}<input type="file" accept="image/jpeg,image/png,image/webp" data-staff-photo="${person.id}"></label>
+    <button class="edit-staff-button" type="button" data-edit-staff="${person.id}" data-staff-name="${escapeHtml(person.name)}">Rediger navn</button>
     <button class="remove-staff-button" type="button" data-deactivate-staff="${person.id}" data-staff-name="${escapeHtml(person.name)}">Fjern</button>
   </div>`).join('');
   document.querySelectorAll('[data-staff-photo]').forEach(input => input.addEventListener('change', async () => {
     if (!input.files?.[0]) return;
     await uploadStaffPhoto(input.dataset.staffPhoto, input.files[0]);
   }));
+  document.querySelectorAll('[data-edit-staff]').forEach(button => button.addEventListener('click', () => renameStaff(button.dataset.editStaff, button.dataset.staffName)));
   document.querySelectorAll('[data-deactivate-staff]').forEach(button => button.addEventListener('click', () => deactivateStaff(button.dataset.deactivateStaff, button.dataset.staffName)));
+}
+
+async function renameStaff(staffId, currentName) {
+  const answer = prompt('Ret medarbejderens navn:', currentName);
+  if (answer === null) return;
+  const name = answer.trim();
+  if (!name || name === currentName) return;
+  if (state.staff.some(person => person.id !== staffId && person.name.toLowerCase() === name.toLowerCase())) {
+    setStatus('Der findes allerede en medarbejder med dette navn.', 'error');
+    return;
+  }
+  try {
+    await apiFetch(`/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify({ name })
+    }, true);
+    await loadData({ quiet: true });
+    editingWeek = await fetchWeek(editingWeekStart);
+    renderStaffManager();
+    loadAdminDay();
+    setStatus('Navnet er ændret', 'success');
+  } catch (error) {
+    console.error(error);
+    setStatus('Navnet kunne ikke ændres.', 'error');
+  }
 }
 
 async function deactivateStaff(staffId, name) {
