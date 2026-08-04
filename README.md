@@ -16,7 +16,7 @@ Visuel og fælles ugeplan til Team 2.
 - Onboardingformular og administratoroversigt over forespørgsler
 - Selvbetjent nulstilling af personalekode via ansvarlig arbejdsmail
 - Valgfri morgenmad og frokost
-- Valgfri vagtstruktur: hele døgnet, dag/nat eller morgen/aften/nat
+- Valgfri opdeling af dagvagten samt separat tilvalg af nattevagt
 
 ## Pexels
 

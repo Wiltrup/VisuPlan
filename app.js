@@ -105,14 +105,12 @@ function isStaffSession() { return Boolean(state.session?.user?.email) && state.
 function isViewerSession() { return state.session?.user?.email === VIEWER_LOGIN_EMAIL; }
 
 function activeShiftTypes() {
-  if (state.shiftMode === 1) return ['morning'];
-  if (state.shiftMode === 2) return state.nightEnabled ? ['morning', 'night'] : ['morning'];
+  if (state.shiftMode === 1 || state.shiftMode === 2) return state.nightEnabled ? ['morning', 'night'] : ['morning'];
   return state.nightEnabled ? ['morning', 'evening', 'night'] : ['morning', 'evening'];
 }
 
 function shiftLabel(type) {
-  if (type === 'morning' && state.shiftMode === 1) return 'Hele døgnet';
-  if (type === 'morning' && state.shiftMode === 2) return 'Dag';
+  if (type === 'morning' && state.shiftMode < 3) return 'Dagvagt';
   return { morning: 'Morgen', evening: 'Aften', night: 'Nat' }[type];
 }
 
@@ -313,7 +311,7 @@ async function loadData({ quiet = false } = {}) {
       night: settings?.[0]?.night_staff_count || 2
     };
     state.showDatesPublic = settings?.[0]?.show_dates_public ?? true;
-    state.shiftMode = Number(settings?.[0]?.shift_mode || 3);
+    state.shiftMode = Number(settings?.[0]?.shift_mode || 3) < 3 ? 1 : 3;
     state.nightEnabled = settings?.[0]?.night_enabled ?? true;
     state.meals = { breakfast: settings?.[0]?.show_breakfast ?? false, lunch: settings?.[0]?.show_lunch ?? false, dinner: true };
     if (state.activeWeekStart !== currentCalendarWeekStart()) selectedIndex = 0;
@@ -817,9 +815,9 @@ function openSettings() {
 function updateSettingsVisibility() {
   const mode = Number(el('shiftMode').value);
   el('eveningDefaultLabel').hidden = mode < 3;
-  el('nightEnabledSetting').hidden = mode === 1;
-  el('nightDefaultLabel').hidden = mode === 1 || !el('nightEnabled').checked;
-  el('morningDefaultLabel').firstChild.textContent = mode === 1 ? 'Normal bemanding hele døgnet' : mode === 2 ? 'Normal dagbemanding' : 'Normal morgenbemanding';
+  el('nightEnabledSetting').hidden = false;
+  el('nightDefaultLabel').hidden = !el('nightEnabled').checked;
+  el('morningDefaultLabel').firstChild.textContent = mode === 1 ? 'Normal bemanding på dagvagt' : 'Normal morgenbemanding';
 }
 
 async function saveSettings() {
@@ -841,7 +839,7 @@ async function saveSettings() {
         night_staff_count: defaults.night,
         show_dates_public: el('showDatesPublic').checked,
         shift_mode: Number(el('shiftMode').value),
-        night_enabled: Number(el('shiftMode').value) > 1 && el('nightEnabled').checked,
+        night_enabled: el('nightEnabled').checked,
         show_breakfast: el('showBreakfast').checked,
         show_lunch: el('showLunch').checked,
         updated_at: new Date().toISOString()
@@ -850,7 +848,7 @@ async function saveSettings() {
     state.staffingDefaults = defaults;
     state.showDatesPublic = el('showDatesPublic').checked;
     state.shiftMode = Number(el('shiftMode').value);
-    state.nightEnabled = state.shiftMode > 1 && el('nightEnabled').checked;
+    state.nightEnabled = el('nightEnabled').checked;
     state.meals = { breakfast: el('showBreakfast').checked, lunch: el('showLunch').checked, dinner: true };
     render();
     el('settingsDialog').close();

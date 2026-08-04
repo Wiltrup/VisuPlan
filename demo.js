@@ -1,6 +1,6 @@
 const DEMO_DAYS=[['Man','MANDAG','#eab308'],['Tir','TIRSDAG','#ef4444'],['Ons','ONSDAG','#22c55e'],['Tor','TORSDAG','#f97316'],['Fre','FREDAG','#3b82f6'],['Lør','LØRDAG','#a855f7'],['Søn','SØNDAG','#ec4899']];
 const DEMO_STAFF=[['Anna','00'],['Jonas','01'],['Lene','02'],['Mikkel','03'],['Henrik','04'],['Sofie','05'],['Fatima','06'],['Noah','07']].map(([name,id])=>({name,photo:`/assets/demo-staff/person-${id}.webp`}));
-const KEY='visuplanner-demo-session-v3';
+const KEY='visuplanner-demo-session-v4';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value||'').replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const blankDay=()=>({morning:['',''],evening:['',''],night:['',''],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'',dinnerPhoto:'',activities:[]});
@@ -14,8 +14,8 @@ function dateAt(index){const date=monday();date.setDate(date.getDate()+index);re
 function formatDate(date){return new Intl.DateTimeFormat('da-DK',{day:'numeric',month:'long'}).format(date)}
 function status(text){$('demoStatus').textContent=text;setTimeout(()=>$('demoStatus').textContent='',2200)}
 function staffOptions(value=''){return '<option value="">Vælg medarbejder</option>'+DEMO_STAFF.map(person=>`<option ${person.name===value?'selected':''}>${esc(person.name)}</option>`).join('')}
-function activeShifts(){const s=demoState.settings;if(s.shiftMode===1)return['morning'];if(s.shiftMode===2)return s.nightEnabled?['morning','night']:['morning'];return s.nightEnabled?['morning','evening','night']:['morning','evening']}
-function demoShiftLabel(type){if(type==='morning'&&demoState.settings.shiftMode===1)return'Hele døgnet';if(type==='morning'&&demoState.settings.shiftMode===2)return'Dag';return{morning:'Morgen',evening:'Aften',night:'Nat'}[type]}
+function activeShifts(){const s=demoState.settings;if(s.shiftMode<3)return s.nightEnabled?['morning','night']:['morning'];return s.nightEnabled?['morning','evening','night']:['morning','evening']}
+function demoShiftLabel(type){if(type==='morning'&&demoState.settings.shiftMode<3)return'Dagvagt';return{morning:'Morgen',evening:'Aften',night:'Nat'}[type]}
 
 function renderPeople(target,names){
   $(target).innerHTML=names.filter(Boolean).length?names.filter(Boolean).map(name=>{const person=DEMO_STAFF.find(item=>item.name===name);return `<div class="person demo-person" data-demo-image="${esc(person?.photo)}" data-demo-caption="${esc(name)}"><img src="${esc(person?.photo)}" alt=""><span>${esc(name)}</span></div>`}).join(''):'<p class="empty">Ikke udfyldt</p>';
