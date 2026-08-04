@@ -16,12 +16,15 @@ const DAYS = [
   { key: 'sunday', short: 'Søn', name: 'SØNDAG', color: '#ec4899' }
 ];
 
-const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''], dinner: '', dinnerPhotoUrl: '', activities: [] });
+const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''], breakfast: '', breakfastPhotoUrl: '', lunch: '', lunchPhotoUrl: '', dinner: '', dinnerPhotoUrl: '', activities: [] });
 const state = {
   staff: [],
   week: Object.fromEntries(DAYS.map(day => [day.key, emptyDay()])),
   activeWeekStart: null,
   staffingDefaults: { morning: 2, evening: 2, night: 2 },
+  shiftMode: 3,
+  nightEnabled: true,
+  meals: { breakfast: false, lunch: false, dinner: true },
   showDatesPublic: true,
   session: null
 };
@@ -29,11 +32,13 @@ const state = {
 let selectedIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
 let editingActivities = [];
 let pendingDinnerPhoto = null;
+let pendingMealPhotos = { breakfast: null, lunch: null, dinner: null };
 let refreshTimer = null;
 let editingWeekStart = null;
 let editingWeek = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
 let editingShifts = { morning: [], evening: [], night: [] };
 let selectedPexelsPhoto = null;
+let mealSearchTarget = 'dinner';
 const signedImageCache = new Map();
 
 const el = id => document.getElementById(id);
@@ -96,8 +101,20 @@ function apiHeaders(authenticated = false, extra = {}) {
   return headers;
 }
 
-function isStaffSession() { return [STAFF_LOGIN_EMAIL, PLATFORM_ADMIN_EMAIL].includes(state.session?.user?.email); }
+function isStaffSession() { return Boolean(state.session?.user?.email) && state.session.user.email !== VIEWER_LOGIN_EMAIL; }
 function isViewerSession() { return state.session?.user?.email === VIEWER_LOGIN_EMAIL; }
+
+function activeShiftTypes() {
+  if (state.shiftMode === 1) return ['morning'];
+  if (state.shiftMode === 2) return state.nightEnabled ? ['morning', 'night'] : ['morning'];
+  return state.nightEnabled ? ['morning', 'evening', 'night'] : ['morning', 'evening'];
+}
+
+function shiftLabel(type) {
+  if (type === 'morning' && state.shiftMode === 1) return 'Hele døgnet';
+  if (type === 'morning' && state.shiftMode === 2) return 'Dag';
+  return { morning: 'Morgen', evening: 'Aften', night: 'Nat' }[type];
+}
 
 async function apiFetch(path, options = {}, authenticated = false) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
@@ -159,7 +176,10 @@ async function signInViewer(password) {
 }
 
 async function signIn(password) {
-  saveSession(await authenticate(STAFF_LOGIN_EMAIL, password, 'Forkert personalekode.'));
+  const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:'team-2',action:'login',password})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||'Forkert personalekode.');
+  saveSession(data);
 }
 
 async function signOut() {
@@ -239,7 +259,11 @@ async function fetchWeek(weekStart) {
     apiFetch(`/rest/v1/shifts?select=*&plan_date=in.${dateFilter}`, {}, true),
     apiFetch(`/rest/v1/activities?select=*&plan_date=in.${dateFilter}&order=activity_time.asc,sort_order.asc`, {}, true)
   ]);
-  const securePlans = await Promise.all((plans || []).map(async item => ({ ...item, dinner_photo_url: await resolvePhotoUrl(item.dinner_photo_url || '') })));
+  const securePlans = await Promise.all((plans || []).map(async item => ({ ...item,
+    breakfast_photo_url: await resolvePhotoUrl(item.breakfast_photo_url || ''),
+    lunch_photo_url: await resolvePhotoUrl(item.lunch_photo_url || ''),
+    dinner_photo_url: await resolvePhotoUrl(item.dinner_photo_url || '')
+  })));
   const secureActivities = await Promise.all((activities || []).map(async item => ({ ...item, photo_url: await resolvePhotoUrl(item.photo_url || '') })));
   const week = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
   const staffById = new Map(state.staff.map(person => [person.id, person]));
@@ -248,6 +272,10 @@ async function fetchWeek(weekStart) {
       const data = week[DAYS[index].key];
       const plan = securePlans.find(item => item.plan_date === date);
       if (plan) {
+        data.breakfast = plan.breakfast_name || '';
+        data.breakfastPhotoUrl = plan.breakfast_photo_url || '';
+        data.lunch = plan.lunch_name || '';
+        data.lunchPhotoUrl = plan.lunch_photo_url || '';
         data.dinner = plan.dinner_name || '';
         data.dinnerPhotoUrl = plan.dinner_photo_url || '';
       }
@@ -271,7 +299,7 @@ async function loadData({ quiet = false } = {}) {
   try {
     const [staff, settings] = await Promise.all([
       apiFetch('/rest/v1/staff?select=*&order=sort_order.asc,name.asc', {}, true),
-      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public&id=eq.team2', {}, true)
+      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public,shift_mode,night_enabled,show_breakfast,show_lunch&id=eq.team2', {}, true)
     ]);
     state.staff = await Promise.all((staff || []).map(async person => ({ ...person, photo_url: await resolvePhotoUrl(person.photo_url || '') })));
     const savedWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
@@ -285,6 +313,9 @@ async function loadData({ quiet = false } = {}) {
       night: settings?.[0]?.night_staff_count || 2
     };
     state.showDatesPublic = settings?.[0]?.show_dates_public ?? true;
+    state.shiftMode = Number(settings?.[0]?.shift_mode || 3);
+    state.nightEnabled = settings?.[0]?.night_enabled ?? true;
+    state.meals = { breakfast: settings?.[0]?.show_breakfast ?? false, lunch: settings?.[0]?.show_lunch ?? false, dinner: true };
     if (state.activeWeekStart !== currentCalendarWeekStart()) selectedIndex = 0;
     state.week = await fetchWeek(state.activeWeekStart);
     render();
@@ -331,11 +362,21 @@ function render() {
   document.documentElement.style.setProperty('--day-color', day.color);
   el('dayLabel').textContent = day.name;
   el('dateLabel').textContent = formatDate(dateForIndex(selectedIndex, state.activeWeekStart));
-  renderPeople('morningStaff', data.morning);
-  renderPeople('eveningStaff', data.evening);
-  renderPeople('nightStaff', data.night);
-  el('dinnerText').textContent = data.dinner || 'Ikke udfyldt';
-  el('dinnerPhoto').innerHTML = data.dinnerPhotoUrl ? `<button class="image-button" data-enlarge-image="${escapeHtml(data.dinnerPhotoUrl)}" data-image-caption="${escapeHtml(data.dinner || 'Aftensmad')}" aria-label="Vis stort billede af aftensmaden"><img src="${escapeHtml(data.dinnerPhotoUrl)}" alt="${escapeHtml(data.dinner || 'Aftensmad')}"></button>` : '';
+  ['morning','evening','night'].forEach(type => {
+    const active = activeShiftTypes().includes(type);
+    el(`${type}Panel`).hidden = !active;
+    el(`${type}Panel`).querySelector('h3').textContent = `${{morning:'☀️',evening:'🌙',night:'🌑'}[type]} ${shiftLabel(type)}`;
+    if (active) renderPeople(`${type}Staff`, data[type]);
+  });
+  ['breakfast','lunch','dinner'].forEach(type => {
+    const visible = state.meals[type];
+    el(`${type}Panel`).hidden = !visible;
+    if (!visible) return;
+    el(`${type}Text`).textContent = data[type] || 'Ikke udfyldt';
+    const photo = data[`${type}PhotoUrl`];
+    const label = {breakfast:'morgenmaden',lunch:'frokosten',dinner:'aftensmaden'}[type];
+    el(`${type}Photo`).innerHTML = photo ? `<button class="image-button" data-enlarge-image="${escapeHtml(photo)}" data-image-caption="${escapeHtml(data[type] || label)}" aria-label="Vis stort billede af ${label}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(data[type] || label)}"></button>` : '';
+  });
   el('activitiesList').innerHTML = data.activities.length ? data.activities.map(activity => `<div class="activity">
     ${activity.photoUrl ? `<button class="activity-photo image-button" data-enlarge-image="${escapeHtml(activity.photoUrl)}" data-image-caption="${escapeHtml(activity.name)}" aria-label="Vis stort billede af ${escapeHtml(activity.name)}"><img src="${escapeHtml(activity.photoUrl)}" alt=""></button>` : ''}
     <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>
@@ -419,9 +460,13 @@ function loadAdminDay() {
     while (editingShifts[type].length < state.staffingDefaults[type]) editingShifts[type].push('');
   });
   renderShiftEditors();
-  el('dinnerInput').value = data.dinner || '';
-  el('dinnerPhotoInput').value = '';
-  el('dinnerPhotoName').textContent = data.dinnerPhotoUrl ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
+  ['breakfast','lunch','dinner'].forEach(type => {
+    el(`${type}EditorSection`).hidden = !state.meals[type];
+    el(`${type}Input`).value = data[type] || '';
+    el(`${type}PhotoInput`).value = '';
+    el(`${type}PhotoName`).textContent = data[`${type}PhotoUrl`] ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
+    pendingMealPhotos[type] = null;
+  });
   pendingDinnerPhoto = null;
   selectedPexelsPhoto = null;
   editingActivities = structuredClone(data.activities || []);
@@ -452,9 +497,11 @@ function renderPexelsResults(photos) {
       if (!imageResponse.ok) throw new Error('Billedet kunne ikke hentes.');
       const blob = await imageResponse.blob();
       selectedPexelsPhoto = photo;
-      pendingDinnerPhoto = new File([blob], `pexels-${photo.id}.jpg`, { type: blob.type || 'image/jpeg' });
-      el('dinnerPhotoInput').value = '';
-      el('dinnerPhotoName').textContent = `Billede valgt fra Pexels · Foto: ${photo.photographer}`;
+      const selectedFile = new File([blob], `pexels-${photo.id}.jpg`, { type: blob.type || 'image/jpeg' });
+      pendingMealPhotos[mealSearchTarget] = selectedFile;
+      if(mealSearchTarget==='dinner') pendingDinnerPhoto=selectedFile;
+      el(`${mealSearchTarget}PhotoInput`).value = '';
+      el(`${mealSearchTarget}PhotoName`).textContent = `Billede valgt fra Pexels · Foto: ${photo.photographer}`;
       el('imageSearchDialog').close();
       setStatus('Billedet er valgt – husk Gem dagen', 'success');
     } catch (error) {
@@ -466,8 +513,12 @@ function renderPexelsResults(photos) {
 }
 
 function renderShiftEditors() {
-  const labels = { morning: 'Morgen', evening: 'Aften', night: 'Nat' };
+  const labels = { morning: shiftLabel('morning'), evening: shiftLabel('evening'), night: shiftLabel('night') };
   ['morning', 'evening', 'night'].forEach(type => {
+    const active = activeShiftTypes().includes(type);
+    el(`${type}EditorGroup`).hidden = !active;
+    el(`${type}EditorGroup`).querySelector('h4').textContent = `${{morning:'☀️',evening:'🌙',night:'🌑'}[type]} ${labels[type]}`;
+    if (!active) return;
     const values = editingShifts[type];
     el(`${type}Editors`).innerHTML = values.map((value, index) => `<div class="shift-person-row">
       <select data-shift-type="${type}" data-shift-index="${index}" aria-label="${labels[type]} medarbejder ${index + 1}">${staffOptions(value)}</select>
@@ -654,17 +705,23 @@ async function saveDay() {
   const existing = editingWeek[DAYS[index].key];
 
   try {
-    let dinnerPhotoUrl = stablePhotoUrl(existing.dinnerPhotoUrl || '');
-    if (pendingDinnerPhoto) dinnerPhotoUrl = await uploadImage(pendingDinnerPhoto, `dinners/${planDate}-${Date.now()}.jpg`);
+    const mealValues = {};
+    for (const type of ['breakfast','lunch','dinner']) {
+      let photoUrl = stablePhotoUrl(existing[`${type}PhotoUrl`] || '');
+      const pending = pendingMealPhotos[type] || (type === 'dinner' ? pendingDinnerPhoto : null);
+      if (pending) photoUrl = await uploadImage(pending, `meals/${type}-${planDate}-${Date.now()}.jpg`);
+      mealValues[`${type}_name`] = el(`${type}Input`).value.trim();
+      mealValues[`${type}_photo_url`] = photoUrl || null;
+    }
 
     await apiFetch('/rest/v1/day_plans?on_conflict=plan_date', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ plan_date: planDate, dinner_name: el('dinnerInput').value.trim(), dinner_photo_url: dinnerPhotoUrl, updated_at: new Date().toISOString() })
+      body: JSON.stringify({ plan_date: planDate, ...mealValues, updated_at: new Date().toISOString() })
     }, true);
 
     await apiFetch(`/rest/v1/shifts?plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
-    const shifts = ['morning', 'evening', 'night'].flatMap(shiftType => editingShifts[shiftType].map((name, index) => {
+    const shifts = activeShiftTypes().flatMap(shiftType => editingShifts[shiftType].map((name, index) => {
       const person = staffByName(name);
       return person ? { plan_date: planDate, shift_type: shiftType, slot: index + 1, staff_id: person.id } : null;
     })).filter(Boolean);
@@ -749,7 +806,20 @@ function openSettings() {
   el('eveningDefault').value = state.staffingDefaults.evening;
   el('nightDefault').value = state.staffingDefaults.night;
   el('showDatesPublic').checked = state.showDatesPublic;
+  el('shiftMode').value = String(state.shiftMode);
+  el('nightEnabled').checked = state.nightEnabled;
+  el('showBreakfast').checked = state.meals.breakfast;
+  el('showLunch').checked = state.meals.lunch;
+  updateSettingsVisibility();
   el('settingsDialog').showModal();
+}
+
+function updateSettingsVisibility() {
+  const mode = Number(el('shiftMode').value);
+  el('eveningDefaultLabel').hidden = mode < 3;
+  el('nightEnabledSetting').hidden = mode === 1;
+  el('nightDefaultLabel').hidden = mode === 1 || !el('nightEnabled').checked;
+  el('morningDefaultLabel').firstChild.textContent = mode === 1 ? 'Normal bemanding hele døgnet' : mode === 2 ? 'Normal dagbemanding' : 'Normal morgenbemanding';
 }
 
 async function saveSettings() {
@@ -770,11 +840,18 @@ async function saveSettings() {
         evening_staff_count: defaults.evening,
         night_staff_count: defaults.night,
         show_dates_public: el('showDatesPublic').checked,
+        shift_mode: Number(el('shiftMode').value),
+        night_enabled: Number(el('shiftMode').value) > 1 && el('nightEnabled').checked,
+        show_breakfast: el('showBreakfast').checked,
+        show_lunch: el('showLunch').checked,
         updated_at: new Date().toISOString()
       })
     }, true);
     state.staffingDefaults = defaults;
     state.showDatesPublic = el('showDatesPublic').checked;
+    state.shiftMode = Number(el('shiftMode').value);
+    state.nightEnabled = state.shiftMode > 1 && el('nightEnabled').checked;
+    state.meals = { breakfast: el('showBreakfast').checked, lunch: el('showLunch').checked, dinner: true };
     render();
     el('settingsDialog').close();
     loadAdminDay();
@@ -786,6 +863,37 @@ async function saveSettings() {
     button.disabled = false;
     button.textContent = 'Gem indstillinger';
   }
+}
+
+async function teamAccountAction(action, value) {
+  const response = await fetch('/api/team-account', { method:'POST', headers:{ 'Content-Type':'application/json', Authorization:`Bearer ${state.session.access_token}` }, body:JSON.stringify({ action, value }) });
+  const data = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(data.error || 'Handlingen mislykkedes.');
+  return data;
+}
+
+async function saveViewerCode() {
+  const input=el('newViewerCode'),button=el('saveViewerCode'),value=input.value;
+  if(value.length<6){setStatus('Tavlekoden skal have mindst seks tegn.','error');return}
+  if(!confirm('Vil du sætte en ny tavlekode? Den gamle kode stopper med at virke.'))return;
+  button.disabled=true;button.textContent='Gemmer…';
+  try{await teamAccountAction('reset-viewer',value);input.value='';setStatus('Den nye tavlekode er gemt','success')}
+  catch(error){setStatus(error.message,'error')}
+  finally{button.disabled=false;button.textContent='Sæt ny tavlekode'}
+}
+
+async function sendStaffRecovery(email) {
+  const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:'team-2',action:'recover',email})});
+  if(!response.ok)throw new Error('Mailen kunne ikke sendes. Prøv igen senere.');
+}
+
+async function handleRecoveryLink() {
+  const params=new URLSearchParams(location.hash.slice(1));
+  if(params.get('type')!=='recovery'||!params.get('access_token'))return false;
+  state.session={access_token:params.get('access_token'),refresh_token:params.get('refresh_token'),user:{email:STAFF_LOGIN_EMAIL}};
+  history.replaceState(null,'',location.pathname);
+  el('newPasswordDialog').showModal();
+  return true;
 }
 
 el('prevDay').addEventListener('click', () => { selectedIndex = (selectedIndex + 6) % 7; render(); });
@@ -840,22 +948,33 @@ document.querySelectorAll('[data-add-shift]').forEach(button => button.addEventL
   renderShiftEditors();
 }));
 el('openSettingsButton').addEventListener('click', openSettings);
+el('shiftMode').addEventListener('change',updateSettingsVisibility);
+el('nightEnabled').addEventListener('change',updateSettingsVisibility);
 el('closeSettingsButton').addEventListener('click', () => el('settingsDialog').close());
 el('saveSettingsButton').addEventListener('click', saveSettings);
+el('saveViewerCode').addEventListener('click',saveViewerCode);
+el('toggleViewerCode').addEventListener('click',()=>{const input=el('newViewerCode');input.type=input.type==='password'?'text':'password';el('toggleViewerCode').textContent=input.type==='password'?'Vis':'Skjul'});
 el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', name: '' }); renderActivityEditor(); });
 el('saveDayButton').addEventListener('click', saveDay);
 el('addStaffButton').addEventListener('click', addStaff);
-el('dinnerPhotoInput').addEventListener('change', event => {
-  pendingDinnerPhoto = event.target.files?.[0] || null;
-  selectedPexelsPhoto = null;
-  el('dinnerPhotoName').textContent = pendingDinnerPhoto ? pendingDinnerPhoto.name : 'Intet billede valgt.';
-});
-el('openDinnerImageSearch').addEventListener('click', () => {
-  el('imageSearchInput').value = el('dinnerInput').value.trim();
+['breakfast','lunch','dinner'].forEach(type=>el(`${type}PhotoInput`).addEventListener('change',event=>{pendingMealPhotos[type]=event.target.files?.[0]||null;if(type==='dinner'){pendingDinnerPhoto=pendingMealPhotos[type];selectedPexelsPhoto=null}el(`${type}PhotoName`).textContent=pendingMealPhotos[type]?pendingMealPhotos[type].name:'Intet billede valgt.'}));
+el('openStaffManagerButton').addEventListener('click',()=>{renderStaffManager();el('staffManagerDialog').showModal()});
+el('closeStaffManagerButton').addEventListener('click',()=>el('staffManagerDialog').close());
+el('openViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').showModal());
+el('closeViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').close());
+el('viewerHelpForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('viewerHelpStatus').textContent='Sender…';try{const response=await fetch('/api/public-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'viewer-help',team_slug:'team-2',contact_name:el('viewerHelpName').value,contact_email:el('viewerHelpEmail').value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Kunne ikke sende anmodningen.');event.target.reset();el('viewerHelpStatus').textContent='Anmodningen er sendt. Du bliver kontaktet på arbejdsmailen.'}catch(error){el('viewerHelpStatus').textContent=error.message}finally{button.disabled=false}});
+el('forgotStaffPassword').addEventListener('click',()=>{el('loginDialog').close();el('staffRecoveryDialog').showModal()});
+el('closeStaffRecovery').addEventListener('click',()=>el('staffRecoveryDialog').close());
+el('staffRecoveryForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('staffRecoveryStatus').textContent='Sender…';try{await sendStaffRecovery(el('staffRecoveryEmail').value.trim());el('staffRecoveryStatus').textContent='Hvis mailen er registreret på teamets personalelogin, er nulstillingslinket sendt.'}catch(error){el('staffRecoveryStatus').textContent=error.message}finally{button.disabled=false}});
+el('newPasswordForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{await apiFetch('/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:el('recoveryNewPassword').value})},true);el('newPasswordStatus').textContent='Koden er ændret. Du kan nu logge ind som personale.';setTimeout(()=>location.href='/team-2',1500)}catch{el('newPasswordStatus').textContent='Koden kunne ikke ændres. Bed om et nyt link.'}finally{button.disabled=false}});
+document.querySelectorAll('[data-open-meal-search]').forEach(searchButton=>searchButton.addEventListener('click', () => {
+  mealSearchTarget=searchButton.dataset.openMealSearch;
+  el('imageSearchTitle').textContent=`Find billede til ${{breakfast:'morgenmad',lunch:'frokost',dinner:'aftensmad'}[mealSearchTarget]}`;
+  el('imageSearchInput').value = el(`${mealSearchTarget}Input`).value.trim();
   el('imageSearchResults').innerHTML = '<p class="image-search-message">Skriv fx “lasagne”, “frikadeller” eller “kylling med ris”.</p>';
   el('imageSearchDialog').showModal();
   el('imageSearchInput').focus();
-});
+}));
 el('closeImageSearch').addEventListener('click', () => el('imageSearchDialog').close());
 el('imageSearchForm').addEventListener('submit', async event => {
   event.preventDefault();
@@ -873,6 +992,7 @@ document.addEventListener('error', event => { if (event.target instanceof HTMLIm
 
 async function init() {
   renderLoginState();
+  if(await handleRecoveryLink())return;
   await restoreSession();
   if (!state.session || (!isStaffSession() && !isViewerSession())) {
     clearSession();

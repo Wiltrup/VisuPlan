@@ -4,6 +4,8 @@
   "rewrites": [
     { "source": "/team-2", "destination": "/app" },
     { "source": "/team-2/", "destination": "/app" },
+    { "source": "/opret", "destination": "/opret.html" },
+    { "source": "/saadan-virker-det", "destination": "/saadan-virker-det.html" },
     { "source": "/administration", "destination": "/admin" }
   ]
 }

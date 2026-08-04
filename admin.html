@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/admin.css"><title>Administration – VisuPlanner</title>
+  <link rel="stylesheet" href="/admin.css"><link rel="stylesheet" href="/admin-extra.css"><title>Administration – VisuPlanner</title>
 </head>
 <body>
   <header><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a><a href="/">Til forsiden</a></header>
@@ -19,6 +19,8 @@
     <section id="adminDashboard" hidden>
       <div class="dashboard-head"><div><p class="eyebrow">TEAMS</p><h2>Oprettede tavler</h2></div><button id="platformLogout" class="secondary">Log ud</button></div>
       <div id="teamCards"></div>
+      <div class="request-section"><h2>Nye oprettelsesforespørgsler</h2><div id="onboardingRequests"></div></div>
+      <div class="request-section"><h2>Hjælp til tavleadgang</h2><div id="accessHelpRequests"></div></div>
     </section>
   </main>
   <div id="adminStatus" role="status"></div><script src="/admin.js"></script>

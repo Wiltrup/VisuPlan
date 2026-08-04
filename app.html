@@ -31,19 +31,25 @@
       </section>
 
       <section class="grid">
-        <article class="panel">
+        <article id="morningPanel" class="panel shift-panel">
           <h3>☀️ Morgen</h3>
           <div id="morningStaff" class="people"></div>
         </article>
-        <article class="panel">
+        <article id="eveningPanel" class="panel shift-panel">
           <h3>🌙 Aften</h3>
           <div id="eveningStaff" class="people"></div>
         </article>
-        <article class="panel">
+        <article id="nightPanel" class="panel shift-panel">
           <h3>🌑 Nat</h3>
           <div id="nightStaff" class="people"></div>
         </article>
-        <article class="panel dinner-panel">
+        <article id="breakfastPanel" class="panel meal-panel" hidden>
+          <h3>🥐 Morgenmad</h3><div id="breakfastPhoto" class="dinner-photo"></div><p id="breakfastText" class="large-text"></p>
+        </article>
+        <article id="lunchPanel" class="panel meal-panel" hidden>
+          <h3>🥪 Frokost</h3><div id="lunchPhoto" class="dinner-photo"></div><p id="lunchText" class="large-text"></p>
+        </article>
+        <article id="dinnerPanel" class="panel dinner-panel meal-panel">
           <h3>🍽️ Aftensmad</h3>
           <div id="dinnerPhoto" class="dinner-photo"></div>
           <p id="dinnerText" class="large-text"></p>
@@ -71,6 +77,7 @@
       <label>Teamkode<input id="viewerPinInput" name="password" type="password" autocomplete="current-password" required autofocus></label>
       <p id="viewerLoginError" class="error"></p>
       <button id="viewerLoginSubmit" type="submit">Åbn tavlen</button>
+      <button id="openViewerHelp" class="subtle-help-link" type="button">Problemer med adgang?</button>
       <a class="viewer-back-link" href="/login">← Vælg et andet team</a>
     </form>
   </dialog>
@@ -83,6 +90,7 @@
         <input id="pinInput" name="password" type="password" autocomplete="current-password" required />
       </label>
       <p id="loginError" class="error"></p>
+      <button id="forgotStaffPassword" type="button" class="subtle-help-link">Glemt personalekoden?</button>
       <div class="dialog-actions">
         <button id="closeLoginButton" type="button" class="secondary">Luk</button>
         <button type="submit" id="loginSubmit">Log ind</button>
@@ -119,25 +127,31 @@
       <div class="form-section">
         <h3>Personale</h3>
         <div class="shift-editor-grid">
-          <section class="shift-editor-group">
+          <section id="morningEditorGroup" class="shift-editor-group">
             <div class="section-title-row"><h4>☀️ Morgen</h4><button class="secondary small" data-add-shift="morning" type="button">+ Medarbejder</button></div>
             <div id="morningEditors" class="shift-editor-rows"></div>
           </section>
-          <section class="shift-editor-group">
+          <section id="eveningEditorGroup" class="shift-editor-group">
             <div class="section-title-row"><h4>🌙 Aften</h4><button class="secondary small" data-add-shift="evening" type="button">+ Medarbejder</button></div>
             <div id="eveningEditors" class="shift-editor-rows"></div>
           </section>
-          <section class="shift-editor-group">
+          <section id="nightEditorGroup" class="shift-editor-group">
             <div class="section-title-row"><h4>🌑 Nat</h4><button class="secondary small" data-add-shift="night" type="button">+ Medarbejder</button></div>
             <div id="nightEditors" class="shift-editor-rows"></div>
           </section>
         </div>
       </div>
 
-      <div class="form-section">
-        <h3>Aftensmad</h3>
+      <div id="breakfastEditorSection" class="form-section meal-editor-section" hidden>
+        <h3>🥐 Morgenmad</h3><input id="breakfastInput" placeholder="Fx Havregrød"><button class="pexels-search-button" data-open-meal-search="breakfast" type="button">🔎 Søg efter billede</button><label class="photo-field">Billede af morgenmaden<input id="breakfastPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><p id="breakfastPhotoName" class="file-note">Intet billede valgt.</p>
+      </div>
+      <div id="lunchEditorSection" class="form-section meal-editor-section" hidden>
+        <h3>🥪 Frokost</h3><input id="lunchInput" placeholder="Fx Rugbrød"><button class="pexels-search-button" data-open-meal-search="lunch" type="button">🔎 Søg efter billede</button><label class="photo-field">Billede af frokosten<input id="lunchPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><p id="lunchPhotoName" class="file-note">Intet billede valgt.</p>
+      </div>
+      <div id="dinnerEditorSection" class="form-section meal-editor-section">
+        <h3>🍽️ Aftensmad</h3>
         <input id="dinnerInput" placeholder="Fx Mad i TAK" />
-        <button id="openDinnerImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede</button>
+        <button id="openDinnerImageSearch" class="pexels-search-button" data-open-meal-search="dinner" type="button">🔎 Søg efter billede</button>
         <label class="photo-field">Billede af aftensmaden
           <input id="dinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" />
         </label>
@@ -152,16 +166,7 @@
         <div id="activityEditor"></div>
       </div>
 
-      <div class="form-section">
-        <div class="section-title-row">
-          <h3>Medarbejdere</h3>
-        </div>
-        <div class="inline-form">
-          <input id="newStaffName" placeholder="Navn på medarbejder eller vikar" />
-          <button id="addStaffButton" type="button">Tilføj</button>
-        </div>
-        <div id="staffManager" class="staff-manager"></div>
-      </div>
+      <button id="openStaffManagerButton" class="staff-manager-launch" type="button"><span class="avatar-stack"><i>👤</i><i>👤</i><i>👤</i></span><span><strong>Rediger medarbejderliste</strong><small>Tilføj, ret eller fjern medarbejdere</small></span><b>›</b></button>
 
       <div class="dialog-actions sticky-actions">
         <button id="logoutButton" class="danger secondary" type="button">Log ud</button>
@@ -178,16 +183,28 @@
         <div><p class="eyebrow">TEAM 2</p><h2>Grundindstillinger</h2></div>
         <button id="closeSettingsButton" class="icon-button" aria-label="Luk">✕</button>
       </div>
-      <p class="note">Vælg hvor mange medarbejderfelter der normalt skal vises på hver vagt. Der kan altid tilføjes ekstra på den enkelte dag.</p>
+      <p class="note">Tilpas tavlens faste opbygning. Valgene gælder for hele teamet og fylder ikke i den daglige redigering.</p>
       <div class="settings-fields">
-        <label>Normal morgenbemanding<input id="morningDefault" type="number" min="1" max="10"></label>
-        <label>Normal aftenbemanding<input id="eveningDefault" type="number" min="1" max="10"></label>
-        <label>Normal natbemanding<input id="nightDefault" type="number" min="1" max="10"></label>
+        <label>Opdeling af personaledøgnet<select id="shiftMode"><option value="3">Morgen, aften og nat</option><option value="2">Dag og nat</option><option value="1">Hele døgnet</option></select></label>
+        <label id="nightEnabledSetting" class="toggle-setting"><input id="nightEnabled" type="checkbox"><span><strong>Vis nattevagt</strong><small>Slå fra på steder uden nattevagt.</small></span></label>
+        <label id="morningDefaultLabel">Normal morgenbemanding<input id="morningDefault" type="number" min="1" max="10"></label>
+        <label id="eveningDefaultLabel">Normal aftenbemanding<input id="eveningDefault" type="number" min="1" max="10"></label>
+        <label id="nightDefaultLabel">Normal natbemanding<input id="nightDefault" type="number" min="1" max="10"></label>
         <label class="toggle-setting"><input id="showDatesPublic" type="checkbox"><span><strong>Vis datoer på beboertavlen</strong><small>Viser datoen under hver ugedag.</small></span></label>
+        <label class="toggle-setting"><input id="showBreakfast" type="checkbox"><span><strong>Vis morgenmad</strong><small>Tilføjer morgenmad til tavlen og redigeringen.</small></span></label>
+        <label class="toggle-setting"><input id="showLunch" type="checkbox"><span><strong>Vis frokost</strong><small>Tilføjer frokost til tavlen og redigeringen.</small></span></label>
       </div>
+      <div class="settings-account-section"><h3>Adgang til tavlen</h3><p class="note">Af sikkerhedshensyn kan den nuværende tavlekode ikke aflæses. Du kan altid erstatte den med en ny.</p><label>Ny tavlekode<div class="password-row"><input id="newViewerCode" type="password" minlength="6" autocomplete="new-password" placeholder="Mindst 6 tegn"><button id="toggleViewerCode" class="secondary" type="button">Vis</button></div></label><button id="saveViewerCode" class="danger-button" type="button">Sæt ny tavlekode</button></div>
       <div class="dialog-actions"><button id="saveSettingsButton" type="button">Gem indstillinger</button></div>
     </div>
   </dialog>
+
+  <dialog id="staffManagerDialog"><div class="dialog-card staff-manager-card"><div class="admin-heading"><div><p class="eyebrow">PERSONALE</p><h2>Medarbejderliste</h2></div><button id="closeStaffManagerButton" class="icon-button" type="button" aria-label="Luk">✕</button></div><div class="inline-form"><input id="newStaffName" placeholder="Navn på medarbejder eller vikar"><button id="addStaffButton" type="button">Tilføj</button></div><div id="staffManager" class="staff-manager"></div></div></dialog>
+
+  <dialog id="viewerHelpDialog"><div class="dialog-card"><div class="admin-heading"><div><p class="eyebrow">HJÆLP TIL ADGANG</p><h2>Kan du ikke åbne tavlen?</h2></div><button id="closeViewerHelp" class="icon-button" type="button">✕</button></div><p>Spørg først en medarbejder i dit team om hjælp. Personalet kan ændre tavlekoden under Grundindstillinger.</p><details class="admin-help-details"><summary>Er tavlekoden glemt af alle?</summary><p>Send en enkelt anmodning til VisuPlanner-administratoren. Skriv en arbejdsmail, så du kan kontaktes.</p><form id="viewerHelpForm"><label>Arbejdsmail<input id="viewerHelpEmail" type="email" required autocomplete="email"></label><label>Kontaktperson<input id="viewerHelpName" required autocomplete="name"></label><p id="viewerHelpStatus" class="note"></p><button type="submit">Send anmodning</button></form></details></div></dialog>
+
+  <dialog id="staffRecoveryDialog"><form id="staffRecoveryForm" class="dialog-card"><div class="admin-heading"><div><p class="eyebrow">PERSONALE</p><h2>Nulstil personalekode</h2></div><button id="closeStaffRecovery" class="icon-button" type="button">✕</button></div><p class="note">Nulstillingslinket sendes til teamets registrerede, ansvarlige arbejdsmail.</p><label>Ansvarlig arbejdsmail<input id="staffRecoveryEmail" type="email" autocomplete="email" required></label><p id="staffRecoveryStatus" class="note"></p><button type="submit">Send nulstillingslink</button></form></dialog>
+  <dialog id="newPasswordDialog"><form id="newPasswordForm" class="dialog-card"><p class="eyebrow">NY PERSONALEKODE</p><h2>Vælg en ny kode</h2><label>Ny personalekode<input id="recoveryNewPassword" type="password" minlength="6" autocomplete="new-password" required></label><p id="newPasswordStatus" class="note"></p><button type="submit">Gem ny personalekode</button></form></dialog>
 
   <dialog id="imageDialog" class="image-dialog">
     <div class="image-dialog-card">
@@ -200,14 +217,14 @@
   <dialog id="imageSearchDialog">
     <div class="dialog-card image-search-card">
       <div class="admin-heading">
-        <div><p class="eyebrow">PEXELS</p><h2>Find et madbillede</h2></div>
+        <div><p class="eyebrow">PEXELS</p><h2 id="imageSearchTitle">Find et madbillede</h2></div>
         <button id="closeImageSearch" class="icon-button" aria-label="Luk">✕</button>
       </div>
       <form id="imageSearchForm" class="image-search-form">
         <input id="imageSearchInput" placeholder="Fx lasagne" autocomplete="off" required />
         <button id="imageSearchSubmit" type="submit">Søg</button>
       </form>
-      <p class="note">Vælg ét billede. Det gemmes kun til denne dags aftensmad.</p>
+      <p class="note">Vælg ét billede. Det gemmes kun til det valgte måltid på denne dag.</p>
       <div id="imageSearchResults" class="image-search-results"></div>
       <p class="pexels-credit">Billeder leveret af <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></p>
     </div>

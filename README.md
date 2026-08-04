@@ -13,6 +13,10 @@ Visuel og fælles ugeplan til Team 2.
 - Fælles synkronisering gennem Supabase
 - Ugeudgivelse og løbende ændringer
 - Mobilvenlig PWA
+- Onboardingformular og administratoroversigt over forespørgsler
+- Selvbetjent nulstilling af personalekode via ansvarlig arbejdsmail
+- Valgfri morgenmad og frokost
+- Valgfri vagtstruktur: hele døgnet, dag/nat eller morgen/aften/nat
 
 ## Pexels
 
@@ -36,6 +40,14 @@ Før panelet bruges:
 4. Redeploy seneste deployment i Vercel.
 
 Den hemmelige nøgle må aldrig lægges i GitHub eller sendes til andre. Den anvendes kun i serverfunktionen `api/platform-admin.js`.
+
+## Opdatering til version 21
+
+Kør `supabase-v21-foundation.sql` én gang i Supabase SQL Editor. Scriptet tilføjer de nye indstillinger og tabeller uden at slette eksisterende data.
+
+Teamets ansvarlige arbejdsmail bør være en rigtig, unik arbejdsmail. Når mailen ændres i administratorpanelet, kobles den til personaleloginnet og kan bruges til “Glemt personalekoden?”. Den samme mail kan ikke samtidig være Supabase-login for platformadministratoren.
+
+Onboarding- og adgangsanmodninger gemmes altid i administratorpanelet. Tilføj miljøvariablen `RESEND_API_KEY` i Vercel og verificér `visuplanner.dk` hos Resend for også at modtage dem som mail på `wiltrup@wiltrup.com`. Hvis mailleveringen er nede, ligger anmodningen stadig sikkert i administrationen.
 
 Team- og personalelogin gemmes kun i `sessionStorage`. Chrome, Safari og andre browsere kan selv tilbyde at huske loginoplysningerne. På en midlertidig computer kan brugeren derfor afslå browserens tilbud, og VisuPlanner-login forsvinder, når browsersessionen afsluttes.
 

@@ -37,8 +37,12 @@ module.exports = async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const teams = await serviceFetch('/rest/v1/teams_registry?select=*&order=name.asc', secret);
-      return response.status(200).json({ teams: teams || [] });
+      const [teams,onboarding,accessHelp] = await Promise.all([
+        serviceFetch('/rest/v1/teams_registry?select=*&order=name.asc', secret),
+        serviceFetch('/rest/v1/onboarding_requests?select=*&order=created_at.desc&limit=100', secret),
+        serviceFetch('/rest/v1/access_help_requests?select=*&order=created_at.desc&limit=100', secret)
+      ]);
+      return response.status(200).json({ teams: teams || [], onboarding: onboarding || [], accessHelp: accessHelp || [] });
     }
     if (request.method !== 'POST') return response.status(405).json({ error: 'Kun GET og POST er tilladt.' });
     const { slug, action, value } = request.body || {};
@@ -49,6 +53,9 @@ module.exports = async function handler(request, response) {
 
     if (action === 'save-contact') {
       if (!/^\S+@\S+\.\S+$/.test(value)) return response.status(400).json({ error: 'Skriv en gyldig arbejdsmail.' });
+      if (team.editor_user_id) {
+        await serviceFetch(`/auth/v1/admin/users/${team.editor_user_id}`, secret, { method:'PUT', body:JSON.stringify({ email:value, email_confirm:true }) });
+      }
       await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, {
         method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ recovery_email: value, updated_at: new Date().toISOString() })
       });

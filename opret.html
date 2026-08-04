@@ -1,0 +1,15 @@
+<!doctype html><html lang="da"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/finder.css"><link rel="stylesheet" href="/forms.css"><title>Opret jer – VisuPlanner</title></head><body>
+<header class="finder-header"><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a><a href="/">Til forsiden</a></header>
+<main class="finder-shell"><section class="finder-intro"><img src="/assets/brand/calendar.png" alt="" class="finder-calendar"><p class="eyebrow">KOM I GANG</p><h1>Opret jeres egen tavle</h1><p>Fortæl kort, hvem I er. Oplysningerne bruges kun til at kontakte jer og klargøre den rigtige løsning.</p></section>
+<form id="onboardingForm" class="finder-card onboarding-card">
+<label>Kontaktperson<input name="contact_name" required autocomplete="name" placeholder="Navn"></label>
+<label>Arbejdsmail<input name="contact_email" required type="email" autocomplete="email" placeholder="navn@arbejdsplads.dk"></label>
+<label>Telefon <small>(valgfrit)</small><input name="phone" type="tel" autocomplete="tel"></label>
+<label>Kommune<input name="municipality" required placeholder="Fx Halsnæs Kommune"></label>
+<label>Arbejdsplads<input name="workplace" required placeholder="Arbejdspladsens navn eller adresse"></label>
+<label>Team/afdeling<input name="team_name" required placeholder="Fx Team 2"></label>
+<label>Hvor mange beboere skal kunne bruge tavlen?<input name="resident_count" required type="number" min="1" max="500" inputmode="numeric"></label>
+<label>Bemærkninger <small>(valgfrit)</small><textarea name="notes" rows="4" placeholder="Særlige ønsker eller spørgsmål"></textarea></label>
+<label class="consent-row"><input name="consent" type="checkbox" required><span>Jeg accepterer, at Jakob Wiltrup må kontakte mig om VisuPlanner.</span></label>
+<p id="onboardingStatus" class="finder-message" aria-live="polite"></p><button type="submit">Send forespørgsel</button>
+</form></main><footer>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></footer><script src="/opret.js"></script></body></html>
