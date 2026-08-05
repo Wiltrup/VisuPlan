@@ -96,10 +96,19 @@ create policy tenant_activities_write on public.activities for all to authentica
 create policy tenant_settings_read on public.team_settings for select to authenticated using(public.can_view_team(team_slug));
 create policy tenant_settings_write on public.team_settings for all to authenticated using(public.can_edit_team(team_slug)) with check(public.can_edit_team(team_slug));
 
-do $$ declare p record; begin
-  for p in select policyname from pg_policies where schemaname='storage' and tablename='objects'
-  loop execute format('drop policy if exists %I on storage.objects',p.policyname); end loop;
-end $$;
+-- Fjern kun VisuPlanners egne tidligere billedpolitikker. Andre buckets og
+-- andre projekters Storage-politikker i samme Supabase-projekt bevares.
+drop policy if exists visuplanner_authenticated_read_images on storage.objects;
+drop policy if exists visuplanner_staff_insert_images on storage.objects;
+drop policy if exists visuplanner_staff_update_images on storage.objects;
+drop policy if exists visuplanner_staff_delete_images on storage.objects;
+drop policy if exists visuplanner_team2_insert_images on storage.objects;
+drop policy if exists visuplanner_team2_update_images on storage.objects;
+drop policy if exists visuplanner_team2_delete_images on storage.objects;
+drop policy if exists tenant_images_read on storage.objects;
+drop policy if exists tenant_images_insert on storage.objects;
+drop policy if exists tenant_images_update on storage.objects;
+drop policy if exists tenant_images_delete on storage.objects;
 create policy tenant_images_read on storage.objects for select to authenticated
   using(bucket_id='visuplan-images' and (public.can_view_team((storage.foldername(name))[1]) or (public.current_team_slug()='trekloeveret-team-2' and (storage.foldername(name))[1] in ('staff','meals','activities'))));
 create policy tenant_images_insert on storage.objects for insert to authenticated
