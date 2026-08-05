@@ -1,36 +1,9 @@
-const municipality = document.getElementById('municipality');
-const workplace = document.getElementById('workplace');
-const team = document.getElementById('team');
-const button = document.getElementById('openTeam');
-const message = document.getElementById('finderMessage');
-
-municipality.addEventListener('change', () => {
-  workplace.innerHTML = municipality.value === 'halsnaes'
-    ? '<option value="">Vælg arbejdsplads</option><option value="trekloeveret">Center for Botilbud og Beskæftigelse – Trekløveret</option>'
-    : '<option value="">Vælg arbejdsplads</option>';
-  workplace.disabled = !municipality.value;
-  team.innerHTML = '<option value="">Vælg team</option>';
-  team.disabled = true;
-  button.disabled = true;
-  message.textContent = '';
-});
-
-workplace.addEventListener('change', () => {
-  team.innerHTML = workplace.value === 'trekloeveret'
-    ? '<option value="">Vælg team</option><option value="team-1">Team 1 – ikke oprettet endnu</option><option value="team-2">Team 2</option><option value="team-3">Team 3 – ikke oprettet endnu</option><option value="opgangen">Opgangen – ikke oprettet endnu</option>'
-    : '<option value="">Vælg team</option>';
-  team.disabled = !workplace.value;
-  button.disabled = true;
-  message.textContent = '';
-});
-
-team.addEventListener('change', () => {
-  const ready = team.value === 'team-2';
-  button.disabled = !ready;
-  message.textContent = team.value && !ready ? 'Dette team er endnu ikke oprettet i VisuPlanner.' : '';
-});
-
-document.getElementById('teamFinder').addEventListener('submit', event => {
-  event.preventDefault();
-  if (team.value === 'team-2') window.location.href = '/team-2';
-});
+const municipality=document.getElementById('municipality'),workplace=document.getElementById('workplace'),team=document.getElementById('team'),button=document.getElementById('openTeam'),message=document.getElementById('finderMessage');
+let directory=[];
+const unique=items=>[...new Set(items)].sort((a,b)=>a.localeCompare(b,'da'));
+async function loadDirectory(){try{const response=await fetch('/api/team-login'),data=await response.json();if(!response.ok)throw new Error();directory=data;municipality.innerHTML='<option value="">Vælg kommune</option>'+unique(data.map(x=>x.municipality)).map(x=>`<option>${x}</option>`).join('');municipality.disabled=false}catch{message.textContent='Listen kunne ikke hentes. Prøv igen senere.'}}
+municipality.addEventListener('change',()=>{const choices=unique(directory.filter(x=>x.municipality===municipality.value).map(x=>x.workplace));workplace.innerHTML='<option value="">Vælg arbejdsplads</option>'+choices.map(x=>`<option>${x}</option>`).join('');workplace.disabled=!municipality.value;team.innerHTML='<option value="">Vælg team</option>';team.disabled=true;button.disabled=true;message.textContent=''});
+workplace.addEventListener('change',()=>{const choices=directory.filter(x=>x.municipality===municipality.value&&x.workplace===workplace.value);team.innerHTML='<option value="">Vælg team</option>'+choices.map(x=>`<option value="${x.slug}">${x.name}</option>`).join('');team.disabled=!workplace.value;button.disabled=true;message.textContent=''});
+team.addEventListener('change',()=>{button.disabled=!team.value});
+document.getElementById('teamFinder').addEventListener('submit',event=>{event.preventDefault();if(team.value)location.href=`/${team.value}`});
+loadDirectory();

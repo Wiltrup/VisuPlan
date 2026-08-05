@@ -1,11 +1,14 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    { "source": "/team-2", "destination": "/trekloeveret-team-2", "permanent": true }
+  ],
   "rewrites": [
-    { "source": "/team-2", "destination": "/app" },
-    { "source": "/team-2/", "destination": "/app" },
     { "source": "/opret", "destination": "/opret.html" },
+    { "source": "/aktiver", "destination": "/aktiver.html" },
     { "source": "/saadan-virker-det", "destination": "/saadan-virker-det.html" },
-    { "source": "/administration", "destination": "/admin" }
+    { "source": "/administration", "destination": "/admin" },
+    { "source": "/:teamSlug", "destination": "/app" }
   ]
 }

@@ -1,7 +1,6 @@
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
-const STAFF_LOGIN_EMAIL = 'team2@visuplanner.invalid';
-const VIEWER_LOGIN_EMAIL = 'team2-viewer@visuplanner.invalid';
+const TEAM_SLUG = location.pathname.split('/').filter(Boolean)[0] || 'trekloeveret-team-2';
 const PLATFORM_ADMIN_EMAIL = 'wiltrup@wiltrup.com';
 const SESSION_KEY = 'visuplanner-session';
 const VIEWER_SESSION_KEY = 'visuplanner-viewer-session';
@@ -18,6 +17,7 @@ const DAYS = [
 
 const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''], breakfast: '', breakfastPhotoUrl: '', lunch: '', lunchPhotoUrl: '', dinner: '', dinnerPhotoUrl: '', activities: [] });
 const state = {
+  team: { slug: TEAM_SLUG, name: 'Team', workplace: '' },
   staff: [],
   week: Object.fromEntries(DAYS.map(day => [day.key, emptyDay()])),
   activeWeekStart: null,
@@ -101,8 +101,9 @@ function apiHeaders(authenticated = false, extra = {}) {
   return headers;
 }
 
-function isStaffSession() { return Boolean(state.session?.user?.email) && state.session.user.email !== VIEWER_LOGIN_EMAIL; }
-function isViewerSession() { return state.session?.user?.email === VIEWER_LOGIN_EMAIL; }
+function sessionRole() { return state.session?.user?.user_metadata?.role || ''; }
+function isStaffSession() { return sessionRole() === 'editor' && state.session?.user?.user_metadata?.team_slug === TEAM_SLUG; }
+function isViewerSession() { return sessionRole() === 'viewer' && state.session?.user?.user_metadata?.team_slug === TEAM_SLUG; }
 
 function activeShiftTypes() {
   if (state.shiftMode === 1 || state.shiftMode === 2) return state.nightEnabled ? ['morning', 'night'] : ['morning'];
@@ -131,7 +132,7 @@ async function apiFetch(path, options = {}, authenticated = false) {
 function saveSession(session, rememberViewer = false) {
   state.session = session;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
-  if (rememberViewer || session?.user?.email === VIEWER_LOGIN_EMAIL) sessionStorage.setItem(VIEWER_SESSION_KEY, JSON.stringify(session));
+  if (rememberViewer || session?.user?.user_metadata?.role === 'viewer') sessionStorage.setItem(VIEWER_SESSION_KEY, JSON.stringify(session));
   renderLoginState();
 }
 
@@ -155,26 +156,21 @@ async function refreshSavedSession(storageKey) {
 async function restoreSession() {
   try {
     const session = await refreshSavedSession(SESSION_KEY);
-    if (session) saveSession(session, session.user?.email === VIEWER_LOGIN_EMAIL);
+    if (session) saveSession(session, session.user?.user_metadata?.role === 'viewer');
   } catch {
     clearSession();
   }
 }
 
-async function authenticate(email, password, errorMessage) {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
-    method: 'POST', headers: apiHeaders(false, { 'Content-Type': 'application/json' }), body: JSON.stringify({ email, password })
-  });
-  if (!response.ok) throw new Error(errorMessage);
-  return response.json();
-}
-
 async function signInViewer(password) {
-  saveSession(await authenticate(VIEWER_LOGIN_EMAIL, password, 'Forkert teamkode.'), true);
+  const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:TEAM_SLUG,action:'viewer-login',password})});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||'Forkert tavlekode.');
+  saveSession(data,true);
 }
 
 async function signIn(password) {
-  const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:'team-2',action:'login',password})});
+  const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:TEAM_SLUG,action:'login',password})});
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data.error||'Forkert personalekode.');
   saveSession(data);
@@ -253,9 +249,9 @@ async function fetchWeek(weekStart) {
   const dates = weekDates(weekStart);
   const dateFilter = `(${dates.join(',')})`;
   const [plans, shifts, activities] = await Promise.all([
-    apiFetch(`/rest/v1/day_plans?select=*&plan_date=in.${dateFilter}`, {}, true),
-    apiFetch(`/rest/v1/shifts?select=*&plan_date=in.${dateFilter}`, {}, true),
-    apiFetch(`/rest/v1/activities?select=*&plan_date=in.${dateFilter}&order=activity_time.asc,sort_order.asc`, {}, true)
+    apiFetch(`/rest/v1/day_plans?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=in.${dateFilter}`, {}, true),
+    apiFetch(`/rest/v1/shifts?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=in.${dateFilter}`, {}, true),
+    apiFetch(`/rest/v1/activities?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=in.${dateFilter}&order=activity_time.asc,sort_order.asc`, {}, true)
   ]);
   const securePlans = await Promise.all((plans || []).map(async item => ({ ...item,
     breakfast_photo_url: await resolvePhotoUrl(item.breakfast_photo_url || ''),
@@ -296,8 +292,8 @@ async function loadData({ quiet = false } = {}) {
   if (!quiet) setStatus('Henter ugeplan…');
   try {
     const [staff, settings] = await Promise.all([
-      apiFetch('/rest/v1/staff?select=*&order=sort_order.asc,name.asc', {}, true),
-      apiFetch('/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public,shift_mode,night_enabled,show_breakfast,show_lunch&id=eq.team2', {}, true)
+      apiFetch(`/rest/v1/staff?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&order=sort_order.asc,name.asc`, {}, true),
+      apiFetch(`/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public,shift_mode,night_enabled,show_breakfast,show_lunch&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, {}, true)
     ]);
     state.staff = await Promise.all((staff || []).map(async person => ({ ...person, photo_url: await resolvePhotoUrl(person.photo_url || '') })));
     const savedWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
@@ -643,7 +639,7 @@ async function uploadImage(file, path) {
 async function uploadStaffPhoto(staffId, file) {
   try {
     setStatus('Uploader personalebillede…');
-    const photoUrl = await uploadImage(file, `staff/${staffId}-${Date.now()}.jpg`);
+    const photoUrl = await uploadImage(file, `${TEAM_SLUG}/staff/${staffId}-${Date.now()}.jpg`);
     await apiFetch(`/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
@@ -679,7 +675,7 @@ async function addStaff() {
       await apiFetch('/rest/v1/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify({ name, sort_order: state.staff.length + 1 })
+        body: JSON.stringify({ team_slug: TEAM_SLUG, name, sort_order: state.staff.length + 1 })
       }, true);
     }
     el('newStaffName').value = '';
@@ -707,21 +703,21 @@ async function saveDay() {
     for (const type of ['breakfast','lunch','dinner']) {
       let photoUrl = stablePhotoUrl(existing[`${type}PhotoUrl`] || '');
       const pending = pendingMealPhotos[type] || (type === 'dinner' ? pendingDinnerPhoto : null);
-      if (pending) photoUrl = await uploadImage(pending, `meals/${type}-${planDate}-${Date.now()}.jpg`);
+      if (pending) photoUrl = await uploadImage(pending, `${TEAM_SLUG}/meals/${type}-${planDate}-${Date.now()}.jpg`);
       mealValues[`${type}_name`] = el(`${type}Input`).value.trim();
       mealValues[`${type}_photo_url`] = photoUrl || null;
     }
 
-    await apiFetch('/rest/v1/day_plans?on_conflict=plan_date', {
+    await apiFetch('/rest/v1/day_plans?on_conflict=team_slug,plan_date', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ plan_date: planDate, ...mealValues, updated_at: new Date().toISOString() })
+      body: JSON.stringify({ team_slug: TEAM_SLUG, plan_date: planDate, ...mealValues, updated_at: new Date().toISOString() })
     }, true);
 
-    await apiFetch(`/rest/v1/shifts?plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
+    await apiFetch(`/rest/v1/shifts?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
     const shifts = activeShiftTypes().flatMap(shiftType => editingShifts[shiftType].map((name, index) => {
       const person = staffByName(name);
-      return person ? { plan_date: planDate, shift_type: shiftType, slot: index + 1, staff_id: person.id } : null;
+      return person ? { team_slug: TEAM_SLUG, plan_date: planDate, shift_type: shiftType, slot: index + 1, staff_id: person.id } : null;
     })).filter(Boolean);
     if (shifts.length) {
       await apiFetch('/rest/v1/shifts', {
@@ -731,13 +727,13 @@ async function saveDay() {
       }, true);
     }
 
-    await apiFetch(`/rest/v1/activities?plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
+    await apiFetch(`/rest/v1/activities?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
     const validActivities = editingActivities.filter(activity => activity.name.trim());
     const activities = await Promise.all(validActivities.map(async (activity, order) => {
       let photoUrl = stablePhotoUrl(activity.photoUrl || '');
-      if (activity.photoFile) photoUrl = await uploadImage(activity.photoFile, `activities/${planDate}-${order}-${Date.now()}.jpg`);
+      if (activity.photoFile) photoUrl = await uploadImage(activity.photoFile, `${TEAM_SLUG}/activities/${planDate}-${order}-${Date.now()}.jpg`);
       return {
-        plan_date: planDate,
+        team_slug: TEAM_SLUG, plan_date: planDate,
         activity_time: activity.time || null,
         name: activity.name.trim(),
         photo_url: photoUrl || null,
@@ -778,10 +774,10 @@ async function publishEditingWeek() {
   button.disabled = true;
   button.textContent = 'Udgiver…';
   try {
-    await apiFetch('/rest/v1/team_settings?on_conflict=id', {
+    await apiFetch('/rest/v1/team_settings?on_conflict=team_slug', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ id: 'team2', active_week_start: editingWeekStart, updated_at: new Date().toISOString() })
+      body: JSON.stringify({ team_slug: TEAM_SLUG, active_week_start: editingWeekStart, updated_at: new Date().toISOString() })
     }, true);
     state.activeWeekStart = editingWeekStart;
     state.week = editingWeek;
@@ -830,7 +826,7 @@ async function saveSettings() {
   button.disabled = true;
   button.textContent = 'Gemmer…';
   try {
-    await apiFetch('/rest/v1/team_settings?id=eq.team2', {
+    await apiFetch(`/rest/v1/team_settings?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
       body: JSON.stringify({
@@ -881,14 +877,14 @@ async function saveViewerCode() {
 }
 
 async function sendStaffRecovery(email) {
-  const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:'team-2',action:'recover',email})});
+  const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:TEAM_SLUG,action:'recover',email})});
   if(!response.ok)throw new Error('Mailen kunne ikke sendes. Prøv igen senere.');
 }
 
 async function handleRecoveryLink() {
   const params=new URLSearchParams(location.hash.slice(1));
   if(params.get('type')!=='recovery'||!params.get('access_token'))return false;
-  state.session={access_token:params.get('access_token'),refresh_token:params.get('refresh_token'),user:{email:STAFF_LOGIN_EMAIL}};
+  state.session={access_token:params.get('access_token'),refresh_token:params.get('refresh_token'),user:{user_metadata:{role:'editor',team_slug:TEAM_SLUG}}};
   history.replaceState(null,'',location.pathname);
   el('newPasswordDialog').showModal();
   return true;
@@ -960,11 +956,11 @@ el('openStaffManagerButton').addEventListener('click',()=>{renderStaffManager();
 el('closeStaffManagerButton').addEventListener('click',()=>el('staffManagerDialog').close());
 el('openViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').showModal());
 el('closeViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').close());
-el('viewerHelpForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('viewerHelpStatus').textContent='Sender…';try{const response=await fetch('/api/public-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'viewer-help',team_slug:'team-2',contact_name:el('viewerHelpName').value,contact_email:el('viewerHelpEmail').value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Kunne ikke sende anmodningen.');event.target.reset();el('viewerHelpStatus').textContent='Anmodningen er sendt. Du bliver kontaktet på arbejdsmailen.'}catch(error){el('viewerHelpStatus').textContent=error.message}finally{button.disabled=false}});
+el('viewerHelpForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('viewerHelpStatus').textContent='Sender…';try{const response=await fetch('/api/public-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'viewer-help',team_slug:TEAM_SLUG,contact_name:el('viewerHelpName').value,contact_email:el('viewerHelpEmail').value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Kunne ikke sende anmodningen.');event.target.reset();el('viewerHelpStatus').textContent='Anmodningen er sendt. Du bliver kontaktet på arbejdsmailen.'}catch(error){el('viewerHelpStatus').textContent=error.message}finally{button.disabled=false}});
 el('forgotStaffPassword').addEventListener('click',()=>{el('loginDialog').close();el('staffRecoveryDialog').showModal()});
 el('closeStaffRecovery').addEventListener('click',()=>el('staffRecoveryDialog').close());
 el('staffRecoveryForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('staffRecoveryStatus').textContent='Sender…';try{await sendStaffRecovery(el('staffRecoveryEmail').value.trim());el('staffRecoveryStatus').textContent='Hvis mailen er registreret på teamets personalelogin, er nulstillingslinket sendt.'}catch(error){el('staffRecoveryStatus').textContent=error.message}finally{button.disabled=false}});
-el('newPasswordForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{await apiFetch('/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:el('recoveryNewPassword').value})},true);el('newPasswordStatus').textContent='Koden er ændret. Du kan nu logge ind som personale.';setTimeout(()=>location.href='/team-2',1500)}catch{el('newPasswordStatus').textContent='Koden kunne ikke ændres. Bed om et nyt link.'}finally{button.disabled=false}});
+el('newPasswordForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{await apiFetch('/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:el('recoveryNewPassword').value})},true);el('newPasswordStatus').textContent='Koden er ændret. Du kan nu logge ind som personale.';setTimeout(()=>location.href=`/${TEAM_SLUG}`,1500)}catch{el('newPasswordStatus').textContent='Koden kunne ikke ændres. Bed om et nyt link.'}finally{button.disabled=false}});
 document.querySelectorAll('[data-open-meal-search]').forEach(searchButton=>searchButton.addEventListener('click', () => {
   mealSearchTarget=searchButton.dataset.openMealSearch;
   el('imageSearchTitle').textContent=`Find billede til ${{breakfast:'morgenmad',lunch:'frokost',dinner:'aftensmad'}[mealSearchTarget]}`;
@@ -989,6 +985,18 @@ window.addEventListener('pageshow', () => loadData({ quiet: true }));
 document.addEventListener('error', event => { if (event.target instanceof HTMLImageElement) event.target.classList.add('image-load-error'); }, true);
 
 async function init() {
+  try {
+    const response=await fetch(`/api/team-login?slug=${encodeURIComponent(TEAM_SLUG)}`),team=await response.json();
+    if(!response.ok)throw new Error(team.error||'Tavlen blev ikke fundet.');
+    state.team=team;
+    document.querySelectorAll('.eyebrow').forEach(node=>{if(node.textContent.trim()==='TEAM 2')node.textContent=team.name.toUpperCase()});
+    el('viewerUsername').value=team.name;
+    document.querySelector('#viewerLoginDialog .note').textContent=`Indtast ${team.name}s fælles tavlekode. Browseren kan selv tilbyde at gemme koden på enheder, du stoler på.`;
+    document.querySelector('#loginForm input[name="username"]').value=`${team.name} – personale`;
+  } catch(error) {
+    document.body.innerHTML=`<main class="app-shell"><section class="panel"><h1>Tavlen blev ikke fundet</h1><p>${escapeHtml(error.message)}</p><a class="button" href="/login">Find jeres tavle</a></section></main>`;
+    return;
+  }
   renderLoginState();
   if(await handleRecoveryLink())return;
   await restoreSession();

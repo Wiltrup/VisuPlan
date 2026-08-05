@@ -51,5 +51,13 @@ Onboarding- og adgangsanmodninger gemmes altid i administratorpanelet. Tilføj m
 
 Team- og personalelogin gemmes kun i `sessionStorage`. Chrome, Safari og andre browsere kan selv tilbyde at huske loginoplysningerne. På en midlertidig computer kan brugeren derfor afslå browserens tilbud, og VisuPlanner-login forsvinder, når browsersessionen afsluttes.
 
+## Samlet opdatering til version 26
+
+Upload først alle v26-filer, og kør derefter `supabase-v26-multitenant.sql` én gang i Supabase SQL Editor. Scriptet indeholder også v25-onboardingens nødvendige databaseændringer, så v25 skal ikke uploades eller køres separat.
+
+Team 2 flyttes automatisk fra `/team-2` til `/trekloeveret-team-2`, mens den gamle adresse viderestiller. Nye adresser dannes af arbejdsplads og team, fx `/trekloeveret-team-2`; hvis adressen allerede findes, tilføjes automatisk `-2`, `-3` osv.
+
+Alle medarbejdere, planer, vagter, aktiviteter, indstillinger og nye billeder bindes til teamets adresse. Supabase-reglerne kontrollerer teamtilhørsforholdet ved både læsning og redigering. Administratoren kan oprette et team direkte fra en forespørgsel, hvorefter kunden modtager et 72-timers engangslink og selv vælger personale- og tavlekode.
+
 ## Udgivelse på Vercel
 Upload alle filer og mapper i denne mappe til roden af GitHub-repository'et. Framework preset kan stå som `Other`, og der kræves ingen build command. Vercel udgiver automatisk efter commit.

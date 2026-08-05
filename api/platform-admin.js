@@ -27,6 +27,22 @@ async function serviceFetch(path, secret, options = {}) {
   return json(response);
 }
 
+const crypto = require('crypto');
+const clean = (value, max = 200) => String(value || '').trim().slice(0, max);
+const slugify = value => clean(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'team';
+const randomPassword = () => crypto.randomBytes(32).toString('base64url');
+const tokenHash = token => crypto.createHash('sha256').update(token).digest('hex');
+async function sendInvitation(email, name, link) {
+  const key = process.env.RESEND_API_KEY;
+  if (!key) return false;
+  const mail = await fetch('https://api.resend.com/emails', { method:'POST', headers:{ Authorization:`Bearer ${key}`, 'Content-Type':'application/json' }, body:JSON.stringify({
+    from:'VisuPlanner <velkommen@visuplanner.dk>', to:[email], subject:`Gør ${name} klar i VisuPlanner`,
+    text:`Jeres VisuPlanner-tavle er oprettet. Vælg selv personale- og tavlekode via dette engangslink:\n\n${link}\n\nLinket udløber efter 72 timer. Koderne sendes ikke til VisuPlanner-administratoren.`
+  }) });
+  if (!mail.ok) console.error('Invitationsmail fejlede', await mail.text());
+  return mail.ok;
+}
+
 module.exports = async function handler(request, response) {
   const secret = process.env.SUPABASE_SECRET_KEY;
   if (!secret) return response.status(503).json({ error: 'Administratorfunktionen mangler SUPABASE_SECRET_KEY i Vercel.' });
@@ -45,11 +61,40 @@ module.exports = async function handler(request, response) {
       return response.status(200).json({ teams: teams || [], onboarding: onboarding || [], accessHelp: accessHelp || [] });
     }
     if (request.method !== 'POST') return response.status(405).json({ error: 'Kun GET og POST er tilladt.' });
-    const { slug, action, value } = request.body || {};
-    if (!slug || !action || typeof value !== 'string') return response.status(400).json({ error: 'Ugyldig anmodning.' });
+    const { slug, action, value, requestId } = request.body || {};
+    if (action === 'create-from-request') {
+      if (!requestId) return response.status(400).json({ error:'Forespørgslen mangler.' });
+      const requests = await serviceFetch(`/rest/v1/onboarding_requests?id=eq.${encodeURIComponent(requestId)}&select=*`, secret);
+      const item = requests?.[0];
+      if (!item || item.status === 'activated') return response.status(400).json({ error:'Forespørgslen kan ikke oprettes.' });
+      const baseSlug = slugify(`${item.workplace}-${item.team_name}`);
+      let newSlug = baseSlug, suffix = 2;
+      while ((await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(newSlug)}&select=slug`, secret))?.length) newSlug = `${baseSlug}-${suffix++}`;
+      const editor = await serviceFetch('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({ email:item.contact_email.toLowerCase(), password:randomPassword(), email_confirm:true, user_metadata:{ role:'editor', team_slug:newSlug } }) });
+      let viewer;
+      try { viewer = await serviceFetch('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({ email:`${newSlug}-viewer@visuplanner.invalid`, password:randomPassword(), email_confirm:true, user_metadata:{ role:'viewer', team_slug:newSlug } }) }); }
+      catch (error) { await serviceFetch(`/auth/v1/admin/users/${editor.id}`, secret, { method:'DELETE' }); throw error; }
+      await serviceFetch('/rest/v1/teams_registry', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ slug:newSlug, name:item.team_name, municipality:item.municipality, workplace:item.workplace, recovery_email:item.contact_email.toLowerCase(), editor_user_id:editor.id, viewer_user_id:viewer.id, onboarding_status:'invited' }) });
+      await serviceFetch('/rest/v1/team_settings', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ id:newSlug, team_slug:newSlug, active_week_start:new Date().toISOString().slice(0,10) }) });
+      const token = crypto.randomBytes(32).toString('base64url');
+      await serviceFetch('/rest/v1/team_invitations', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ team_slug:newSlug, token_hash:tokenHash(token), contact_email:item.contact_email.toLowerCase(), expires_at:new Date(Date.now()+72*60*60*1000).toISOString() }) });
+      await serviceFetch(`/rest/v1/onboarding_requests?id=eq.${encodeURIComponent(requestId)}`, secret, { method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({status:'invited'}) });
+      const origin = `https://${request.headers.host || 'visuplanner.dk'}`;
+      const inviteUrl = `${origin}/aktiver?token=${encodeURIComponent(token)}`;
+      const mailSent = await sendInvitation(item.contact_email, item.team_name, inviteUrl);
+      return response.status(200).json({ ok:true, slug:newSlug, inviteUrl, mailSent });
+    }
+    if (!slug || !action || (action !== 'send-reset-editor' && typeof value !== 'string')) return response.status(400).json({ error: 'Ugyldig anmodning.' });
     const teams = await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=*`, secret);
     const team = teams?.[0];
     if (!team) return response.status(404).json({ error: 'Teamet blev ikke fundet.' });
+
+    if (action === 'send-reset-editor') {
+      const user = await serviceFetch(`/auth/v1/admin/users/${team.editor_user_id}`, secret);
+      const recover = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(`https://visuplanner.dk/${team.slug}`)}`, { method:'POST', headers:{ apikey:SUPABASE_KEY, Authorization:`Bearer ${SUPABASE_KEY}`, 'Content-Type':'application/json' }, body:JSON.stringify({email:user.email}) });
+      if (!recover.ok) throw new Error(await recover.text());
+      return response.status(200).json({ ok:true });
+    }
 
     if (action === 'save-contact') {
       if (!/^\S+@\S+\.\S+$/.test(value)) return response.status(400).json({ error: 'Skriv en gyldig arbejdsmail.' });
