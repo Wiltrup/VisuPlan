@@ -13,34 +13,35 @@
     <header class="topbar">
       <div>
         <p class="eyebrow">TEAM 2</p>
-        <h1 class="app-wordmark-heading"><img class="app-wordmark" src="/assets/brand/wordmark.png" alt="VisuPlanner"></h1>
+        <h1 class="app-wordmark-heading"><img class="app-wordmark" src="/assets/brand/wordmark.png" alt="VisuPlanner"><span id="speakBrand" class="speak-brand" hidden>Speak</span></h1>
       </div>
       <div class="topbar-actions"><button id="viewerLogoutButton" class="board-logout-button" type="button">Log ud</button><button id="adminButton" class="icon-button" aria-label="Åbn redigering">⚙️</button></div>
     </header>
 
+    <nav id="moduleTabs" class="module-tabs" hidden><button id="boardTab" class="active" type="button">Ugetavle</button><button id="tasksTab" type="button">Ugeopgaver</button></nav>
     <nav id="dayTabs" class="day-tabs" aria-label="Vælg dag"></nav>
 
     <main>
-      <section id="dayHeader" class="day-header">
+      <div id="boardView"><section id="dayHeader" class="day-header">
         <button id="prevDay" class="nav-button" aria-label="Forrige dag">‹</button>
         <div>
           <p id="dateLabel" class="date-label"></p>
-          <h2 id="dayLabel"></h2>
+          <h2 id="dayLabel"></h2><button id="speakDayButton" class="speak-button" type="button" hidden aria-label="Læs ugedagen op">🔊</button>
         </div>
         <button id="nextDay" class="nav-button" aria-label="Næste dag">›</button>
       </section>
 
       <section class="grid">
         <article id="morningPanel" class="panel shift-panel">
-          <h3>☀️ Morgen</h3>
+          <h3>☀️ Morgen</h3><button class="speak-button shift-speak" data-speak-shift="morning" type="button" hidden aria-label="Læs vagttypen op">🔊</button>
           <div id="morningStaff" class="people"></div>
         </article>
         <article id="eveningPanel" class="panel shift-panel">
-          <h3>🌙 Aften</h3>
+          <h3>🌙 Aften</h3><button class="speak-button shift-speak" data-speak-shift="evening" type="button" hidden aria-label="Læs vagttypen op">🔊</button>
           <div id="eveningStaff" class="people"></div>
         </article>
         <article id="nightPanel" class="panel shift-panel">
-          <h3>🌑 Nat</h3>
+          <h3>🌑 Nat</h3><button class="speak-button shift-speak" data-speak-shift="night" type="button" hidden aria-label="Læs vagttypen op">🔊</button>
           <div id="nightStaff" class="people"></div>
         </article>
         <article id="breakfastPanel" class="panel meal-panel" hidden>
@@ -58,7 +59,8 @@
           <h3>🎯 Aktiviteter</h3>
           <div id="activitiesList" class="activities"></div>
         </article>
-      </section>
+      </section></div>
+      <section id="tasksView" class="tasks-view" hidden><div class="tasks-heading"><p class="eyebrow">DENNE UGE</p><h2>Ugeopgaver</h2><p id="tasksWeekLabel"></p></div><div id="taskAssignments" class="task-assignments"></div></section>
     </main>
 
     <footer class="site-footer">
@@ -185,7 +187,7 @@
       </div>
       <p class="note">Tilpas tavlens faste opbygning. Valgene gælder for hele teamet og fylder ikke i den daglige redigering.</p>
       <div class="settings-fields">
-        <label>Opdeling af dagvagten<select id="shiftMode"><option value="1">Dagvagt uden skift</option><option value="3">Dagvagt delt op i morgen og aften</option></select></label>
+        <label>Opdeling af dagvagten<select id="shiftMode"><option value="1">Heldagsvagt</option><option value="2">Døgnvagt</option><option value="3">Dagvagt delt op i morgen og aften</option></select></label>
         <label id="nightEnabledSetting" class="toggle-setting"><input id="nightEnabled" type="checkbox"><span><strong>Nattevagt</strong><small>Vælg ja, hvis nattevagten skal vises på tavlen.</small></span></label>
         <label id="morningDefaultLabel">Normal morgenbemanding<input id="morningDefault" type="number" min="1" max="10"></label>
         <label id="eveningDefaultLabel">Normal aftenbemanding<input id="eveningDefault" type="number" min="1" max="10"></label>
@@ -193,13 +195,18 @@
         <label class="toggle-setting"><input id="showDatesPublic" type="checkbox"><span><strong>Vis datoer på beboertavlen</strong><small>Viser datoen under hver ugedag.</small></span></label>
         <label class="toggle-setting"><input id="showBreakfast" type="checkbox"><span><strong>Vis morgenmad</strong><small>Tilføjer morgenmad til tavlen og redigeringen.</small></span></label>
         <label class="toggle-setting"><input id="showLunch" type="checkbox"><span><strong>Vis frokost</strong><small>Tilføjer frokost til tavlen og redigeringen.</small></span></label>
+        <label class="toggle-setting"><input id="tasksEnabled" type="checkbox"><span><strong>Ugeopgaver</strong><small>Tilføjer en separat fane med beboernes team-opgaver.</small></span></label>
+        <label class="toggle-setting"><input id="speakEnabled" type="checkbox"><span><strong>VisuPlanner Speak</strong><small>Tilføjer oplæsning af ugedage, vagter og indtalte medarbejdernavne.</small></span></label>
       </div>
+      <button id="openTasksManagerButton" class="staff-manager-launch" type="button" hidden><span class="avatar-stack"><i>✓</i><i>↻</i></span><span><strong>Indstil ugeopgaver</strong><small>Navne, opgaver og automatisk rotation</small></span><b>›</b></button>
       <div class="settings-account-section"><h3>Adgang til tavlen</h3><p class="note">Af sikkerhedshensyn kan den nuværende tavlekode ikke aflæses. Du kan altid erstatte den med en ny.</p><label>Ny tavlekode<div class="password-row"><input id="newViewerCode" type="password" minlength="6" autocomplete="new-password" placeholder="Mindst 6 tegn"><button id="toggleViewerCode" class="secondary" type="button">Vis</button></div></label><button id="saveViewerCode" class="danger-button" type="button">Sæt ny tavlekode</button></div>
       <div class="dialog-actions"><button id="saveSettingsButton" type="button">Gem indstillinger</button></div>
     </div>
   </dialog>
 
   <dialog id="staffManagerDialog"><div class="dialog-card staff-manager-card"><div class="admin-heading"><div><p class="eyebrow">PERSONALE</p><h2>Medarbejderliste</h2></div><button id="closeStaffManagerButton" class="icon-button" type="button" aria-label="Luk">✕</button></div><div class="inline-form"><input id="newStaffName" placeholder="Navn på medarbejder eller vikar"><button id="addStaffButton" type="button">Tilføj</button></div><div id="staffManager" class="staff-manager"></div></div></dialog>
+
+  <dialog id="tasksManagerDialog"><div class="dialog-card tasks-manager-card"><div class="admin-heading"><div><p class="eyebrow">VALGFRIT MODUL</p><h2>Ugeopgaver</h2></div><button id="closeTasksManagerButton" class="icon-button" type="button">✕</button></div><p class="note">Opret kun fornavne. Hver mandag flytter fordelingen automatisk én opgave frem.</p><label>Rotation starter mandag<input id="taskRotationStart" type="date"></label><h3>Beboere</h3><div class="inline-form"><input id="newResidentName" placeholder="Fornavn"><button id="addResidentButton" type="button">Tilføj</button></div><div id="residentManager" class="simple-manager"></div><h3>Opgaver</h3><div class="inline-form"><input id="newTaskName" placeholder="Fx Dække bord"><button id="addTaskButton" type="button">Tilføj</button></div><div id="taskManager" class="simple-manager"></div><div class="dialog-actions"><button id="saveTasksButton" type="button">Gem ugeopgaver</button></div></div></dialog>
 
   <dialog id="viewerHelpDialog"><div class="dialog-card"><div class="admin-heading"><div><p class="eyebrow">HJÆLP TIL ADGANG</p><h2>Kan du ikke åbne tavlen?</h2></div><button id="closeViewerHelp" class="icon-button" type="button">✕</button></div><p>Spørg først en medarbejder i dit team om hjælp. Personalet kan ændre tavlekoden under Grundindstillinger.</p><details class="admin-help-details"><summary>Er tavlekoden glemt af alle?</summary><p>Send en enkelt anmodning til VisuPlanner-administratoren. Skriv en arbejdsmail, så du kan kontaktes.</p><form id="viewerHelpForm"><label>Arbejdsmail<input id="viewerHelpEmail" type="email" required autocomplete="email"></label><label>Kontaktperson<input id="viewerHelpName" required autocomplete="name"></label><p id="viewerHelpStatus" class="note"></p><button type="submit">Send anmodning</button></form></details></div></dialog>
 
@@ -227,6 +234,16 @@
       <p class="note">Vælg ét billede. Det gemmes kun til det valgte måltid på denne dag.</p>
       <div id="imageSearchResults" class="image-search-results"></div>
       <p class="pexels-credit">Billeder leveret af <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></p>
+    </div>
+  </dialog>
+
+  <dialog id="recordingDialog" class="recording-dialog">
+    <div class="dialog-card recording-card">
+      <p class="eyebrow">VISUPLANNER SPEAK</p>
+      <h2 id="recordingTitle">Indtal lyd</h2>
+      <div id="recordingCountdown" class="recording-countdown" aria-live="assertive">3</div>
+      <p id="recordingHint" class="note">Optagelsen starter efter nedtællingen.</p>
+      <button id="cancelRecordingButton" class="secondary" type="button">Annuller</button>
     </div>
   </dialog>
 

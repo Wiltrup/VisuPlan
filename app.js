@@ -15,7 +15,7 @@ const DAYS = [
   { key: 'sunday', short: 'Søn', name: 'SØNDAG', color: '#ec4899' }
 ];
 
-const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''], breakfast: '', breakfastPhotoUrl: '', lunch: '', lunchPhotoUrl: '', dinner: '', dinnerPhotoUrl: '', activities: [] });
+const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''], breakfast: '', breakfastPhotoUrl: '', breakfastAudioUrl: '', lunch: '', lunchPhotoUrl: '', lunchAudioUrl: '', dinner: '', dinnerPhotoUrl: '', dinnerAudioUrl: '', activities: [] });
 const state = {
   team: { slug: TEAM_SLUG, name: 'Team', workplace: '' },
   staff: [],
@@ -26,13 +26,20 @@ const state = {
   nightEnabled: true,
   meals: { breakfast: false, lunch: false, dinner: true },
   showDatesPublic: true,
+  tasksEnabled: false,
+  speakEnabled: false,
+  residents: [],
+  teamTasks: [],
   session: null
 };
+let activeModule='board';
+let taskDraftResidents=[],taskDraftTasks=[];
 
 let selectedIndex = new Date().getDay() === 0 ? 6 : new Date().getDay() - 1;
 let editingActivities = [];
 let pendingDinnerPhoto = null;
 let pendingMealPhotos = { breakfast: null, lunch: null, dinner: null };
+let pendingMealAudio = { breakfast: null, lunch: null, dinner: null };
 let refreshTimer = null;
 let editingWeekStart = null;
 let editingWeek = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
@@ -106,14 +113,24 @@ function isStaffSession() { return sessionRole() === 'editor' && state.session?.
 function isViewerSession() { return sessionRole() === 'viewer' && state.session?.user?.user_metadata?.team_slug === TEAM_SLUG; }
 
 function activeShiftTypes() {
-  if (state.shiftMode === 1 || state.shiftMode === 2) return state.nightEnabled ? ['morning', 'night'] : ['morning'];
+  if (state.shiftMode === 2) return ['morning'];
+  if (state.shiftMode === 1) return state.nightEnabled ? ['morning', 'night'] : ['morning'];
   return state.nightEnabled ? ['morning', 'evening', 'night'] : ['morning', 'evening'];
 }
 
 function shiftLabel(type) {
-  if (type === 'morning' && state.shiftMode < 3) return 'Dagvagt';
+  if (type === 'morning' && state.shiftMode === 1) return 'Heldagsvagt';
+  if (type === 'morning' && state.shiftMode === 2) return 'Døgnvagt';
   return { morning: 'Morgen', evening: 'Aften', night: 'Nat' }[type];
 }
+
+const FIXED_AUDIO = {
+  monday: '/assets/audio/mandag.mp3', tuesday: '/assets/audio/tirsdag.mp3', wednesday: '/assets/audio/onsdag.mp3',
+  thursday: '/assets/audio/torsdag.mp3', friday: '/assets/audio/fredag.mp3', saturday: '/assets/audio/loerdag.mp3', sunday: '/assets/audio/soendag.mp3',
+  morning: '/assets/audio/morgenvagt.mp3', evening: '/assets/audio/aftenvagt.mp3', night: '/assets/audio/nattevagt.mp3',
+  allday: '/assets/audio/heldagsvagt.mp3', overnight: '/assets/audio/doegnvagt.mp3',
+  breakfast: '/assets/audio/morgenmad.mp3', lunch: '/assets/audio/frokost.mp3', dinner: '/assets/audio/aftensmad.mp3', activity: '/assets/audio/aktivitet.mp3'
+};
 
 async function apiFetch(path, options = {}, authenticated = false) {
   const response = await fetch(`${SUPABASE_URL}${path}`, {
@@ -256,9 +273,12 @@ async function fetchWeek(weekStart) {
   const securePlans = await Promise.all((plans || []).map(async item => ({ ...item,
     breakfast_photo_url: await resolvePhotoUrl(item.breakfast_photo_url || ''),
     lunch_photo_url: await resolvePhotoUrl(item.lunch_photo_url || ''),
-    dinner_photo_url: await resolvePhotoUrl(item.dinner_photo_url || '')
+    dinner_photo_url: await resolvePhotoUrl(item.dinner_photo_url || ''),
+    breakfast_audio_url: await resolvePhotoUrl(item.breakfast_audio_url || ''),
+    lunch_audio_url: await resolvePhotoUrl(item.lunch_audio_url || ''),
+    dinner_audio_url: await resolvePhotoUrl(item.dinner_audio_url || '')
   })));
-  const secureActivities = await Promise.all((activities || []).map(async item => ({ ...item, photo_url: await resolvePhotoUrl(item.photo_url || '') })));
+  const secureActivities = await Promise.all((activities || []).map(async item => ({ ...item, photo_url: await resolvePhotoUrl(item.photo_url || ''), audio_url: await resolvePhotoUrl(item.audio_url || '') })));
   const week = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
   const staffById = new Map(state.staff.map(person => [person.id, person]));
 
@@ -272,6 +292,9 @@ async function fetchWeek(weekStart) {
         data.lunchPhotoUrl = plan.lunch_photo_url || '';
         data.dinner = plan.dinner_name || '';
         data.dinnerPhotoUrl = plan.dinner_photo_url || '';
+        data.breakfastAudioUrl = plan.breakfast_audio_url || '';
+        data.lunchAudioUrl = plan.lunch_audio_url || '';
+        data.dinnerAudioUrl = plan.dinner_audio_url || '';
       }
       (shifts || []).filter(item => item.plan_date === date).forEach(shift => {
         const target = { morning: 'morning', evening: 'evening', night: 'night' }[shift.shift_type];
@@ -282,7 +305,8 @@ async function fetchWeek(weekStart) {
         id: item.id,
         time: item.activity_time ? item.activity_time.slice(0, 5) : '',
         name: item.name,
-        photoUrl: item.photo_url || ''
+        photoUrl: item.photo_url || '',
+        audioUrl: item.audio_url || ''
       }));
   });
   return week;
@@ -291,11 +315,13 @@ async function fetchWeek(weekStart) {
 async function loadData({ quiet = false } = {}) {
   if (!quiet) setStatus('Henter ugeplan…');
   try {
-    const [staff, settings] = await Promise.all([
+    const [staff, settings, residents, teamTasks] = await Promise.all([
       apiFetch(`/rest/v1/staff?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&order=sort_order.asc,name.asc`, {}, true),
-      apiFetch(`/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public,shift_mode,night_enabled,show_breakfast,show_lunch&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, {}, true)
+      apiFetch(`/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public,shift_mode,night_enabled,show_breakfast,show_lunch,tasks_enabled,speak_enabled,task_rotation_start&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, {}, true),
+      apiFetch(`/rest/v1/team_residents?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&active=eq.true&order=sort_order.asc`,{},true),
+      apiFetch(`/rest/v1/team_tasks?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&active=eq.true&order=sort_order.asc`,{},true)
     ]);
-    state.staff = await Promise.all((staff || []).map(async person => ({ ...person, photo_url: await resolvePhotoUrl(person.photo_url || '') })));
+    state.staff = await Promise.all((staff || []).map(async person => ({ ...person, photo_url: await resolvePhotoUrl(person.photo_url || ''), audio_url: await resolvePhotoUrl(person.audio_url || '') })));
     const savedWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
     const calendarWeekStart = currentCalendarWeekStart();
     // En fremtidig uge kan vises allerede søndag. En gammel uge må aldrig
@@ -307,9 +333,13 @@ async function loadData({ quiet = false } = {}) {
       night: settings?.[0]?.night_staff_count || 2
     };
     state.showDatesPublic = settings?.[0]?.show_dates_public ?? true;
-    state.shiftMode = Number(settings?.[0]?.shift_mode || 3) < 3 ? 1 : 3;
+    state.shiftMode = [1,2,3].includes(Number(settings?.[0]?.shift_mode)) ? Number(settings[0].shift_mode) : 3;
     state.nightEnabled = settings?.[0]?.night_enabled ?? true;
     state.meals = { breakfast: settings?.[0]?.show_breakfast ?? false, lunch: settings?.[0]?.show_lunch ?? false, dinner: true };
+    state.tasksEnabled=settings?.[0]?.tasks_enabled??false;
+    state.speakEnabled=settings?.[0]?.speak_enabled??false;
+    state.taskRotationStart=settings?.[0]?.task_rotation_start||currentCalendarWeekStart();
+    state.residents=residents||[];state.teamTasks=teamTasks||[];
     if (state.activeWeekStart !== currentCalendarWeekStart()) selectedIndex = 0;
     state.week = await fetchWeek(state.activeWeekStart);
     render();
@@ -346,7 +376,7 @@ function renderPeople(target, names) {
   el(target).innerHTML = people.length ? people.map(name => {
     const person = staffByName(name);
     const imageAttributes = person?.photo_url ? `data-enlarge-image="${escapeHtml(person.photo_url)}" data-image-caption="${escapeHtml(name)}" role="button" tabindex="0" aria-label="Vis stort billede af ${escapeHtml(name)}"` : '';
-    return `<div class="person ${person?.photo_url ? 'has-photo' : ''}" ${imageAttributes}>${person?.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}<span>${escapeHtml(name)}</span></div>`;
+    return `<div class="person ${person?.photo_url ? 'has-photo' : ''}" ${imageAttributes}>${person?.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}<span>${escapeHtml(name)}</span>${state.speakEnabled&&person?.audio_url?`<button class="speak-button person-speak" data-audio-url="${escapeHtml(person.audio_url)}" type="button" aria-label="Læs ${escapeHtml(name)} op">🔊</button>`:''}</div>`;
   }).join('') : '<p class="empty">Ikke udfyldt</p>';
 }
 
@@ -356,6 +386,9 @@ function render() {
   document.documentElement.style.setProperty('--day-color', day.color);
   el('dayLabel').textContent = day.name;
   el('dateLabel').textContent = formatDate(dateForIndex(selectedIndex, state.activeWeekStart));
+  el('speakBrand').hidden=!state.speakEnabled;el('speakDayButton').hidden=!state.speakEnabled;
+  document.querySelectorAll('.shift-speak').forEach(button=>button.hidden=!state.speakEnabled);
+  el('moduleTabs').hidden=!state.tasksEnabled;
   ['morning','evening','night'].forEach(type => {
     const active = activeShiftTypes().includes(type);
     el(`${type}Panel`).hidden = !active;
@@ -367,17 +400,36 @@ function render() {
     el(`${type}Panel`).hidden = !visible;
     if (!visible) return;
     el(`${type}Text`).textContent = data[type] || 'Ikke udfyldt';
+    const heading=el(`${type}Panel`).querySelector('h3');
+    heading.classList.toggle('speak-heading',state.speakEnabled);
+    heading.innerHTML=`<span>${{breakfast:'🥐 Morgenmad',lunch:'🥪 Frokost',dinner:'🍽️ Aftensmad'}[type]}</span>${state.speakEnabled?`<button class="speak-button inline-speak" data-fixed-audio="${type}" type="button" aria-label="Afspil ${type}">🔊</button>`:''}`;
     const photo = data[`${type}PhotoUrl`];
     const label = {breakfast:'morgenmaden',lunch:'frokosten',dinner:'aftensmaden'}[type];
     el(`${type}Photo`).innerHTML = photo ? `<button class="image-button" data-enlarge-image="${escapeHtml(photo)}" data-image-caption="${escapeHtml(data[type] || label)}" aria-label="Vis stort billede af ${label}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(data[type] || label)}"></button>` : '';
+    const text=el(`${type}Text`);const existing=text.parentElement.querySelector('.meal-name-speak');if(existing)existing.remove();
+    if(state.speakEnabled&&data[`${type}AudioUrl`]) text.insertAdjacentHTML('afterend',`<button class="speak-button meal-name-speak" data-audio-url="${escapeHtml(data[`${type}AudioUrl`])}" type="button" aria-label="Afspil ${escapeHtml(data[type]||label)}">🔊</button>`);
   });
+  const activityHeading=el('activitiesList').closest('.activities-panel').querySelector('h3');
+  activityHeading.classList.toggle('speak-heading',state.speakEnabled);activityHeading.innerHTML=`<span>🎯 Aktiviteter</span>${state.speakEnabled?'<button class="speak-button inline-speak" data-fixed-audio="activity" type="button" aria-label="Afspil aktivitet">🔊</button>':''}`;
   el('activitiesList').innerHTML = data.activities.length ? data.activities.map(activity => `<div class="activity">
     ${activity.photoUrl ? `<button class="activity-photo image-button" data-enlarge-image="${escapeHtml(activity.photoUrl)}" data-image-caption="${escapeHtml(activity.name)}" aria-label="Vis stort billede af ${escapeHtml(activity.name)}"><img src="${escapeHtml(activity.photoUrl)}" alt=""></button>` : ''}
-    <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>
+    <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">🔊</button>`:''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
   renderTabs();
+  renderTaskAssignments();
+  bindSpeakButtons();
   bindImageEnlargement();
 }
+
+function weeksSince(start,end){
+  if(!start||!end)return 0;
+  return Math.max(0,Math.floor((dateFromIso(end)-dateFromIso(start))/(7*86400000)));
+}
+function renderTaskAssignments(){if(!state.tasksEnabled)return;el('tasksWeekLabel').textContent=formatWeekRange(state.activeWeekStart);const offset=weeksSince(state.taskRotationStart,state.activeWeekStart);el('taskAssignments').innerHTML=state.residents.length&&state.teamTasks.length?state.residents.map((resident,index)=>{const task=state.teamTasks[(index+offset)%state.teamTasks.length];return `<article class="task-assignment"><span class="task-person">${escapeHtml(resident.name)}</span><span class="task-arrow">→</span><strong>${escapeHtml(task?.name||'Ingen opgave')}</strong></article>`}).join(''):'<p class="empty">Ugeopgaverne er ikke udfyldt endnu.</p>'}
+function showModule(module){activeModule=module;el('boardView').hidden=module!=='board';el('dayTabs').hidden=module!=='board';el('tasksView').hidden=module!=='tasks';el('boardTab').classList.toggle('active',module==='board');el('tasksTab').classList.toggle('active',module==='tasks')}
+function playAudio(url){if(!url)return;const audio=new Audio(url);audio.play().catch(()=>setStatus('Lyden kunne ikke afspilles.','error'))}
+function shiftAudioKey(type){if(type==='morning'&&state.shiftMode===1)return'allday';if(type==='morning'&&state.shiftMode===2)return'overnight';return type}
+function bindSpeakButtons(){el('speakDayButton').onclick=()=>playAudio(FIXED_AUDIO[DAYS[selectedIndex].key]);document.querySelectorAll('[data-speak-shift]').forEach(button=>button.onclick=()=>playAudio(FIXED_AUDIO[shiftAudioKey(button.dataset.speakShift)]));document.querySelectorAll('[data-fixed-audio]').forEach(button=>button.onclick=event=>{event.stopPropagation();playAudio(FIXED_AUDIO[button.dataset.fixedAudio])});document.querySelectorAll('[data-audio-url]').forEach(button=>button.onclick=event=>{event.stopPropagation();playAudio(button.dataset.audioUrl)})}
 
 function openLargeImage(url, caption) {
   el('largeImage').src = url;
@@ -460,11 +512,13 @@ function loadAdminDay() {
     el(`${type}PhotoInput`).value = '';
     el(`${type}PhotoName`).textContent = data[`${type}PhotoUrl`] ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
     pendingMealPhotos[type] = null;
+    pendingMealAudio[type] = { url: data[`${type}AudioUrl`] || '', blob: null, deleted: false };
   });
   pendingDinnerPhoto = null;
   selectedPexelsPhoto = null;
   editingActivities = structuredClone(data.activities || []);
   renderActivityEditor();
+  renderMealAudioControls();
 }
 
 async function searchPexels(query) {
@@ -537,6 +591,7 @@ function renderActivityEditor() {
     <input value="${escapeHtml(activity.name)}" placeholder="Aktivitet" data-index="${index}" data-field="name">
     <button class="remove-row" data-remove="${index}" type="button">✕</button>
     <label class="activity-upload-button">${activity.photoFile ? 'Nyt billede valgt ✓' : activity.photoUrl ? 'Skift aktivitetsbillede' : '+ Billede til aktiviteten'}<input type="file" accept="image/jpeg,image/png,image/webp" data-activity-photo="${index}"></label>
+    ${state.speakEnabled?audioEditorControls('activity',index,activity.audioBlobUrl||activity.audioUrl):''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter endnu.</p>';
   document.querySelectorAll('[data-field]').forEach(input => input.addEventListener('input', () => {
     editingActivities[Number(input.dataset.index)][input.dataset.field] = input.value;
@@ -551,13 +606,63 @@ function renderActivityEditor() {
     editingActivities[Number(input.dataset.activityPhoto)].photoFile = file;
     renderActivityEditor();
   }));
+  bindAudioEditorControls();
 }
+
+function audioEditorControls(kind,id,url){return `<div class="audio-edit-controls">${url?`<button class="play-audio-button" type="button" data-play-edit-audio="${escapeHtml(url)}">▶ Afspil</button><button class="record-audio-button" type="button" data-record-kind="${kind}" data-record-id="${id}">🎙️ Indtal igen</button><button class="delete-audio-button" type="button" data-delete-audio-kind="${kind}" data-delete-audio-id="${id}">🗑️ Slet</button>`:`<button class="record-audio-button" type="button" data-record-kind="${kind}" data-record-id="${id}">🎙️ Indtal</button>`}</div>`}
+function renderMealAudioControls(){['breakfast','lunch','dinner'].forEach(type=>{const section=el(`${type}EditorSection`);section.querySelector('.audio-edit-controls')?.remove();if(!state.speakEnabled)return;const draft=pendingMealAudio[type];section.insertAdjacentHTML('beforeend',audioEditorControls('meal',type,draft?.blobUrl||draft?.url||''))});bindAudioEditorControls()}
+function bindAudioEditorControls(){document.querySelectorAll('[data-play-edit-audio]').forEach(button=>button.onclick=()=>playAudio(button.dataset.playEditAudio));document.querySelectorAll('[data-record-kind]').forEach(button=>button.onclick=()=>startRecording(button.dataset.recordKind,button.dataset.recordId));document.querySelectorAll('[data-delete-audio-kind]').forEach(button=>button.onclick=()=>deleteDraftAudio(button.dataset.deleteAudioKind,button.dataset.deleteAudioId))}
+
+let activeRecorder=null;
+async function captureAudio(title){
+  if(!navigator.mediaDevices?.getUserMedia||!window.MediaRecorder)throw new Error('Denne browser kan ikke optage lyd.');
+  const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+  const dialog=el('recordingDialog'),countdown=el('recordingCountdown'),hint=el('recordingHint');
+  const stopStream=()=>stream.getTracks().forEach(track=>track.stop());
+  el('recordingTitle').textContent=title;
+  hint.textContent='Optagelsen starter efter nedtællingen.';
+  dialog.showModal();
+  let cancelled=false;
+  el('cancelRecordingButton').onclick=()=>{
+    cancelled=true;
+    if(activeRecorder?.state==='recording')activeRecorder.stop();
+    else{stopStream();dialog.close()}
+  };
+  for(const number of [3,2,1]){
+    if(cancelled)throw new Error('Optagelsen blev annulleret.');
+    countdown.className='recording-countdown';
+    countdown.textContent=number;
+    await new Promise(resolve=>setTimeout(resolve,700));
+  }
+  if(cancelled)throw new Error('Optagelsen blev annulleret.');
+  const chunks=[],recorder=new MediaRecorder(stream);
+  activeRecorder=recorder;
+  countdown.className='recording-countdown is-recording';
+  countdown.textContent='● Optager';
+  hint.textContent='Indtal nu. Optagelsen stopper automatisk.';
+  return new Promise((resolve,reject)=>{
+    let stopTimer;
+    recorder.ondataavailable=event=>{if(event.data.size)chunks.push(event.data)};
+    recorder.onerror=()=>{clearTimeout(stopTimer);stopStream();activeRecorder=null;dialog.close();reject(new Error('Optagelsen mislykkedes.'))};
+    recorder.onstop=()=>{
+      clearTimeout(stopTimer);stopStream();activeRecorder=null;dialog.close();
+      if(cancelled)return reject(new Error('Optagelsen blev annulleret.'));
+      if(!chunks.length)return reject(new Error('Der blev ikke optaget nogen lyd. Prøv igen.'));
+      resolve(new Blob(chunks,{type:recorder.mimeType||'audio/webm'}));
+    };
+    recorder.start();
+    stopTimer=setTimeout(()=>{if(recorder.state==='recording')recorder.stop()},3200);
+  });
+}
+async function startRecording(kind,id){try{const label=kind==='staff'?'medarbejderens navn':kind==='meal'?'navnet på retten':'aktiviteten';const blob=await captureAudio(`Indtal ${label}`),blobUrl=URL.createObjectURL(blob);if(kind==='meal'){pendingMealAudio[id]={...(pendingMealAudio[id]||{}),blob,blobUrl,deleted:false};renderMealAudioControls()}else if(kind==='activity'){const item=editingActivities[Number(id)];item.audioBlob=blob;item.audioBlobUrl=blobUrl;item.audioDeleted=false;renderActivityEditor()}else await saveStaffAudio(id,blob);setStatus('Optagelsen er klar – prøv den gerne af','success')}catch(error){if(!error.message.includes('annulleret'))setStatus(error.message,'error')}}
+function deleteDraftAudio(kind,id){if(!confirm('Vil du slette optagelsen?'))return;if(kind==='meal'){const draft=pendingMealAudio[id]||{};if(draft.blobUrl)URL.revokeObjectURL(draft.blobUrl);pendingMealAudio[id]={url:'',blob:null,blobUrl:'',deleted:true};renderMealAudioControls()}else if(kind==='activity'){const item=editingActivities[Number(id)];if(item.audioBlobUrl)URL.revokeObjectURL(item.audioBlobUrl);item.audioUrl='';item.audioBlob=null;item.audioBlobUrl='';item.audioDeleted=true;renderActivityEditor()}else deleteStaffAudio(id)}
 
 function renderStaffManager() {
   el('staffManager').innerHTML = state.staff.filter(person => person.active).map(person => `<div class="staff-manage-row">
     ${person.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}
     <strong>${escapeHtml(person.name)}</strong>
     <label class="upload-button">${person.photo_url ? 'Skift billede' : 'Tilføj billede'}<input type="file" accept="image/jpeg,image/png,image/webp" data-staff-photo="${person.id}"></label>
+    ${state.speakEnabled?`${person.audio_url?`<button class="play-name-button" type="button" data-audio-url="${escapeHtml(person.audio_url)}">▶ Afspil</button>`:''}<button class="record-name-button" type="button" data-record-name="${person.id}">${person.audio_url?'🎙️ Indtal igen':'🎙️ Indtal navn'}</button>${person.audio_url?`<button class="delete-audio-button" type="button" data-delete-staff-audio="${person.id}">🗑️ Slet</button>`:''}`:''}
     <button class="edit-staff-button" type="button" data-edit-staff="${person.id}" data-staff-name="${escapeHtml(person.name)}">Rediger navn</button>
     <button class="remove-staff-button" type="button" data-deactivate-staff="${person.id}" data-staff-name="${escapeHtml(person.name)}">Fjern</button>
   </div>`).join('');
@@ -567,7 +672,14 @@ function renderStaffManager() {
   }));
   document.querySelectorAll('[data-edit-staff]').forEach(button => button.addEventListener('click', () => renameStaff(button.dataset.editStaff, button.dataset.staffName)));
   document.querySelectorAll('[data-deactivate-staff]').forEach(button => button.addEventListener('click', () => deactivateStaff(button.dataset.deactivateStaff, button.dataset.staffName)));
+  document.querySelectorAll('[data-record-name]').forEach(button=>button.addEventListener('click',()=>startRecording('staff',button.dataset.recordName)));
+  document.querySelectorAll('[data-delete-staff-audio]').forEach(button=>button.addEventListener('click',()=>deleteDraftAudio('staff',button.dataset.deleteStaffAudio)));
+  document.querySelectorAll('.play-name-button').forEach(button=>button.addEventListener('click',()=>new Audio(button.dataset.audioUrl).play()));
 }
+
+async function uploadAudio(blob,path){const ext=blob.type.includes('ogg')?'ogg':blob.type.includes('mp4')?'m4a':'webm';const fullPath=`${path}.${ext}`;await apiFetch(`/storage/v1/object/visuplan-images/${fullPath}`,{method:'POST',headers:{'Content-Type':blob.type||'audio/webm','x-upsert':'true'},body:blob},true);return `${SUPABASE_URL}/storage/v1/object/public/visuplan-images/${fullPath}`}
+async function saveStaffAudio(staffId,blob){const audioUrl=await uploadAudio(blob,`${TEAM_SLUG}/audio/staff/${staffId}-${Date.now()}`);await apiFetch(`/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({audio_url:audioUrl})},true);await loadData({quiet:true});renderStaffManager()}
+async function deleteStaffAudio(staffId){await apiFetch(`/rest/v1/staff?id=eq.${encodeURIComponent(staffId)}`,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({audio_url:null})},true);await loadData({quiet:true});renderStaffManager();setStatus('Optagelsen er slettet','success')}
 
 async function renameStaff(staffId, currentName) {
   const answer = prompt('Ret medarbejderens navn:', currentName);
@@ -706,6 +818,10 @@ async function saveDay() {
       if (pending) photoUrl = await uploadImage(pending, `${TEAM_SLUG}/meals/${type}-${planDate}-${Date.now()}.jpg`);
       mealValues[`${type}_name`] = el(`${type}Input`).value.trim();
       mealValues[`${type}_photo_url`] = photoUrl || null;
+      const audioDraft=pendingMealAudio[type]||{};
+      let audioUrl=audioDraft.deleted?'':stablePhotoUrl(audioDraft.url||existing[`${type}AudioUrl`]||'');
+      if(audioDraft.blob)audioUrl=await uploadAudio(audioDraft.blob,`${TEAM_SLUG}/audio/meals/${type}-${planDate}-${Date.now()}`);
+      mealValues[`${type}_audio_url`]=audioUrl||null;
     }
 
     await apiFetch('/rest/v1/day_plans?on_conflict=team_slug,plan_date', {
@@ -732,11 +848,14 @@ async function saveDay() {
     const activities = await Promise.all(validActivities.map(async (activity, order) => {
       let photoUrl = stablePhotoUrl(activity.photoUrl || '');
       if (activity.photoFile) photoUrl = await uploadImage(activity.photoFile, `${TEAM_SLUG}/activities/${planDate}-${order}-${Date.now()}.jpg`);
+      let audioUrl=activity.audioDeleted?'':stablePhotoUrl(activity.audioUrl||'');
+      if(activity.audioBlob)audioUrl=await uploadAudio(activity.audioBlob,`${TEAM_SLUG}/audio/activities/${planDate}-${order}-${Date.now()}`);
       return {
         team_slug: TEAM_SLUG, plan_date: planDate,
         activity_time: activity.time || null,
         name: activity.name.trim(),
         photo_url: photoUrl || null,
+        audio_url: audioUrl || null,
         sort_order: order
       };
     }));
@@ -804,6 +923,8 @@ function openSettings() {
   el('nightEnabled').checked = state.nightEnabled;
   el('showBreakfast').checked = state.meals.breakfast;
   el('showLunch').checked = state.meals.lunch;
+  el('tasksEnabled').checked=state.tasksEnabled;
+  el('speakEnabled').checked=state.speakEnabled;
   updateSettingsVisibility();
   el('settingsDialog').showModal();
 }
@@ -811,9 +932,10 @@ function openSettings() {
 function updateSettingsVisibility() {
   const mode = Number(el('shiftMode').value);
   el('eveningDefaultLabel').hidden = mode < 3;
-  el('nightEnabledSetting').hidden = false;
-  el('nightDefaultLabel').hidden = !el('nightEnabled').checked;
-  el('morningDefaultLabel').firstChild.textContent = mode === 1 ? 'Normal bemanding på dagvagt' : 'Normal morgenbemanding';
+  el('nightEnabledSetting').hidden = mode === 2;
+  el('nightDefaultLabel').hidden = mode === 2 || !el('nightEnabled').checked;
+  el('morningDefaultLabel').firstChild.textContent = mode === 1 ? 'Normal bemanding hele dagen' : mode === 2 ? 'Normal bemanding på døgnvagt' : 'Normal morgenbemanding';
+  el('openTasksManagerButton').hidden=!el('tasksEnabled').checked;
 }
 
 async function saveSettings() {
@@ -838,6 +960,8 @@ async function saveSettings() {
         night_enabled: el('nightEnabled').checked,
         show_breakfast: el('showBreakfast').checked,
         show_lunch: el('showLunch').checked,
+        tasks_enabled:el('tasksEnabled').checked,
+        speak_enabled:el('speakEnabled').checked,
         updated_at: new Date().toISOString()
       })
     }, true);
@@ -846,6 +970,7 @@ async function saveSettings() {
     state.shiftMode = Number(el('shiftMode').value);
     state.nightEnabled = el('nightEnabled').checked;
     state.meals = { breakfast: el('showBreakfast').checked, lunch: el('showLunch').checked, dinner: true };
+    state.tasksEnabled=el('tasksEnabled').checked;state.speakEnabled=el('speakEnabled').checked;
     render();
     el('settingsDialog').close();
     loadAdminDay();
@@ -857,6 +982,33 @@ async function saveSettings() {
     button.disabled = false;
     button.textContent = 'Gem indstillinger';
   }
+}
+
+function openTasksManager(){taskDraftResidents=state.residents.map(item=>({...item}));taskDraftTasks=state.teamTasks.map(item=>({...item}));el('taskRotationStart').value=state.taskRotationStart||currentCalendarWeekStart();renderTasksManager();el('tasksManagerDialog').showModal()}
+function renderTasksManager(){el('residentManager').innerHTML=taskDraftResidents.map((item,index)=>`<div><span>${escapeHtml(item.name)}</span><button type="button" data-remove-resident="${index}">Fjern</button></div>`).join('')||'<p class="empty">Ingen navne endnu.</p>';el('taskManager').innerHTML=taskDraftTasks.map((item,index)=>`<div><span>${escapeHtml(item.name)}</span><button type="button" data-remove-task="${index}">Fjern</button></div>`).join('')||'<p class="empty">Ingen opgaver endnu.</p>';document.querySelectorAll('[data-remove-resident]').forEach(button=>button.onclick=()=>{taskDraftResidents.splice(Number(button.dataset.removeResident),1);renderTasksManager()});document.querySelectorAll('[data-remove-task]').forEach(button=>button.onclick=()=>{taskDraftTasks.splice(Number(button.dataset.removeTask),1);renderTasksManager()})}
+function addTaskDraft(kind){const input=el(kind==='resident'?'newResidentName':'newTaskName'),name=input.value.trim();if(!name)return;const list=kind==='resident'?taskDraftResidents:taskDraftTasks;if(list.some(item=>item.name.toLowerCase()===name.toLowerCase()))return setStatus('Navnet findes allerede.','error');list.push({name});input.value='';renderTasksManager()}
+async function syncTaskList(table,drafts,current){
+  const keptIds=new Set(drafts.map(item=>item.id).filter(Boolean));
+  const removed=current.filter(item=>item.id&&!keptIds.has(item.id));
+  await Promise.all(removed.map(item=>apiFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(item.id)}&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({active:false})},true)));
+  for(let index=0;index<drafts.length;index+=1){
+    const item=drafts[index],values={team_slug:TEAM_SLUG,name:item.name,sort_order:index+1,active:true};
+    if(item.id)await apiFetch(`/rest/v1/${table}?id=eq.${encodeURIComponent(item.id)}&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify(values)},true);
+    else await apiFetch(`/rest/v1/${table}?on_conflict=team_slug,name`,{method:'POST',headers:{'Content-Type':'application/json',Prefer:'resolution=merge-duplicates,return=minimal'},body:JSON.stringify(values)},true);
+  }
+}
+async function saveTasks(){
+  const button=el('saveTasksButton'),rotationStart=el('taskRotationStart').value;
+  if(!rotationStart)return setStatus('Vælg en startmandag.','error');
+  if(dateFromIso(rotationStart).getDay()!==1)return setStatus('Rotationen skal starte på en mandag.','error');
+  button.disabled=true;button.textContent='Gemmer…';
+  try{
+    await syncTaskList('team_residents',taskDraftResidents,state.residents);
+    await syncTaskList('team_tasks',taskDraftTasks,state.teamTasks);
+    await apiFetch(`/rest/v1/team_settings?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({task_rotation_start:rotationStart})},true);
+    el('tasksManagerDialog').close();await loadData({quiet:true});setStatus('Ugeopgaverne er gemt','success');
+  }catch(error){console.error(error);setStatus('Ugeopgaverne kunne ikke gemmes. Intet er slettet.','error')}
+  finally{button.disabled=false;button.textContent='Gem ugeopgaver'}
 }
 
 async function teamAccountAction(action, value) {
@@ -944,6 +1096,7 @@ document.querySelectorAll('[data-add-shift]').forEach(button => button.addEventL
 el('openSettingsButton').addEventListener('click', openSettings);
 el('shiftMode').addEventListener('change',updateSettingsVisibility);
 el('nightEnabled').addEventListener('change',updateSettingsVisibility);
+el('tasksEnabled').addEventListener('change',updateSettingsVisibility);
 el('closeSettingsButton').addEventListener('click', () => el('settingsDialog').close());
 el('saveSettingsButton').addEventListener('click', saveSettings);
 el('saveViewerCode').addEventListener('click',saveViewerCode);
@@ -954,6 +1107,13 @@ el('addStaffButton').addEventListener('click', addStaff);
 ['breakfast','lunch','dinner'].forEach(type=>el(`${type}PhotoInput`).addEventListener('change',event=>{pendingMealPhotos[type]=event.target.files?.[0]||null;if(type==='dinner'){pendingDinnerPhoto=pendingMealPhotos[type];selectedPexelsPhoto=null}el(`${type}PhotoName`).textContent=pendingMealPhotos[type]?pendingMealPhotos[type].name:'Intet billede valgt.'}));
 el('openStaffManagerButton').addEventListener('click',()=>{renderStaffManager();el('staffManagerDialog').showModal()});
 el('closeStaffManagerButton').addEventListener('click',()=>el('staffManagerDialog').close());
+el('boardTab').addEventListener('click',()=>showModule('board'));
+el('tasksTab').addEventListener('click',()=>showModule('tasks'));
+el('openTasksManagerButton').addEventListener('click',openTasksManager);
+el('closeTasksManagerButton').addEventListener('click',()=>el('tasksManagerDialog').close());
+el('addResidentButton').addEventListener('click',()=>addTaskDraft('resident'));
+el('addTaskButton').addEventListener('click',()=>addTaskDraft('task'));
+el('saveTasksButton').addEventListener('click',saveTasks);
 el('openViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').showModal());
 el('closeViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').close());
 el('viewerHelpForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('viewerHelpStatus').textContent='Sender…';try{const response=await fetch('/api/public-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'viewer-help',team_slug:TEAM_SLUG,contact_name:el('viewerHelpName').value,contact_email:el('viewerHelpEmail').value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Kunne ikke sende anmodningen.');event.target.reset();el('viewerHelpStatus').textContent='Anmodningen er sendt. Du bliver kontaktet på arbejdsmailen.'}catch(error){el('viewerHelpStatus').textContent=error.message}finally{button.disabled=false}});

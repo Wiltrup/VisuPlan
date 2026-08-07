@@ -54,7 +54,7 @@ module.exports = async function handler(request, response) {
   try {
     if (request.method === 'GET') {
       const [teams,onboarding,accessHelp] = await Promise.all([
-        serviceFetch('/rest/v1/teams_registry?select=*&order=name.asc', secret),
+        serviceFetch('/rest/v1/teams_registry?archived_at=is.null&select=*&order=name.asc', secret),
         serviceFetch('/rest/v1/onboarding_requests?select=*&order=created_at.desc&limit=100', secret),
         serviceFetch('/rest/v1/access_help_requests?select=*&order=created_at.desc&limit=100', secret)
       ]);
@@ -84,10 +84,24 @@ module.exports = async function handler(request, response) {
       const mailSent = await sendInvitation(item.contact_email, item.team_name, inviteUrl);
       return response.status(200).json({ ok:true, slug:newSlug, inviteUrl, mailSent });
     }
-    if (!slug || !action || (action !== 'send-reset-editor' && typeof value !== 'string')) return response.status(400).json({ error: 'Ugyldig anmodning.' });
+    if (!slug || !action || (!['send-reset-editor','resend-invite','archive-team'].includes(action) && typeof value !== 'string')) return response.status(400).json({ error: 'Ugyldig anmodning.' });
     const teams = await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=*`, secret);
     const team = teams?.[0];
     if (!team) return response.status(404).json({ error: 'Teamet blev ikke fundet.' });
+
+    if (action === 'resend-invite') {
+      if (team.onboarding_status === 'active') return response.status(400).json({ error:'Teamet er allerede aktiveret. Brug nulstilling, hvis personalekoden er glemt.' });
+      await serviceFetch(`/rest/v1/team_invitations?team_slug=eq.${encodeURIComponent(slug)}&used_at=is.null`, secret, { method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({used_at:new Date().toISOString()}) });
+      const token=crypto.randomBytes(32).toString('base64url');
+      await serviceFetch('/rest/v1/team_invitations', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({team_slug:slug,token_hash:tokenHash(token),contact_email:team.recovery_email,expires_at:new Date(Date.now()+72*60*60*1000).toISOString()}) });
+      const origin=`https://${request.headers.host||'visuplanner.dk'}`,inviteUrl=`${origin}/aktiver?token=${encodeURIComponent(token)}`;
+      return response.status(200).json({ok:true,inviteUrl,mailSent:await sendInvitation(team.recovery_email,team.name,inviteUrl)});
+    }
+
+    if (action === 'archive-team') {
+      await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, {method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({archived_at:new Date().toISOString(),updated_at:new Date().toISOString()})});
+      return response.status(200).json({ok:true});
+    }
 
     if (action === 'send-reset-editor') {
       const user = await serviceFetch(`/auth/v1/admin/users/${team.editor_user_id}`, secret);

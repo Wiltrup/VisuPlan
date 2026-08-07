@@ -61,3 +61,16 @@ Alle medarbejdere, planer, vagter, aktiviteter, indstillinger og nye billeder bi
 
 ## Udgivelse på Vercel
 Upload alle filer og mapper i denne mappe til roden af GitHub-repository'et. Framework preset kan stå som `Other`, og der kræves ingen build command. Vercel udgiver automatisk efter commit.
+
+## Opdatering til version 28
+
+Kør først `supabase-v28-modules.sql` i Supabase SQL Editor. Upload derefter v28-filerne til GitHub. Denne rækkefølge sikrer, at den nye webkode ikke forsøger at hente modultabeller og lydfelter, før de findes.
+
+Version 28 tilføjer:
+
+- Nyt 72-timers invitationslink fra administrationen; tidligere ubrugte links ugyldiggøres.
+- Sikker arkivering af kunder. Tavlen lukkes, mens data bevares.
+- Valgfri fane med ugeopgaver og automatisk rotation hver mandag.
+- Valgfrit VisuPlanner Speak med færdige danske lydfiler, medarbejdernes egne indtalte navne og særskilte optagelser til madretter og aktiviteter.
+- Optagelser tæller ned fra 3 og kan bagefter afspilles, indtales igen eller slettes.
+- Døgnvagt vises som én samlet vagt. Heldagsvagt kan kombineres med en særskilt nattevagt.

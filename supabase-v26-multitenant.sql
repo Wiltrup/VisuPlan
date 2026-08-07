@@ -76,9 +76,11 @@ as $$ select slug from public.teams_registry where editor_user_id=auth.uid() or 
 create or replace function public.can_view_team(wanted text)
 returns boolean language sql stable security definer set search_path=public
 as $$ select public.is_visuplanner_admin() or wanted=public.current_team_slug() $$;
-create or replace function public.can_edit_team(wanted text)
+-- Behold parameternavnet fra den eksisterende v20/v21-funktion. PostgreSQL
+-- tillader ikke, at CREATE OR REPLACE omdøber et inputparameter-navn.
+create or replace function public.can_edit_team(team_slug text)
 returns boolean language sql stable security definer set search_path=public
-as $$ select public.is_visuplanner_admin() or exists(select 1 from public.teams_registry where slug=wanted and editor_user_id=auth.uid()) $$;
+as $$ select public.is_visuplanner_admin() or exists(select 1 from public.teams_registry where slug=$1 and editor_user_id=auth.uid()) $$;
 
 do $$ declare p record; begin
   for p in select schemaname,tablename,policyname from pg_policies where schemaname='public' and tablename in ('staff','day_plans','shifts','activities','team_settings')

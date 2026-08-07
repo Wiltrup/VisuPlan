@@ -6,10 +6,10 @@ module.exports=async function handler(request,response){
   const secret=process.env.SUPABASE_SECRET_KEY;if(!secret)return response.status(503).json({error:'Loginfunktionen er ikke klar.'});
   try{
     const input=request.method==='GET'?request.query:(request.body||{}),{slug,action,password,email}=input;
-    if(request.method==='GET'&&!slug){const directory=await service('/rest/v1/teams_registry?onboarding_status=eq.active&select=slug,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc',secret);return response.status(200).json(directory||[])}
+    if(request.method==='GET'&&!slug){const directory=await service('/rest/v1/teams_registry?onboarding_status=eq.active&archived_at=is.null&select=slug,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc',secret);return response.status(200).json(directory||[])}
     if(!/^[a-z0-9-]{3,120}$/.test(String(slug||'')))return response.status(404).json({error:'Teamet blev ikke fundet.'});
     const teams=await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=*`,secret),team=teams?.[0];
-    if(!team||team.onboarding_status!=='active')return response.status(404).json({error:'Teamet blev ikke fundet eller er endnu ikke aktiveret.'});
+    if(!team||team.onboarding_status!=='active'||team.archived_at)return response.status(404).json({error:'Teamet blev ikke fundet eller er endnu ikke aktiveret.'});
     if(request.method==='GET')return response.status(200).json({slug:team.slug,name:team.name,workplace:team.workplace,municipality:team.municipality});
     if(!team.editor_user_id||!team.viewer_user_id)return response.status(400).json({error:'Teamets login er ikke koblet korrekt.'});
     const userId=action==='viewer-login'?team.viewer_user_id:team.editor_user_id,user=await service(`/auth/v1/admin/users/${userId}`,secret);
