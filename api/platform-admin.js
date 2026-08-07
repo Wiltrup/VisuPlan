@@ -27,6 +27,27 @@ async function serviceFetch(path, secret, options = {}) {
   return json(response);
 }
 
+function publicAdminError(error) {
+  const message = String(error?.message || error || '');
+  if (/already (been )?registered|already exists|email.*exists|duplicate.*email/i.test(message)) {
+    return { status: 409, message: 'Mailadressen bruges allerede til et VisuPlanner-login. Brug kundens egen, endnu ikke registrerede arbejdsmail.' };
+  }
+  if (/duplicate key.*teams_registry|teams_registry_pkey/i.test(message)) {
+    return { status: 409, message: 'Der findes allerede et team med denne adresse. Genindlæs administrationen og prøv igen.' };
+  }
+  const stepMessages = {
+    'editor-user': 'Kundens personalelogin kunne ikke oprettes.',
+    'viewer-user': 'Teamets tavlelogin kunne ikke oprettes.',
+    'team-registry': 'Teamets grundoplysninger kunne ikke gemmes.',
+    'invitation': 'Invitationslinket kunne ikke oprettes.',
+    'request-status': 'Teamet blev oprettet, men kundeforespørgslen kunne ikke opdateres.'
+  };
+  if (error?.adminStep && stepMessages[error.adminStep]) {
+    return { status: 500, message: `${stepMessages[error.adminStep]} Oprettelsen er rullet tilbage, så du kan prøve igen.` };
+  }
+  return { status: 500, message: 'Administratorhandlingen mislykkedes. Ingen data blev slettet.' };
+}
+
 const crypto = require('crypto');
 const clean = (value, max = 200) => String(value || '').trim().slice(0, max);
 const slugify = value => clean(value).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || 'team';
@@ -70,19 +91,34 @@ module.exports = async function handler(request, response) {
       const baseSlug = slugify(`${item.workplace}-${item.team_name}`);
       let newSlug = baseSlug, suffix = 2;
       while ((await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(newSlug)}&select=slug`, secret))?.length) newSlug = `${baseSlug}-${suffix++}`;
-      const editor = await serviceFetch('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({ email:item.contact_email.toLowerCase(), password:randomPassword(), email_confirm:true, user_metadata:{ role:'editor', team_slug:newSlug } }) });
-      let viewer;
-      try { viewer = await serviceFetch('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({ email:`${newSlug}-viewer@visuplanner.invalid`, password:randomPassword(), email_confirm:true, user_metadata:{ role:'viewer', team_slug:newSlug } }) }); }
-      catch (error) { await serviceFetch(`/auth/v1/admin/users/${editor.id}`, secret, { method:'DELETE' }); throw error; }
-      await serviceFetch('/rest/v1/teams_registry', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ slug:newSlug, name:item.team_name, municipality:item.municipality, workplace:item.workplace, recovery_email:item.contact_email.toLowerCase(), editor_user_id:editor.id, viewer_user_id:viewer.id, onboarding_status:'invited' }) });
-      await serviceFetch('/rest/v1/team_settings', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ id:newSlug, team_slug:newSlug, active_week_start:new Date().toISOString().slice(0,10) }) });
-      const token = crypto.randomBytes(32).toString('base64url');
-      await serviceFetch('/rest/v1/team_invitations', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ team_slug:newSlug, token_hash:tokenHash(token), contact_email:item.contact_email.toLowerCase(), expires_at:new Date(Date.now()+72*60*60*1000).toISOString() }) });
-      await serviceFetch(`/rest/v1/onboarding_requests?id=eq.${encodeURIComponent(requestId)}`, secret, { method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({status:'invited'}) });
-      const origin = `https://${request.headers.host || 'visuplanner.dk'}`;
-      const inviteUrl = `${origin}/aktiver?token=${encodeURIComponent(token)}`;
-      const mailSent = await sendInvitation(item.contact_email, item.team_name, inviteUrl);
-      return response.status(200).json({ ok:true, slug:newSlug, inviteUrl, mailSent });
+      let editor = null, viewer = null, teamCreated = false, adminStep = 'editor-user';
+      try {
+        editor = await serviceFetch('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({ email:item.contact_email.toLowerCase(), password:randomPassword(), email_confirm:true, user_metadata:{ role:'editor', team_slug:newSlug } }) });
+        adminStep = 'viewer-user';
+        viewer = await serviceFetch('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({ email:`${newSlug}-viewer@visuplanner.invalid`, password:randomPassword(), email_confirm:true, user_metadata:{ role:'viewer', team_slug:newSlug } }) });
+        adminStep = 'team-registry';
+        await serviceFetch('/rest/v1/teams_registry', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ slug:newSlug, name:item.team_name, municipality:item.municipality, workplace:item.workplace, recovery_email:item.contact_email.toLowerCase(), editor_user_id:editor.id, viewer_user_id:viewer.id, onboarding_status:'invited' }) });
+        teamCreated = true;
+        // Indstillinger oprettes af appens normale upsert, første gang teamet
+        // gemmer. Det undgår at onboarding afhænger af ældre settings-kolonner.
+        adminStep = 'invitation';
+        const token = crypto.randomBytes(32).toString('base64url');
+        await serviceFetch('/rest/v1/team_invitations', secret, { method:'POST', headers:{Prefer:'return=minimal'}, body:JSON.stringify({ team_slug:newSlug, token_hash:tokenHash(token), contact_email:item.contact_email.toLowerCase(), expires_at:new Date(Date.now()+72*60*60*1000).toISOString() }) });
+        adminStep = 'request-status';
+        await serviceFetch(`/rest/v1/onboarding_requests?id=eq.${encodeURIComponent(requestId)}`, secret, { method:'PATCH', headers:{Prefer:'return=minimal'}, body:JSON.stringify({status:'invited'}) });
+        const origin = `https://${request.headers.host || 'visuplanner.dk'}`;
+        const inviteUrl = `${origin}/aktiver?token=${encodeURIComponent(token)}`;
+        const mailSent = await sendInvitation(item.contact_email, item.team_name, inviteUrl);
+        return response.status(200).json({ ok:true, slug:newSlug, inviteUrl, mailSent });
+      } catch (error) {
+        // Oprettelsen spænder over Auth og databasen og kan derfor ikke ligge i
+        // én transaktion. Ryd kun de nye objekter op, så forespørgslen kan prøves igen.
+        if (teamCreated) await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(newSlug)}`, secret, { method:'DELETE', headers:{Prefer:'return=minimal'} }).catch(()=>{});
+        if (viewer?.id) await serviceFetch(`/auth/v1/admin/users/${viewer.id}`, secret, { method:'DELETE' }).catch(()=>{});
+        if (editor?.id) await serviceFetch(`/auth/v1/admin/users/${editor.id}`, secret, { method:'DELETE' }).catch(()=>{});
+        error.adminStep = adminStep;
+        throw error;
+      }
     }
     if (!slug || !action || (!['send-reset-editor','resend-invite','archive-team'].includes(action) && typeof value !== 'string')) return response.status(400).json({ error: 'Ugyldig anmodning.' });
     const teams = await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=*`, secret);
@@ -128,6 +164,7 @@ module.exports = async function handler(request, response) {
     return response.status(200).json({ ok: true });
   } catch (error) {
     console.error(error);
-    return response.status(500).json({ error: 'Administratorhandlingen mislykkedes. Ingen data blev slettet.' });
+    const safeError = publicAdminError(error);
+    return response.status(safeError.status).json({ error: safeError.message });
   }
 };
