@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#2563eb" />
   <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css" />
+  <link rel="stylesheet" href="/styles.css?v=29.2" />
   <title>VisuPlanner</title>
 </head>
 <body>
@@ -26,22 +26,22 @@
         <button id="prevDay" class="nav-button" aria-label="Forrige dag">‹</button>
         <div>
           <p id="dateLabel" class="date-label"></p>
-          <h2 id="dayLabel"></h2><button id="speakDayButton" class="speak-button" type="button" hidden aria-label="Læs ugedagen op">🔊</button>
+          <div class="day-title-row"><h2 id="dayLabel"></h2><button id="speakDayButton" class="speak-button" type="button" hidden aria-label="Læs ugedagen op">👂</button></div>
         </div>
         <button id="nextDay" class="nav-button" aria-label="Næste dag">›</button>
       </section>
 
       <section class="grid">
         <article id="morningPanel" class="panel shift-panel">
-          <h3>☀️ Morgen</h3><button class="speak-button shift-speak" data-speak-shift="morning" type="button" hidden aria-label="Læs vagttypen op">🔊</button>
+          <h3>☀️ Morgen</h3><button class="speak-button shift-speak" data-speak-shift="morning" type="button" hidden aria-label="Læs vagttypen op">👂</button>
           <div id="morningStaff" class="people"></div>
         </article>
         <article id="eveningPanel" class="panel shift-panel">
-          <h3>🌙 Aften</h3><button class="speak-button shift-speak" data-speak-shift="evening" type="button" hidden aria-label="Læs vagttypen op">🔊</button>
+          <h3>🌙 Aften</h3><button class="speak-button shift-speak" data-speak-shift="evening" type="button" hidden aria-label="Læs vagttypen op">👂</button>
           <div id="eveningStaff" class="people"></div>
         </article>
         <article id="nightPanel" class="panel shift-panel">
-          <h3>🌑 Nat</h3><button class="speak-button shift-speak" data-speak-shift="night" type="button" hidden aria-label="Læs vagttypen op">🔊</button>
+          <h3>🌑 Nat</h3><button class="speak-button shift-speak" data-speak-shift="night" type="button" hidden aria-label="Læs vagttypen op">👂</button>
           <div id="nightStaff" class="people"></div>
         </article>
         <article id="breakfastPanel" class="panel meal-panel" hidden>
@@ -249,6 +249,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js"></script>
+  <script src="/app.js?v=29.2"></script>
 </body>
 </html>

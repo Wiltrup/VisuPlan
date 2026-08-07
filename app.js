@@ -376,7 +376,7 @@ function renderPeople(target, names) {
   el(target).innerHTML = people.length ? people.map(name => {
     const person = staffByName(name);
     const imageAttributes = person?.photo_url ? `data-enlarge-image="${escapeHtml(person.photo_url)}" data-image-caption="${escapeHtml(name)}" role="button" tabindex="0" aria-label="Vis stort billede af ${escapeHtml(name)}"` : '';
-    return `<div class="person ${person?.photo_url ? 'has-photo' : ''}" ${imageAttributes}>${person?.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}<span>${escapeHtml(name)}</span>${state.speakEnabled&&person?.audio_url?`<button class="speak-button person-speak" data-audio-url="${escapeHtml(person.audio_url)}" type="button" aria-label="Læs ${escapeHtml(name)} op">🔊</button>`:''}</div>`;
+      return `<div class="person ${person?.photo_url ? 'has-photo' : ''}" ${imageAttributes}>${person?.photo_url ? `<img src="${escapeHtml(person.photo_url)}" alt="">` : '<span class="avatar-placeholder">👤</span>'}<span>${escapeHtml(name)}</span>${state.speakEnabled&&person?.audio_url?`<button class="speak-button person-speak" data-audio-url="${escapeHtml(person.audio_url)}" type="button" aria-label="Læs ${escapeHtml(name)} op">👂</button>`:''}</div>`;
   }).join('') : '<p class="empty">Ikke udfyldt</p>';
 }
 
@@ -402,18 +402,18 @@ function render() {
     el(`${type}Text`).textContent = data[type] || 'Ikke udfyldt';
     const heading=el(`${type}Panel`).querySelector('h3');
     heading.classList.toggle('speak-heading',state.speakEnabled);
-    heading.innerHTML=`<span>${{breakfast:'🥐 Morgenmad',lunch:'🥪 Frokost',dinner:'🍽️ Aftensmad'}[type]}</span>${state.speakEnabled?`<button class="speak-button inline-speak" data-fixed-audio="${type}" type="button" aria-label="Afspil ${type}">🔊</button>`:''}`;
+    heading.innerHTML=`<span>${{breakfast:'🥐 Morgenmad',lunch:'🥪 Frokost',dinner:'🍽️ Aftensmad'}[type]}</span>${state.speakEnabled?`<button class="speak-button inline-speak" data-fixed-audio="${type}" type="button" aria-label="Afspil ${type}">👂</button>`:''}`;
     const photo = data[`${type}PhotoUrl`];
     const label = {breakfast:'morgenmaden',lunch:'frokosten',dinner:'aftensmaden'}[type];
     el(`${type}Photo`).innerHTML = photo ? `<button class="image-button" data-enlarge-image="${escapeHtml(photo)}" data-image-caption="${escapeHtml(data[type] || label)}" aria-label="Vis stort billede af ${label}"><img src="${escapeHtml(photo)}" alt="${escapeHtml(data[type] || label)}"></button>` : '';
     const text=el(`${type}Text`);const existing=text.parentElement.querySelector('.meal-name-speak');if(existing)existing.remove();
-    if(state.speakEnabled&&data[`${type}AudioUrl`]) text.insertAdjacentHTML('afterend',`<button class="speak-button meal-name-speak" data-audio-url="${escapeHtml(data[`${type}AudioUrl`])}" type="button" aria-label="Afspil ${escapeHtml(data[type]||label)}">🔊</button>`);
+    if(state.speakEnabled&&data[`${type}AudioUrl`]) text.insertAdjacentHTML('afterend',`<button class="speak-button meal-name-speak" data-audio-url="${escapeHtml(data[`${type}AudioUrl`])}" type="button" aria-label="Afspil ${escapeHtml(data[type]||label)}">👂</button>`);
   });
   const activityHeading=el('activitiesList').closest('.activities-panel').querySelector('h3');
-  activityHeading.classList.toggle('speak-heading',state.speakEnabled);activityHeading.innerHTML=`<span>🎯 Aktiviteter</span>${state.speakEnabled?'<button class="speak-button inline-speak" data-fixed-audio="activity" type="button" aria-label="Afspil aktivitet">🔊</button>':''}`;
+  activityHeading.classList.toggle('speak-heading',state.speakEnabled);activityHeading.innerHTML=`<span>🎯 Aktiviteter</span>${state.speakEnabled?'<button class="speak-button inline-speak" data-fixed-audio="activity" type="button" aria-label="Afspil aktivitet">👂</button>':''}`;
   el('activitiesList').innerHTML = data.activities.length ? data.activities.map(activity => `<div class="activity">
     ${activity.photoUrl ? `<button class="activity-photo image-button" data-enlarge-image="${escapeHtml(activity.photoUrl)}" data-image-caption="${escapeHtml(activity.name)}" aria-label="Vis stort billede af ${escapeHtml(activity.name)}"><img src="${escapeHtml(activity.photoUrl)}" alt=""></button>` : ''}
-    <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">🔊</button>`:''}
+    <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">👂</button>`:''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
   renderTabs();
   renderTaskAssignments();
