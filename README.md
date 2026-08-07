@@ -1,5 +1,9 @@
 # VisuPlanner
 
+## v29 – rettelse til Speak-optagelser
+
+Kør `supabase-v29-audio-fix.sql` i Supabase, og upload derefter webfilerne. Rettelsen tillader lyd i medielageret og normaliserer browserens lydtype før upload.
+
 Visuel og fælles ugeplan til Team 2.
 
 ## Funktioner
