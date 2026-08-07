@@ -27,6 +27,30 @@ async function serviceFetch(path, secret, options = {}) {
   return json(response);
 }
 
+async function listStorageFiles(prefix, secret) {
+  const items = await serviceFetch('/storage/v1/object/list/visuplan-images', secret, {
+    method: 'POST',
+    body: JSON.stringify({ prefix, limit: 1000, offset: 0, sortBy: { column: 'name', order: 'asc' } })
+  }) || [];
+  const files = [];
+  for (const item of items) {
+    const path = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.id) files.push(path);
+    else files.push(...await listStorageFiles(path, secret));
+  }
+  return files;
+}
+
+async function deleteTeamStorage(slug, secret) {
+  const files = await listStorageFiles(slug, secret);
+  for (let index = 0; index < files.length; index += 100) {
+    await serviceFetch('/storage/v1/object/visuplan-images', secret, {
+      method: 'DELETE',
+      body: JSON.stringify({ prefixes: files.slice(index, index + 100) })
+    });
+  }
+}
+
 function publicAdminError(error) {
   const message = String(error?.message || error || '');
   if (/already (been )?registered|already exists|email.*exists|duplicate.*email/i.test(message)) {
@@ -74,15 +98,21 @@ module.exports = async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const [teams,onboarding,accessHelp] = await Promise.all([
+      const [teams,archivedTeams,onboarding,accessHelp] = await Promise.all([
         serviceFetch('/rest/v1/teams_registry?archived_at=is.null&select=*&order=name.asc', secret),
-        serviceFetch('/rest/v1/onboarding_requests?select=*&order=created_at.desc&limit=100', secret),
+        serviceFetch('/rest/v1/teams_registry?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
+        serviceFetch('/rest/v1/onboarding_requests?status=eq.new&select=*&order=created_at.desc&limit=100', secret),
         serviceFetch('/rest/v1/access_help_requests?select=*&order=created_at.desc&limit=100', secret)
       ]);
-      return response.status(200).json({ teams: teams || [], onboarding: onboarding || [], accessHelp: accessHelp || [] });
+      return response.status(200).json({ teams: teams || [], archivedTeams: archivedTeams || [], onboarding: onboarding || [], accessHelp: accessHelp || [] });
     }
     if (request.method !== 'POST') return response.status(405).json({ error: 'Kun GET og POST er tilladt.' });
     const { slug, action, value, requestId } = request.body || {};
+    if (action === 'delete-request') {
+      if (!requestId) return response.status(400).json({ error:'Forespørgslen mangler.' });
+      await serviceFetch(`/rest/v1/onboarding_requests?id=eq.${encodeURIComponent(requestId)}&status=eq.new`, secret, { method:'DELETE', headers:{Prefer:'return=minimal'} });
+      return response.status(200).json({ ok:true });
+    }
     if (action === 'create-from-request') {
       if (!requestId) return response.status(400).json({ error:'Forespørgslen mangler.' });
       const requests = await serviceFetch(`/rest/v1/onboarding_requests?id=eq.${encodeURIComponent(requestId)}&select=*`, secret);
@@ -120,7 +150,7 @@ module.exports = async function handler(request, response) {
         throw error;
       }
     }
-    if (!slug || !action || (!['send-reset-editor','resend-invite','archive-team'].includes(action) && typeof value !== 'string')) return response.status(400).json({ error: 'Ugyldig anmodning.' });
+    if (!slug || !action || (!['send-reset-editor','resend-invite','archive-team','delete-team'].includes(action) && typeof value !== 'string')) return response.status(400).json({ error: 'Ugyldig anmodning.' });
     const teams = await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=*`, secret);
     const team = teams?.[0];
     if (!team) return response.status(404).json({ error: 'Teamet blev ikke fundet.' });
@@ -137,6 +167,20 @@ module.exports = async function handler(request, response) {
     if (action === 'archive-team') {
       await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, {method:'PATCH',headers:{Prefer:'return=minimal'},body:JSON.stringify({archived_at:new Date().toISOString(),updated_at:new Date().toISOString()})});
       return response.status(200).json({ok:true});
+    }
+
+    if (action === 'delete-team') {
+      // Filer slettes først. Hvis Storage fejler, bevares kunde og login, så
+      // administratoren sikkert kan prøve igen uden en halvfærdig sletning.
+      await deleteTeamStorage(slug, secret);
+      if (team.editor_user_id) await serviceFetch(`/auth/v1/admin/users/${team.editor_user_id}`, secret, { method:'DELETE' });
+      if (team.viewer_user_id) await serviceFetch(`/auth/v1/admin/users/${team.viewer_user_id}`, secret, { method:'DELETE' });
+      // Foreign keys med ON DELETE CASCADE fjerner planer, vagter, aktiviteter,
+      // indstillinger, ugeopgaver og invitationer sammen med teamet.
+      await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, { method:'DELETE', headers:{Prefer:'return=minimal'} });
+      await serviceFetch(`/rest/v1/access_help_requests?team_slug=eq.${encodeURIComponent(slug)}`, secret, { method:'DELETE', headers:{Prefer:'return=minimal'} });
+      await serviceFetch(`/rest/v1/onboarding_requests?contact_email=eq.${encodeURIComponent(team.recovery_email)}&team_name=eq.${encodeURIComponent(team.name)}`, secret, { method:'DELETE', headers:{Prefer:'return=minimal'} });
+      return response.status(200).json({ ok:true });
     }
 
     if (action === 'send-reset-editor') {
