@@ -894,11 +894,17 @@ async function publishEditingWeek() {
   button.disabled = true;
   button.textContent = 'Udgiver…';
   try {
-    await apiFetch('/rest/v1/team_settings?on_conflict=team_slug', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ team_slug: TEAM_SLUG, active_week_start: editingWeekStart, updated_at: new Date().toISOString() })
+    // Teamindstillingerne findes allerede. Opdatér kun den aktive uge i stedet
+    // for at lave en upsert, som også kan blive behandlet som en ny (ufuldstændig)
+    // indstillingsrække af PostgREST.
+    const updatedSettings = await apiFetch(`/rest/v1/team_settings?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&select=active_week_start`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
+      body: JSON.stringify({ active_week_start: editingWeekStart, updated_at: new Date().toISOString() })
     }, true);
+    if (updatedSettings?.[0]?.active_week_start !== editingWeekStart) {
+      throw new Error('Teamets aktive uge blev ikke opdateret');
+    }
     state.activeWeekStart = editingWeekStart;
     state.week = editingWeek;
     selectedIndex = 0;
