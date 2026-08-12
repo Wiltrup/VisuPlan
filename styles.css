@@ -122,7 +122,7 @@ input, select { width:100%; border:1px solid #d8dee8; background:#fff; padding:1
 .note { color:#667085; font-size:.92rem; line-height:1.45; }
 .sticky-actions { position:sticky; bottom:-24px; background:white; padding:14px 0 4px; border-top:1px solid #edf0f4; }
 .publish-button { background:#7c3aed !important; }
-.sync-status { position:fixed; left:50%; bottom:18px; transform:translateX(-50%); z-index:20; background:#172033; color:#fff; border-radius:999px; padding:10px 16px; font-weight:800; box-shadow:0 10px 30px rgba(0,0,0,.2); opacity:1; transition:opacity .2s; }
+.sync-status { position:fixed; left:50%; bottom:max(18px, env(safe-area-inset-bottom)); transform:translateX(-50%); z-index:2147483647; max-width:calc(100vw - 32px); text-align:center; background:#172033; color:#fff; border-radius:999px; padding:10px 16px; font-weight:800; box-shadow:0 10px 30px rgba(0,0,0,.2); opacity:1; transition:opacity .2s; }
 .sync-status:empty { opacity:0; pointer-events:none; }
 .sync-status.success { background:#15803d; }
 .sync-status.error { background:#b42318; }

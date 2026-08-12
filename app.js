@@ -354,6 +354,12 @@ async function loadData({ quiet = false } = {}) {
 
 function setStatus(message, type = '') {
   const target = el('syncStatus');
+  // Et almindeligt fixed-element ligger bag et åbent <dialog>, fordi dialogen
+  // vises i browserens top layer. Flyt derfor beskeden ind i den øverste åbne
+  // dialog, så fejl og bekræftelser altid kan ses dér, hvor brugeren arbejder.
+  const openDialogs = [...document.querySelectorAll('dialog[open]')];
+  const statusHost = openDialogs.at(-1) || document.body;
+  if (target.parentElement !== statusHost) statusHost.appendChild(target);
   target.textContent = message;
   target.className = `sync-status ${type}`;
   if (type === 'success') setTimeout(() => { target.textContent = ''; target.className = 'sync-status'; }, 1800);
