@@ -146,6 +146,39 @@ async function apiFetch(path, options = {}, authenticated = false) {
   return text ? JSON.parse(text) : null;
 }
 
+function teamSettingsPayload(overrides = {}) {
+  return {
+    id: TEAM_SLUG,
+    team_slug: TEAM_SLUG,
+    active_week_start: state.activeWeekStart || currentCalendarWeekStart(),
+    morning_staff_count: state.staffingDefaults.morning,
+    evening_staff_count: state.staffingDefaults.evening,
+    night_staff_count: state.staffingDefaults.night,
+    show_dates_public: state.showDatesPublic,
+    shift_mode: state.shiftMode,
+    night_enabled: state.nightEnabled,
+    show_breakfast: state.meals.breakfast,
+    show_lunch: state.meals.lunch,
+    tasks_enabled: state.tasksEnabled,
+    speak_enabled: state.speakEnabled,
+    task_rotation_start: state.taskRotationStart || currentCalendarWeekStart(),
+    updated_at: new Date().toISOString(),
+    ...overrides
+  };
+}
+
+async function upsertTeamSettings(overrides = {}, returnColumns = '') {
+  const select = returnColumns ? `&select=${encodeURIComponent(returnColumns)}` : '';
+  return apiFetch(`/rest/v1/team_settings?on_conflict=team_slug${select}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Prefer: `resolution=merge-duplicates,return=${returnColumns ? 'representation' : 'minimal'}`
+    },
+    body: JSON.stringify(teamSettingsPayload(overrides))
+  }, true);
+}
+
 function saveSession(session, rememberViewer = false) {
   state.session = session;
   sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
@@ -900,14 +933,12 @@ async function publishEditingWeek() {
   button.disabled = true;
   button.textContent = 'Udgiver…';
   try {
-    // Teamindstillingerne findes allerede. Opdatér kun den aktive uge i stedet
-    // for at lave en upsert, som også kan blive behandlet som en ny (ufuldstændig)
-    // indstillingsrække af PostgREST.
-    const updatedSettings = await apiFetch(`/rest/v1/team_settings?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&select=active_week_start`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Prefer: 'return=representation' },
-      body: JSON.stringify({ active_week_start: editingWeekStart, updated_at: new Date().toISOString() })
-    }, true);
+    // Nye tavler har endnu ingen indstillingsrække. En fuld upsert opretter den
+    // første gang og opdaterer kun det samme teams række fremover.
+    const updatedSettings = await upsertTeamSettings(
+      { active_week_start: editingWeekStart },
+      'active_week_start'
+    );
     if (updatedSettings?.[0]?.active_week_start !== editingWeekStart) {
       throw new Error('Teamets aktive uge blev ikke opdateret');
     }
@@ -961,23 +992,18 @@ async function saveSettings() {
   button.disabled = true;
   button.textContent = 'Gemmer…';
   try {
-    await apiFetch(`/rest/v1/team_settings?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-      body: JSON.stringify({
-        morning_staff_count: defaults.morning,
-        evening_staff_count: defaults.evening,
-        night_staff_count: defaults.night,
-        show_dates_public: el('showDatesPublic').checked,
-        shift_mode: Number(el('shiftMode').value),
-        night_enabled: el('nightEnabled').checked,
-        show_breakfast: el('showBreakfast').checked,
-        show_lunch: el('showLunch').checked,
-        tasks_enabled:el('tasksEnabled').checked,
-        speak_enabled:el('speakEnabled').checked,
-        updated_at: new Date().toISOString()
-      })
-    }, true);
+    await upsertTeamSettings({
+      morning_staff_count: defaults.morning,
+      evening_staff_count: defaults.evening,
+      night_staff_count: defaults.night,
+      show_dates_public: el('showDatesPublic').checked,
+      shift_mode: Number(el('shiftMode').value),
+      night_enabled: el('nightEnabled').checked,
+      show_breakfast: el('showBreakfast').checked,
+      show_lunch: el('showLunch').checked,
+      tasks_enabled:el('tasksEnabled').checked,
+      speak_enabled:el('speakEnabled').checked
+    });
     state.staffingDefaults = defaults;
     state.showDatesPublic = el('showDatesPublic').checked;
     state.shiftMode = Number(el('shiftMode').value);
@@ -1018,7 +1044,7 @@ async function saveTasks(){
   try{
     await syncTaskList('team_residents',taskDraftResidents,state.residents);
     await syncTaskList('team_tasks',taskDraftTasks,state.teamTasks);
-    await apiFetch(`/rest/v1/team_settings?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`,{method:'PATCH',headers:{'Content-Type':'application/json',Prefer:'return=minimal'},body:JSON.stringify({task_rotation_start:rotationStart})},true);
+    await upsertTeamSettings({task_rotation_start:rotationStart});
     el('tasksManagerDialog').close();await loadData({quiet:true});setStatus('Ugeopgaverne er gemt','success');
   }catch(error){console.error(error);setStatus('Ugeopgaverne kunne ikke gemmes. Intet er slettet.','error')}
   finally{button.disabled=false;button.textContent='Gem ugeopgaver'}
