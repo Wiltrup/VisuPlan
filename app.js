@@ -44,6 +44,8 @@ let refreshTimer = null;
 let editingWeekStart = null;
 let editingWeek = Object.fromEntries(DAYS.map(day => [day.key, emptyDay()]));
 let editingShifts = { morning: [], evening: [], night: [] };
+let editingWeekBaseline = '';
+let editingDayIndex = 0;
 let selectedPexelsPhoto = null;
 let mealSearchTarget = 'dinner';
 const signedImageCache = new Map();
@@ -515,11 +517,13 @@ function defaultEditingWeekStart() {
 
 async function setEditingWeek(weekStart, preferredDay = 0) {
   setStatus('Henter ugen…');
+  const nextWeek = await fetchWeek(weekStart);
   editingWeekStart = weekStart;
-  editingWeek = await fetchWeek(editingWeekStart);
+  editingWeek = nextWeek;
   el('adminWeekLabel').textContent = formatWeekRange(editingWeekStart);
   el('adminDaySelect').innerHTML = DAYS.map((day, index) => `<option value="${index}" ${index === preferredDay ? 'selected' : ''}>${day.name} ${formatDate(dateForIndex(index, editingWeekStart))}</option>`).join('');
   loadAdminDay();
+  markWeekEditorClean();
   setStatus('Ugen er hentet', 'success');
 }
 
@@ -538,6 +542,7 @@ async function openAdmin() {
 
 function loadAdminDay() {
   const index = Number(el('adminDaySelect').value || selectedIndex);
+  editingDayIndex = index;
   const data = editingWeek[DAYS[index].key];
   editingShifts = {};
   ['morning', 'evening', 'night'].forEach(type => {
@@ -549,15 +554,99 @@ function loadAdminDay() {
     el(`${type}EditorSection`).hidden = !state.meals[type];
     el(`${type}Input`).value = data[type] || '';
     el(`${type}PhotoInput`).value = '';
-    el(`${type}PhotoName`).textContent = data[`${type}PhotoUrl`] ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
-    pendingMealPhotos[type] = null;
-    pendingMealAudio[type] = { url: data[`${type}AudioUrl`] || '', blob: null, deleted: false };
+    const pendingPhoto = data._pendingMealPhotos?.[type] || null;
+    el(`${type}PhotoName`).textContent = pendingPhoto ? (pendingPhoto.name || 'Nyt billede valgt ✓') : data[`${type}PhotoUrl`] ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
+    pendingMealPhotos[type] = pendingPhoto;
+    pendingMealAudio[type] = data._pendingMealAudio?.[type]
+      ? { ...data._pendingMealAudio[type] }
+      : { url: data[`${type}AudioUrl`] || '', blob: null, blobUrl: '', deleted: false };
   });
-  pendingDinnerPhoto = null;
+  pendingDinnerPhoto = pendingMealPhotos.dinner;
   selectedPexelsPhoto = null;
-  editingActivities = structuredClone(data.activities || []);
+  editingActivities = (data.activities || []).map(activity => ({ ...activity }));
   renderActivityEditor();
   renderMealAudioControls();
+}
+
+function draftFileFingerprint(file) {
+  if (!file) return '';
+  return [file.name || '', file.size || 0, file.type || '', file.lastModified || 0].join('|');
+}
+
+function captureAdminDay() {
+  if (!editingWeekStart || !editingWeek?.[DAYS[editingDayIndex]?.key]) return;
+  const data = editingWeek[DAYS[editingDayIndex].key];
+  ['morning', 'evening', 'night'].forEach(type => { data[type] = [...(editingShifts[type] || [])]; });
+  ['breakfast', 'lunch', 'dinner'].forEach(type => { data[type] = el(`${type}Input`)?.value || ''; });
+  data._pendingMealPhotos = { ...pendingMealPhotos, dinner: pendingMealPhotos.dinner || pendingDinnerPhoto || null };
+  data._pendingMealAudio = Object.fromEntries(['breakfast', 'lunch', 'dinner'].map(type => [type, { ...(pendingMealAudio[type] || {}) }]));
+  data.activities = editingActivities.map(activity => ({ ...activity }));
+}
+
+function draftDayState(data) {
+  const meals = Object.fromEntries(['breakfast', 'lunch', 'dinner'].map(type => {
+    const audio = data._pendingMealAudio?.[type] || { url: data[`${type}AudioUrl`] || '' };
+    const photo = data._pendingMealPhotos?.[type] || null;
+    return [type, {
+      name: data[type] || '',
+      photoUrl: data[`${type}PhotoUrl`] || '',
+      photo: draftFileFingerprint(photo),
+      audioUrl: audio.url || '',
+      audio: draftFileFingerprint(audio.blob),
+      audioDeleted: Boolean(audio.deleted)
+    }];
+  }));
+  const activities = (data.activities || []).map(activity => ({
+    id: activity.id || '',
+    time: activity.time || '',
+    name: activity.name || '',
+    photoUrl: activity.photoUrl || '',
+    photo: draftFileFingerprint(activity.photoFile),
+    audioUrl: activity.audioUrl || '',
+    audio: draftFileFingerprint(activity.audioBlob),
+    audioDeleted: Boolean(activity.audioDeleted)
+  }));
+  return {
+    shifts: Object.fromEntries(['morning', 'evening', 'night'].map(type => [type, [...(data[type] || [])]])),
+    meals,
+    activities
+  };
+}
+
+function weekEditorState() {
+  return Object.fromEntries(DAYS.map(day => [day.key, draftDayState(editingWeek[day.key])]));
+}
+
+function markWeekEditorClean() {
+  captureAdminDay();
+  editingWeekBaseline = JSON.stringify(weekEditorState());
+}
+
+function hasUnsavedWeekChanges() {
+  if (!el('adminDialog')?.open || !editingWeekBaseline) return false;
+  captureAdminDay();
+  return JSON.stringify(weekEditorState()) !== editingWeekBaseline;
+}
+
+function confirmDiscardWeekChanges(action = 'lukke redigeringen') {
+  if (!hasUnsavedWeekChanges()) return true;
+  return confirm(`Dine ændringer til ugeplanen er ikke gemt.\n\nVil du ${action} uden at gemme?`);
+}
+
+function closeAdminWithCheck() {
+  if (!confirmDiscardWeekChanges()) return;
+  editingWeekBaseline = '';
+  el('adminDialog').close();
+}
+
+async function changeEditingWeek(days) {
+  if (!confirmDiscardWeekChanges('skifte uge')) return;
+  try {
+    await setEditingWeek(addDaysIso(editingWeekStart, days), 0);
+  } catch (error) {
+    console.error(error);
+    setStatus('Ugen kunne ikke hentes.', 'error');
+  }
 }
 
 async function searchPexels(query) {
@@ -590,7 +679,7 @@ function renderPexelsResults(photos) {
       el(`${mealSearchTarget}PhotoInput`).value = '';
       el(`${mealSearchTarget}PhotoName`).textContent = `Billede valgt fra Pexels · Foto: ${photo.photographer}`;
       el('imageSearchDialog').close();
-      setStatus('Billedet er valgt – husk Gem dagen', 'success');
+      setStatus('Billedet er valgt – husk Gem ændringer', 'success');
     } catch (error) {
       console.error(error);
       setStatus('Billedet kunne ikke hentes. Prøv et andet.', 'error');
@@ -740,6 +829,7 @@ async function renameStaff(staffId, currentName) {
     editingWeek = await fetchWeek(editingWeekStart);
     renderStaffManager();
     loadAdminDay();
+    markWeekEditorClean();
     setStatus('Navnet er ændret', 'success');
   } catch (error) {
     console.error(error);
@@ -759,6 +849,7 @@ async function deactivateStaff(staffId, name) {
     editingWeek = await fetchWeek(editingWeekStart);
     renderStaffManager();
     loadAdminDay();
+    markWeekEditorClean();
     setStatus(`${name} er fjernet fra valglisterne`, 'success');
   } catch (error) {
     console.error(error);
@@ -801,6 +892,7 @@ async function uploadStaffPhoto(staffId, file) {
     editingWeek = await fetchWeek(editingWeekStart);
     renderStaffManager();
     loadAdminDay();
+    markWeekEditorClean();
     setStatus('Billedet er gemt', 'success');
   } catch (error) {
     console.error(error);
@@ -835,6 +927,7 @@ async function addStaff() {
     editingWeek = await fetchWeek(editingWeekStart);
     renderStaffManager();
     loadAdminDay();
+    markWeekEditorClean();
     setStatus('Medarbejderen er tilføjet', 'success');
   } catch (error) {
     console.error(error);
@@ -842,91 +935,130 @@ async function addStaff() {
   }
 }
 
-async function saveDay() {
-  const button = el('saveDayButton');
-  button.disabled = true;
-  button.textContent = 'Gemmer…';
-  const index = Number(el('adminDaySelect').value);
+async function saveEditingDay(index, draft) {
   const planDate = weekDates(editingWeekStart)[index];
-  const existing = editingWeek[DAYS[index].key];
+  const mealValues = {};
+  const savedMeals = {};
+  for (const type of ['breakfast','lunch','dinner']) {
+    let photoUrl = stablePhotoUrl(draft[`${type}PhotoUrl`] || '');
+    const pending = draft._pendingMealPhotos?.[type] || null;
+    if (pending) photoUrl = await uploadImage(pending, `${TEAM_SLUG}/meals/${type}-${planDate}-${Date.now()}.jpg`);
+    const name = String(draft[type] || '').trim();
+    const audioDraft = draft._pendingMealAudio?.[type] || {};
+    let audioUrl = audioDraft.deleted ? '' : stablePhotoUrl(audioDraft.url || draft[`${type}AudioUrl`] || '');
+    if (audioDraft.blob) audioUrl = await uploadAudio(audioDraft.blob, `${TEAM_SLUG}/audio/meals/${type}-${planDate}-${Date.now()}`);
+    mealValues[`${type}_name`] = name;
+    mealValues[`${type}_photo_url`] = photoUrl || null;
+    mealValues[`${type}_audio_url`] = audioUrl || null;
+    savedMeals[type] = { name, photoUrl, audioUrl };
+  }
 
-  try {
-    const mealValues = {};
-    for (const type of ['breakfast','lunch','dinner']) {
-      let photoUrl = stablePhotoUrl(existing[`${type}PhotoUrl`] || '');
-      const pending = pendingMealPhotos[type] || (type === 'dinner' ? pendingDinnerPhoto : null);
-      if (pending) photoUrl = await uploadImage(pending, `${TEAM_SLUG}/meals/${type}-${planDate}-${Date.now()}.jpg`);
-      mealValues[`${type}_name`] = el(`${type}Input`).value.trim();
-      mealValues[`${type}_photo_url`] = photoUrl || null;
-      const audioDraft=pendingMealAudio[type]||{};
-      let audioUrl=audioDraft.deleted?'':stablePhotoUrl(audioDraft.url||existing[`${type}AudioUrl`]||'');
-      if(audioDraft.blob)audioUrl=await uploadAudio(audioDraft.blob,`${TEAM_SLUG}/audio/meals/${type}-${planDate}-${Date.now()}`);
-      mealValues[`${type}_audio_url`]=audioUrl||null;
-    }
+  await apiFetch('/rest/v1/day_plans?on_conflict=team_slug,plan_date', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ team_slug: TEAM_SLUG, plan_date: planDate, ...mealValues, updated_at: new Date().toISOString() })
+  }, true);
 
-    await apiFetch('/rest/v1/day_plans?on_conflict=team_slug,plan_date', {
+  await apiFetch(`/rest/v1/shifts?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
+  const shifts = activeShiftTypes().flatMap(shiftType => (draft[shiftType] || []).map((name, slotIndex) => {
+    const person = staffByName(name);
+    return person ? { team_slug: TEAM_SLUG, plan_date: planDate, shift_type: shiftType, slot: slotIndex + 1, staff_id: person.id } : null;
+  })).filter(Boolean);
+  if (shifts.length) {
+    await apiFetch('/rest/v1/shifts', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', Prefer: 'resolution=merge-duplicates,return=minimal' },
-      body: JSON.stringify({ team_slug: TEAM_SLUG, plan_date: planDate, ...mealValues, updated_at: new Date().toISOString() })
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(shifts)
     }, true);
+  }
 
-    await apiFetch(`/rest/v1/shifts?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
-    const shifts = activeShiftTypes().flatMap(shiftType => editingShifts[shiftType].map((name, index) => {
-      const person = staffByName(name);
-      return person ? { team_slug: TEAM_SLUG, plan_date: planDate, shift_type: shiftType, slot: index + 1, staff_id: person.id } : null;
-    })).filter(Boolean);
-    if (shifts.length) {
-      await apiFetch('/rest/v1/shifts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(shifts)
-      }, true);
-    }
-
-    await apiFetch(`/rest/v1/activities?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
-    const validActivities = editingActivities.filter(activity => activity.name.trim());
-    const activities = await Promise.all(validActivities.map(async (activity, order) => {
-      let photoUrl = stablePhotoUrl(activity.photoUrl || '');
-      if (activity.photoFile) photoUrl = await uploadImage(activity.photoFile, `${TEAM_SLUG}/activities/${planDate}-${order}-${Date.now()}.jpg`);
-      let audioUrl=activity.audioDeleted?'':stablePhotoUrl(activity.audioUrl||'');
-      if(activity.audioBlob)audioUrl=await uploadAudio(activity.audioBlob,`${TEAM_SLUG}/audio/activities/${planDate}-${order}-${Date.now()}`);
-      return {
+  await apiFetch(`/rest/v1/activities?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&plan_date=eq.${planDate}`, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }, true);
+  const validActivities = (draft.activities || []).filter(activity => activity.name.trim());
+  const savedActivities = await Promise.all(validActivities.map(async (activity, order) => {
+    let photoUrl = stablePhotoUrl(activity.photoUrl || '');
+    if (activity.photoFile) photoUrl = await uploadImage(activity.photoFile, `${TEAM_SLUG}/activities/${planDate}-${order}-${Date.now()}.jpg`);
+    let audioUrl = activity.audioDeleted ? '' : stablePhotoUrl(activity.audioUrl || '');
+    if (activity.audioBlob) audioUrl = await uploadAudio(activity.audioBlob, `${TEAM_SLUG}/audio/activities/${planDate}-${order}-${Date.now()}`);
+    const name = activity.name.trim();
+    return {
+      api: {
         team_slug: TEAM_SLUG, plan_date: planDate,
         activity_time: activity.time || null,
-        name: activity.name.trim(),
+        name,
         photo_url: photoUrl || null,
         audio_url: audioUrl || null,
         sort_order: order
-      };
-    }));
-    if (activities.length) {
-      await apiFetch('/rest/v1/activities', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
-        body: JSON.stringify(activities)
-      }, true);
+      },
+      draft: { ...activity, name, photoUrl, photoFile: null, audioUrl, audioBlob: null, audioBlobUrl: '', audioDeleted: false }
+    };
+  }));
+  if (savedActivities.length) {
+    await apiFetch('/rest/v1/activities', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Prefer: 'return=minimal' },
+      body: JSON.stringify(savedActivities.map(activity => activity.api))
+    }, true);
+  }
+
+  for (const type of ['breakfast','lunch','dinner']) {
+    draft[type] = savedMeals[type].name;
+    draft[`${type}PhotoUrl`] = savedMeals[type].photoUrl;
+    draft[`${type}AudioUrl`] = savedMeals[type].audioUrl;
+  }
+  draft._pendingMealPhotos = { breakfast: null, lunch: null, dinner: null };
+  draft._pendingMealAudio = Object.fromEntries(['breakfast','lunch','dinner'].map(type => [type, { url: savedMeals[type].audioUrl, blob: null, blobUrl: '', deleted: false }]));
+  draft.activities = savedActivities.map(activity => activity.draft);
+}
+
+async function saveWeekChanges() {
+  captureAdminDay();
+  const button = el('saveDayButton');
+  const baseline = JSON.parse(editingWeekBaseline || '{}');
+  const current = weekEditorState();
+  const changedIndexes = DAYS.map((day, index) => JSON.stringify(current[day.key]) !== JSON.stringify(baseline[day.key]) ? index : -1).filter(index => index >= 0);
+  if (!changedIndexes.length) {
+    setStatus('Der er ingen nye ændringer at gemme.', 'success');
+    return;
+  }
+  button.disabled = true;
+  button.textContent = 'Gemmer…';
+  try {
+    for (const index of changedIndexes) {
+      const day = DAYS[index];
+      await saveEditingDay(index, editingWeek[day.key]);
+      if (index === editingDayIndex) loadAdminDay();
+      baseline[day.key] = draftDayState(editingWeek[day.key]);
+      editingWeekBaseline = JSON.stringify(baseline);
     }
 
+    const selectedEditDay = editingDayIndex;
     editingWeek = await fetchWeek(editingWeekStart);
     if (editingWeekStart === state.activeWeekStart) {
       state.week = editingWeek;
-      selectedIndex = index;
+      selectedIndex = selectedEditDay;
       render();
     }
+    el('adminDaySelect').value = String(selectedEditDay);
     loadAdminDay();
+    markWeekEditorClean();
     button.textContent = 'Gemt ✓';
-    setStatus('Dagen er gemt på alle enheder', 'success');
+    setStatus('Alle ændringer er gemt på alle enheder', 'success');
   } catch (error) {
     console.error(error);
+    loadAdminDay();
     button.textContent = 'Prøv igen';
-    setStatus('Dagen kunne ikke gemmes.', 'error');
+    setStatus('Nogle ændringer kunne ikke gemmes. Prøv igen.', 'error');
   } finally {
     button.disabled = false;
-    setTimeout(() => { button.textContent = 'Gem dagen'; }, 1600);
+    setTimeout(() => { button.textContent = 'Gem ændringer'; }, 1600);
   }
 }
 
 async function publishEditingWeek() {
+  if (hasUnsavedWeekChanges()) {
+    setStatus('Gem ændringerne, før du viser ugen på tavlen.', 'error');
+    return;
+  }
   const confirmed = confirm('Du er ved at vise den valgte uge på tavlen. Tavlen går automatisk frem til den aktuelle kalenderuge hver mandag. Vil du fortsætte?');
   if (!confirmed) return;
   const button = el('publishWeekButton');
@@ -1013,6 +1145,7 @@ async function saveSettings() {
     render();
     el('settingsDialog').close();
     loadAdminDay();
+    markWeekEditorClean();
     setStatus('Grundindstillingerne er gemt', 'success');
   } catch (error) {
     console.error(error);
@@ -1118,21 +1251,28 @@ el('loginForm').addEventListener('submit', async event => {
   }
 });
 el('closeLoginButton').addEventListener('click', () => el('loginDialog').close());
-el('closeAdmin').addEventListener('click', () => el('adminDialog').close());
+el('closeAdmin').addEventListener('click', closeAdminWithCheck);
+el('adminDialog').addEventListener('cancel', event => { event.preventDefault(); closeAdminWithCheck(); });
 el('closeImageDialog').addEventListener('click', () => el('imageDialog').close());
 el('imageDialog').addEventListener('click', event => { if (event.target === el('imageDialog')) el('imageDialog').close(); });
-el('logoutButton').addEventListener('click', signOut);
+el('logoutButton').addEventListener('click', () => { if (confirmDiscardWeekChanges('logge ud')) signOut(); });
 el('viewerLogoutButton').addEventListener('click', leaveBoard);
-el('adminDaySelect').addEventListener('change', loadAdminDay);
-el('previousEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, -7), 0));
-el('nextEditWeek').addEventListener('click', () => setEditingWeek(addDaysIso(editingWeekStart, 7), 0));
+el('adminDaySelect').addEventListener('change', () => {
+  captureAdminDay();
+  loadAdminDay();
+});
+el('previousEditWeek').addEventListener('click', () => changeEditingWeek(-7));
+el('nextEditWeek').addEventListener('click', () => changeEditingWeek(7));
 el('publishWeekButton').addEventListener('click', publishEditingWeek);
 document.querySelectorAll('[data-add-shift]').forEach(button => button.addEventListener('click', () => {
   const type = button.dataset.addShift;
   if (editingShifts[type].length < 10) editingShifts[type].push('');
   renderShiftEditors();
 }));
-el('openSettingsButton').addEventListener('click', openSettings);
+el('openSettingsButton').addEventListener('click', () => {
+  if (hasUnsavedWeekChanges()) return setStatus('Gem ændringerne, før du åbner Grundindstillinger.', 'error');
+  openSettings();
+});
 el('shiftMode').addEventListener('change',updateSettingsVisibility);
 el('nightEnabled').addEventListener('change',updateSettingsVisibility);
 el('tasksEnabled').addEventListener('change',updateSettingsVisibility);
@@ -1141,10 +1281,13 @@ el('saveSettingsButton').addEventListener('click', saveSettings);
 el('saveViewerCode').addEventListener('click',saveViewerCode);
 el('toggleViewerCode').addEventListener('click',()=>{const input=el('newViewerCode');input.type=input.type==='password'?'text':'password';el('toggleViewerCode').textContent=input.type==='password'?'Vis':'Skjul'});
 el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', name: '' }); renderActivityEditor(); });
-el('saveDayButton').addEventListener('click', saveDay);
+el('saveDayButton').addEventListener('click', saveWeekChanges);
 el('addStaffButton').addEventListener('click', addStaff);
 ['breakfast','lunch','dinner'].forEach(type=>el(`${type}PhotoInput`).addEventListener('change',event=>{pendingMealPhotos[type]=event.target.files?.[0]||null;if(type==='dinner'){pendingDinnerPhoto=pendingMealPhotos[type];selectedPexelsPhoto=null}el(`${type}PhotoName`).textContent=pendingMealPhotos[type]?pendingMealPhotos[type].name:'Intet billede valgt.'}));
-el('openStaffManagerButton').addEventListener('click',()=>{renderStaffManager();el('staffManagerDialog').showModal()});
+el('openStaffManagerButton').addEventListener('click',()=>{
+  if(hasUnsavedWeekChanges())return setStatus('Gem ændringerne, før du redigerer medarbejderlisten.','error');
+  renderStaffManager();el('staffManagerDialog').showModal()
+});
 el('closeStaffManagerButton').addEventListener('click',()=>el('staffManagerDialog').close());
 el('boardTab').addEventListener('click',()=>showModule('board'));
 el('tasksTab').addEventListener('click',()=>showModule('tasks'));
@@ -1181,6 +1324,11 @@ el('imageSearchForm').addEventListener('submit', async event => {
 });
 document.addEventListener('visibilitychange', () => { if (!document.hidden) loadData({ quiet: true }); });
 window.addEventListener('pageshow', () => loadData({ quiet: true }));
+window.addEventListener('beforeunload', event => {
+  if (!hasUnsavedWeekChanges()) return;
+  event.preventDefault();
+  event.returnValue = '';
+});
 document.addEventListener('error', event => { if (event.target instanceof HTMLImageElement) event.target.classList.add('image-load-error'); }, true);
 
 async function init() {

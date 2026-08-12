@@ -5,7 +5,7 @@ const $=id=>document.getElementById(id);
 const esc=value=>String(value||'').replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const blankDay=()=>({morning:['',''],evening:['',''],night:['',''],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'',dinnerPhoto:'',activities:[]});
 const defaultState=()=>({week:DEMO_DAYS.map(blankDay),settings:{morning:2,evening:2,night:2,showDates:true,shiftMode:3,nightEnabled:true,showBreakfast:false,showLunch:false}});
-let demoState=loadState(),selected=(new Date().getDay()+6)%7,editActivities=[],editShifts={morning:[],evening:[],night:[]},editMealPhotos={breakfast:'',lunch:'',dinner:''};
+let demoState=loadState(),selected=(new Date().getDay()+6)%7,editActivities=[],editShifts={morning:[],evening:[],night:[]},editMealPhotos={breakfast:'',lunch:'',dinner:''},demoEditorBaseline='';
 
 function loadState(){try{const saved=JSON.parse(sessionStorage.getItem(KEY)||'null');return saved?.week&&saved?.settings?saved:defaultState()}catch{return defaultState()}}
 function saveState(){try{sessionStorage.setItem(KEY,JSON.stringify(demoState));return true}catch{status('Billedet er for stort til demosessionen. Prøv et mindre billede.');return false}}
@@ -45,6 +45,15 @@ function loadEditor(){
   editActivities=structuredClone(day.activities);renderShiftEditors();renderActivityEditor();renderStaffManager();
 }
 
+function captureDemoDay(){
+  const day=demoState.week[selected];
+  activeShifts().forEach(type=>day[type]=[...editShifts[type]]);
+  ['breakfast','lunch','dinner'].forEach(type=>{const cap=type[0].toUpperCase()+type.slice(1);day[type]=$(`demo${cap}Input`).value;day[`${type}Photo`]=editMealPhotos[type]});
+  day.activities=editActivities.map(activity=>({...activity}));
+}
+function demoHasUnsavedChanges(){if(!$('demoEditorDialog').open||!demoEditorBaseline)return false;captureDemoDay();return JSON.stringify(demoState.week)!==demoEditorBaseline}
+function closeDemoEditor(){if(demoHasUnsavedChanges()&&!confirm('Dine ændringer til ugeplanen er ikke gemt.\n\nVil du lukke redigeringen uden at gemme?'))return;demoEditorBaseline='';$('demoEditorDialog').close()}
+
 function renderShiftEditors(){
   ['morning','evening','night'].forEach(type=>{
     const cap=type[0].toUpperCase()+type.slice(1);$(`demo${cap}Group`).hidden=!activeShifts().includes(type);$(`demo${cap}Group`).querySelector('h4').textContent=`${{morning:'☀️',evening:'🌙',night:'🌑'}[type]} ${demoShiftLabel(type)}`;if(!activeShifts().includes(type))return;
@@ -79,19 +88,20 @@ $('demoPrev').onclick=()=>{selected=(selected+6)%7;render()};
 $('demoNext').onclick=()=>{selected=(selected+1)%7;render()};
 $('demoAdminButton').onclick=()=>{$('demoPin').value='';$('demoLoginError').textContent='';$('demoLoginDialog').showModal()};
 $('demoLoginClose').onclick=()=>$('demoLoginDialog').close();
-$('demoLoginForm').onsubmit=event=>{event.preventDefault();if($('demoPin').value!=='1234')return $('demoLoginError').textContent='Forkert kode. Demokoden er 1234.';$('demoPin').value='';$('demoLoginDialog').close();loadEditor();$('demoEditorDialog').showModal()};
-$('demoEditorClose').onclick=()=>$('demoEditorDialog').close();
+$('demoLoginForm').onsubmit=event=>{event.preventDefault();if($('demoPin').value!=='1234')return $('demoLoginError').textContent='Forkert kode. Demokoden er 1234.';$('demoPin').value='';$('demoLoginDialog').close();loadEditor();$('demoEditorDialog').showModal();demoEditorBaseline=JSON.stringify(demoState.week)};
+$('demoEditorClose').onclick=closeDemoEditor;
+$('demoEditorDialog').addEventListener('cancel',event=>{event.preventDefault();closeDemoEditor()});
 $('demoEditDay').innerHTML=DEMO_DAYS.map((day,index)=>`<option value="${index}">${day[1]} ${formatDate(dateAt(index))}</option>`).join('');
-$('demoEditDay').onchange=()=>{selected=Number($('demoEditDay').value);loadEditor();render()};
+$('demoEditDay').onchange=()=>{captureDemoDay();selected=Number($('demoEditDay').value);loadEditor();render()};
 document.querySelectorAll('[data-demo-add-shift]').forEach(button=>button.onclick=()=>{const type=button.dataset.demoAddShift;if(editShifts[type].length<10){editShifts[type].push('');renderShiftEditors()}});
 $('demoAddActivity').onclick=()=>{editActivities.push({time:'10:00',name:'',photo:''});renderActivityEditor()};
 $('demoImageSearch').onclick=()=>alert('Billedsøgning er tilgængelig på en oprettet VisuPlanner-tavle. I demoen kan du uploade dit eget billede.');
 ['breakfast','lunch','dinner'].forEach(type=>{const cap=type[0].toUpperCase()+type.slice(1);$(`demo${cap}PhotoInput`).onchange=async event=>{if(!event.target.files?.[0])return;status('Behandler billedet lokalt…');editMealPhotos[type]=await compressImage(event.target.files[0]);if(type==='dinner')$('demoDinnerPhotoNote').textContent='Billedet er klar og gemmes kun i denne demosession.';status('Billedet er klar')}});
-$('demoSave').onclick=()=>{const day=demoState.week[selected];activeShifts().forEach(type=>day[type]=[...editShifts[type]]);['breakfast','lunch','dinner'].forEach(type=>{const cap=type[0].toUpperCase()+type.slice(1);day[type]=$(`demo${cap}Input`).value.trim();day[`${type}Photo`]=editMealPhotos[type]});day.activities=editActivities.filter(activity=>activity.name.trim()).map(activity=>({...activity,name:activity.name.trim()}));if(!saveState())return;render();$('demoEditorDialog').close();status('Dagen er gemt i denne browserfane')};
-$('demoReset').onclick=()=>{if(!confirm('Vil du nulstille hele demoen? Tekst og uploadede billeder slettes.'))return;demoState=defaultState();sessionStorage.removeItem(KEY);render();loadEditor();status('Demoen er nulstillet')};
-$('demoOpenSettings').onclick=()=>{$('demoMorningDefault').value=demoState.settings.morning;$('demoEveningDefault').value=demoState.settings.evening;$('demoNightDefault').value=demoState.settings.night;$('demoShowDates').checked=demoState.settings.showDates;$('demoShiftMode').value=demoState.settings.shiftMode;$('demoNightEnabled').checked=demoState.settings.nightEnabled;$('demoShowBreakfast').checked=demoState.settings.showBreakfast;$('demoShowLunch').checked=demoState.settings.showLunch;$('demoSettingsDialog').showModal()};
+$('demoSave').onclick=()=>{captureDemoDay();demoState.week.forEach(day=>{['breakfast','lunch','dinner'].forEach(type=>day[type]=String(day[type]||'').trim());day.activities=day.activities.filter(activity=>activity.name.trim()).map(activity=>({...activity,name:activity.name.trim()}))});if(!saveState())return;demoEditorBaseline=JSON.stringify(demoState.week);render();$('demoEditorDialog').close();status('Alle ændringer er gemt i denne browserfane')};
+$('demoReset').onclick=()=>{if(!confirm('Vil du nulstille hele demoen? Tekst og uploadede billeder slettes.'))return;demoState=defaultState();sessionStorage.removeItem(KEY);render();loadEditor();demoEditorBaseline=JSON.stringify(demoState.week);status('Demoen er nulstillet')};
+$('demoOpenSettings').onclick=()=>{if(demoHasUnsavedChanges())return status('Gem ændringerne, før du åbner Grundindstillinger.');$('demoMorningDefault').value=demoState.settings.morning;$('demoEveningDefault').value=demoState.settings.evening;$('demoNightDefault').value=demoState.settings.night;$('demoShowDates').checked=demoState.settings.showDates;$('demoShiftMode').value=demoState.settings.shiftMode;$('demoNightEnabled').checked=demoState.settings.nightEnabled;$('demoShowBreakfast').checked=demoState.settings.showBreakfast;$('demoShowLunch').checked=demoState.settings.showLunch;$('demoSettingsDialog').showModal()};
 $('demoSettingsClose').onclick=()=>$('demoSettingsDialog').close();
-$('demoSettingsSave').onclick=()=>{demoState.settings={morning:Math.min(10,Math.max(1,Number($('demoMorningDefault').value)||1)),evening:Math.min(10,Math.max(1,Number($('demoEveningDefault').value)||1)),night:Math.min(10,Math.max(1,Number($('demoNightDefault').value)||1)),showDates:$('demoShowDates').checked,shiftMode:Number($('demoShiftMode').value),nightEnabled:$('demoNightEnabled').checked,showBreakfast:$('demoShowBreakfast').checked,showLunch:$('demoShowLunch').checked};demoState.week.forEach(ensureShiftDefaults);saveState();render();loadEditor();$('demoSettingsDialog').close();status('Grundindstillingerne er gemt')};
+$('demoSettingsSave').onclick=()=>{demoState.settings={morning:Math.min(10,Math.max(1,Number($('demoMorningDefault').value)||1)),evening:Math.min(10,Math.max(1,Number($('demoEveningDefault').value)||1)),night:Math.min(10,Math.max(1,Number($('demoNightDefault').value)||1)),showDates:$('demoShowDates').checked,shiftMode:Number($('demoShiftMode').value),nightEnabled:$('demoNightEnabled').checked,showBreakfast:$('demoShowBreakfast').checked,showLunch:$('demoShowLunch').checked};demoState.week.forEach(ensureShiftDefaults);saveState();render();loadEditor();demoEditorBaseline=JSON.stringify(demoState.week);$('demoSettingsDialog').close();status('Grundindstillingerne er gemt')};
 $('demoOpenStaff').onclick=()=>{$('demoStaffDialog').showModal()};$('demoStaffClose').onclick=()=>$('demoStaffDialog').close();
 $('demoImageClose').onclick=()=>$('demoImageDialog').close();
 $('demoImageDialog').onclick=event=>{if(event.target===$('demoImageDialog'))$('demoImageDialog').close()};
