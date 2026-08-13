@@ -17,7 +17,7 @@ const DAYS = [
 
 const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''], breakfast: '', breakfastPhotoUrl: '', breakfastAudioUrl: '', lunch: '', lunchPhotoUrl: '', lunchAudioUrl: '', dinner: '', dinnerPhotoUrl: '', dinnerAudioUrl: '', activities: [] });
 const state = {
-  team: { slug: TEAM_SLUG, name: 'Team', workplace: '' },
+  team: { slug: TEAM_SLUG, name: 'Team', workplace: '', subscription: { status: 'legacy', can_edit: true } },
   staff: [],
   week: Object.fromEntries(DAYS.map(day => [day.key, emptyDay()])),
   activeWeekStart: null,
@@ -113,6 +113,45 @@ function apiHeaders(authenticated = false, extra = {}) {
 function sessionRole() { return state.session?.user?.user_metadata?.role || ''; }
 function isStaffSession() { return sessionRole() === 'editor' && state.session?.user?.user_metadata?.team_slug === TEAM_SLUG; }
 function isViewerSession() { return sessionRole() === 'viewer' && state.session?.user?.user_metadata?.team_slug === TEAM_SLUG; }
+function subscriptionCanEdit() { return state.team?.subscription?.can_edit !== false; }
+
+function requireEditable() {
+  if (subscriptionCanEdit()) return true;
+  setStatus('Prøveperioden er udløbet. Tavlen kan stadig ses, men redigering er låst.', 'error');
+  return false;
+}
+
+function renderSubscriptionBanner() {
+  const banner = el('subscriptionBanner');
+  const subscription = state.team?.subscription || { status: 'legacy', can_edit: true };
+  if (!isStaffSession() || !['trial', 'read_only'].includes(subscription.status)) {
+    banner.hidden = true;
+    return;
+  }
+  banner.hidden = false;
+  banner.classList.toggle('expired', !subscription.can_edit);
+  const button = el('requestSubscriptionButton');
+  button.hidden = false;
+  button.disabled = Boolean(subscription.subscription_interest_at);
+  button.textContent = subscription.subscription_interest_at ? 'Forespørgsel sendt ✓' : 'Vi vil gerne fortsætte';
+  if (subscription.status === 'trial' && subscription.can_edit && subscription.trial_ends_at) {
+    const days = Math.max(1, Math.ceil((new Date(subscription.trial_ends_at) - new Date()) / 86400000));
+    el('subscriptionTitle').textContent = `Gratis prøveperiode · ${days} ${days === 1 ? 'dag' : 'dage'} tilbage`;
+    el('subscriptionText').textContent = 'I kan vælge en pakke og få fuld adgang før prøveperioden udløber.';
+  } else {
+    el('subscriptionTitle').textContent = 'Redigering er låst';
+    el('subscriptionText').textContent = 'Tavlen kan fortsat ses. Send en forespørgsel, så aftaler vi pakke og betaling.';
+  }
+}
+
+function setEditorLockedState() {
+  const locked = !subscriptionCanEdit();
+  const allowed = new Set(['closeAdmin', 'logoutButton', 'previousEditWeek', 'nextEditWeek', 'adminDaySelect', 'requestSubscriptionButton']);
+  el('adminDialog').querySelectorAll('input, textarea, select, button').forEach(control => {
+    if (!allowed.has(control.id)) control.disabled = locked;
+  });
+  el('adminDialog').classList.toggle('editor-locked', locked);
+}
 
 function activeShiftTypes() {
   if (state.shiftMode === 2) return ['morning'];
@@ -350,12 +389,17 @@ async function fetchWeek(weekStart) {
 async function loadData({ quiet = false } = {}) {
   if (!quiet) setStatus('Henter ugeplan…');
   try {
-    const [staff, settings, residents, teamTasks] = await Promise.all([
+    const [staff, settings, residents, teamTasks, teamStatus] = await Promise.all([
       apiFetch(`/rest/v1/staff?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&order=sort_order.asc,name.asc`, {}, true),
       apiFetch(`/rest/v1/team_settings?select=active_week_start,morning_staff_count,evening_staff_count,night_staff_count,show_dates_public,shift_mode,night_enabled,show_breakfast,show_lunch,tasks_enabled,speak_enabled,task_rotation_start&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, {}, true),
       apiFetch(`/rest/v1/team_residents?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&active=eq.true&order=sort_order.asc`,{},true),
-      apiFetch(`/rest/v1/team_tasks?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&active=eq.true&order=sort_order.asc`,{},true)
+      apiFetch(`/rest/v1/team_tasks?select=*&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&active=eq.true&order=sort_order.asc`,{},true),
+      fetch(`/api/team-login?slug=${encodeURIComponent(TEAM_SLUG)}`).then(async response => response.ok ? response.json() : null).catch(() => null)
     ]);
+    if (teamStatus?.subscription) {
+      state.team = { ...state.team, ...teamStatus };
+      if (el('adminDialog').open) { renderSubscriptionBanner(); setEditorLockedState(); }
+    }
     state.staff = await Promise.all((staff || []).map(async person => ({ ...person, photo_url: await resolvePhotoUrl(person.photo_url || ''), audio_url: await resolvePhotoUrl(person.audio_url || '') })));
     const savedWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
     const calendarWeekStart = currentCalendarWeekStart();
@@ -532,6 +576,8 @@ async function openAdmin() {
   const preferredDay = start === state.activeWeekStart ? selectedIndex : 0;
   renderStaffManager();
   el('adminDialog').showModal();
+  renderSubscriptionBanner();
+  setEditorLockedState();
   try {
     await setEditingWeek(start, preferredDay);
   } catch (error) {
@@ -901,6 +947,7 @@ async function uploadStaffPhoto(staffId, file) {
 }
 
 async function addStaff() {
+  if (!requireEditable()) return;
   const name = el('newStaffName').value.trim();
   if (!name) return;
   const existing = state.staff.find(person => person.name.toLowerCase() === name.toLowerCase());
@@ -1011,6 +1058,7 @@ async function saveEditingDay(index, draft) {
 }
 
 async function saveWeekChanges() {
+  if (!requireEditable()) return;
   captureAdminDay();
   const button = el('saveDayButton');
   const baseline = JSON.parse(editingWeekBaseline || '{}');
@@ -1055,6 +1103,7 @@ async function saveWeekChanges() {
 }
 
 async function publishEditingWeek() {
+  if (!requireEditable()) return;
   if (hasUnsavedWeekChanges()) {
     setStatus('Gem ændringerne, før du viser ugen på tavlen.', 'error');
     return;
@@ -1115,6 +1164,7 @@ function updateSettingsVisibility() {
 }
 
 async function saveSettings() {
+  if (!requireEditable()) return;
   const button = el('saveSettingsButton');
   const defaults = {
     morning: Math.min(10, Math.max(1, Number(el('morningDefault').value) || 1)),
@@ -1191,6 +1241,7 @@ async function teamAccountAction(action, value) {
 }
 
 async function saveViewerCode() {
+  if (!requireEditable()) return;
   const input=el('newViewerCode'),button=el('saveViewerCode'),value=input.value;
   if(value.length<6){setStatus('Tavlekoden skal have mindst seks tegn.','error');return}
   if(!confirm('Vil du sætte en ny tavlekode? Den gamle kode stopper med at virke.'))return;
@@ -1296,6 +1347,21 @@ el('closeTasksManagerButton').addEventListener('click',()=>el('tasksManagerDialo
 el('addResidentButton').addEventListener('click',()=>addTaskDraft('resident'));
 el('addTaskButton').addEventListener('click',()=>addTaskDraft('task'));
 el('saveTasksButton').addEventListener('click',saveTasks);
+el('requestSubscriptionButton').addEventListener('click', async () => {
+  const button = el('requestSubscriptionButton');
+  button.disabled = true;
+  button.textContent = 'Sender…';
+  try {
+    const result = await teamAccountAction('request-subscription');
+    state.team.subscription.subscription_interest_at = result.requested_at || new Date().toISOString();
+    renderSubscriptionBanner();
+    setStatus('Tak. VisuPlanner har fået besked og kontakter jer om betaling og aktivering.', 'success');
+  } catch (error) {
+    button.disabled = false;
+    button.textContent = 'Vi vil gerne fortsætte';
+    setStatus(error.message, 'error');
+  }
+});
 el('openViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').showModal());
 el('closeViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').close());
 el('viewerHelpForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('viewerHelpStatus').textContent='Sender…';try{const response=await fetch('/api/public-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'viewer-help',team_slug:TEAM_SLUG,contact_name:el('viewerHelpName').value,contact_email:el('viewerHelpEmail').value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Kunne ikke sende anmodningen.');event.target.reset();el('viewerHelpStatus').textContent='Anmodningen er sendt. Du bliver kontaktet på arbejdsmailen.'}catch(error){el('viewerHelpStatus').textContent=error.message}finally{button.disabled=false}});

@@ -1,6 +1,6 @@
 <!doctype html><html lang="da"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><link rel="stylesheet" href="/finder.css"><link rel="stylesheet" href="/forms.css"><title>Opret jer – VisuPlanner</title></head><body>
 <header class="finder-header"><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a><a href="/">Til forsiden</a></header>
-<main class="finder-shell"><section class="finder-intro"><img src="/assets/brand/calendar.png" alt="" class="finder-calendar"><p class="eyebrow">KOM I GANG</p><h1>Opret jeres egen tavle</h1><p>Fortæl kort, hvem I er. Oplysningerne bruges kun til at kontakte jer og klargøre den rigtige løsning.</p></section>
+<main class="finder-shell"><section class="finder-intro"><img src="/assets/brand/calendar.png" alt="" class="finder-calendar"><p class="eyebrow">14 DAGES GRATIS PRØVE</p><h1>Opret jeres egen tavle</h1><p>I starter med én tavle i 14 dage uden betaling. I kan vælge en pakke og få fuld adgang tidligere, hvis I ønsker det.</p></section>
 <form id="onboardingForm" class="finder-card onboarding-card">
 <label>Kontaktperson<input name="contact_name" required autocomplete="name" placeholder="Navn"></label>
 <label>Arbejdsmail<input name="contact_email" required type="email" autocomplete="email" placeholder="navn@arbejdsplads.dk"></label>
@@ -9,7 +9,8 @@
 <label>Arbejdsplads<input name="workplace" required placeholder="Arbejdspladsens navn eller adresse"></label>
 <label>Team/afdeling<input name="team_name" required placeholder="Fx Team 2"></label>
 <label>Hvor mange beboere skal kunne bruge tavlen?<input name="resident_count" required type="number" min="1" max="500" inputmode="numeric"></label>
+<label>Hvilken løsning forventer I at få brug for?<select name="requested_plan"><option value="intro3">Op til 3 tavler</option><option value="intro8">Op til 8 tavler</option><option value="intro12">Op til 12 tavler</option><option value="custom">Skræddersyet løsning</option></select></label>
 <label>Bemærkninger <small>(valgfrit)</small><textarea name="notes" rows="4" placeholder="Særlige ønsker eller spørgsmål"></textarea></label>
-<label class="consent-row"><input name="consent" type="checkbox" required><span>Jeg accepterer, at Jakob Wiltrup må kontakte mig om VisuPlanner.</span></label>
+<label class="consent-row"><input name="consent" type="checkbox" required><span>Jeg accepterer, at VisuPlanner må kontakte mig om oprettelsen. Ved aktivering godkender en ansvarlig person <a href="/betingelser" target="_blank">betingelser</a>, <a href="/privatliv" target="_blank">privatliv</a> og databehandleraftale.</span></label>
 <p id="onboardingStatus" class="finder-message" aria-live="polite"></p><button type="submit">Send forespørgsel</button>
-</form></main><footer>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></footer><script src="/opret.js"></script></body></html>
+</form></main><footer>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="/priser">Priser</a> · <a href="/ofte-spurgte-spoergsmaal">Ofte spurgte spørgsmål</a> · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></footer><script src="/opret.js?v=38"></script></body></html>

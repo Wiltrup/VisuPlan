@@ -1,3 +1,63 @@
-const form=document.getElementById('activateForm'),statusEl=document.getElementById('activateStatus'),token=new URLSearchParams(location.search).get('token')||'';
-async function check(){try{const r=await fetch(`/api/activate-team?token=${encodeURIComponent(token)}`),d=await r.json();if(!r.ok)throw new Error(d.error);document.getElementById('teamName').textContent=d.teamName;form.hidden=false}catch(e){statusEl.textContent=e.message;form.querySelectorAll('input,button').forEach(x=>x.disabled=true)}}
-form.addEventListener('submit',async e=>{e.preventDefault();const values=Object.fromEntries(new FormData(form));if(values.editorPassword!==values.editorRepeat)return statusEl.textContent='Personalekoderne er ikke ens.';if(values.viewerPassword!==values.viewerRepeat)return statusEl.textContent='Tavlekoderne er ikke ens.';const button=e.submitter;button.disabled=true;button.textContent='Aktiverer…';try{const r=await fetch('/api/activate-team',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({token,editorPassword:values.editorPassword,viewerPassword:values.viewerPassword})}),d=await r.json();if(!r.ok)throw new Error(d.error);statusEl.className='finder-message success-message';statusEl.textContent='Tavlen er aktiveret. Du sendes videre…';setTimeout(()=>location.href=`/${d.slug}`,1200)}catch(error){statusEl.textContent=error.message;button.disabled=false;button.textContent='Aktivér tavlen'}});check();
+const form = document.getElementById('activateForm');
+const statusEl = document.getElementById('activateStatus');
+const token = new URLSearchParams(location.search).get('token') || '';
+let invitation = null;
+
+async function check() {
+  try {
+    const response = await fetch(`/api/activate-team?token=${encodeURIComponent(token)}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    invitation = data;
+    document.getElementById('teamName').textContent = data.teamName;
+    const reset = data.purpose === 'password_reset';
+    document.getElementById('activationHeading').textContent = reset ? 'Vælg en ny personalekode' : 'Vælg jeres egne koder';
+    document.getElementById('activationIntro').textContent = reset ? 'Linket kan kun bruges én gang og ændrer kun personalekoden.' : 'VisuPlanner-administratoren kan ikke se de koder, I vælger.';
+    document.getElementById('viewerCodeFields').hidden = reset;
+    document.querySelectorAll('#viewerCodeFields input').forEach(input => { input.required = !reset; });
+    document.getElementById('agreementFields').hidden = reset || !data.needsAcceptance;
+    document.querySelectorAll('#agreementFields input').forEach(input => { input.required = !reset && data.needsAcceptance; });
+    form.querySelector('button').textContent = reset ? 'Gem ny personalekode' : 'Aktivér tavlen';
+    form.hidden = false;
+  } catch (error) {
+    statusEl.textContent = error.message;
+    form.hidden = false;
+    form.querySelectorAll('input,button').forEach(element => { element.disabled = true; });
+  }
+}
+
+form.addEventListener('submit', async event => {
+  event.preventDefault();
+  const values = Object.fromEntries(new FormData(form));
+  if (values.editorPassword !== values.editorRepeat) return statusEl.textContent = 'Personalekoderne er ikke ens.';
+  if (invitation?.purpose !== 'password_reset' && values.viewerPassword !== values.viewerRepeat) return statusEl.textContent = 'Tavlekoderne er ikke ens.';
+  const button = event.submitter;
+  button.disabled = true;
+  button.textContent = 'Gemmer…';
+  try {
+    const response = await fetch('/api/activate-team', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        token,
+        editorPassword: values.editorPassword,
+        viewerPassword: values.viewerPassword,
+        acceptedByName: values.acceptedByName,
+        acceptedTerms: values.acceptedTerms === 'on',
+        acceptedDpa: values.acceptedDpa === 'on',
+        authorized: values.authorized === 'on'
+      })
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    statusEl.className = 'finder-message success-message';
+    statusEl.textContent = data.reset ? 'Personalekoden er ændret. Du sendes videre…' : 'Tavlen er aktiveret. Jeres 14 dages prøveperiode starter nu.';
+    setTimeout(() => { location.href = `/${data.slug}`; }, 1400);
+  } catch (error) {
+    statusEl.className = 'finder-message error-message';
+    statusEl.textContent = error.message;
+    button.disabled = false;
+    button.textContent = invitation?.purpose === 'password_reset' ? 'Gem ny personalekode' : 'Aktivér tavlen';
+  }
+});
+
+check();

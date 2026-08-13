@@ -2,28 +2,32 @@
 <html lang="da">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/admin.css?v=32"><link rel="stylesheet" href="/admin-extra.css?v=32"><title>Administration – VisuPlanner</title>
+  <link rel="stylesheet" href="/admin.css?v=38"><link rel="stylesheet" href="/admin-extra.css?v=38"><link rel="stylesheet" href="/admin-v38.css?v=38">
+  <title>Administration – VisuPlanner</title>
 </head>
 <body>
   <header><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a><a href="/">Til forsiden</a></header>
   <main>
-    <section class="admin-intro"><p class="eyebrow">PLATFORMSADMINISTRATION</p><h1>VisuPlanner administration</h1><p>Opret og hjælp teams uden at kende deres nuværende adgangskoder.</p></section>
+    <section class="admin-intro"><p class="eyebrow">PLATFORMSADMINISTRATION</p><h1>Kunder, tavler og betaling</h1><p>Administrér prøveperioder, pakker, fakturaer og hver enkelt tavle.</p></section>
     <section id="adminLoginCard" class="card login-card">
       <h2>Administratorlogin</h2>
       <form id="platformLoginForm">
-        <label>Din administratormail<input id="platformEmail" name="username" type="email" autocomplete="username" placeholder="Skriv din administratormail" required></label>
+        <label>Din administratormail<input id="platformEmail" name="username" type="email" autocomplete="username" required></label>
         <label>Din adgangskode<input id="platformPassword" name="password" type="password" autocomplete="current-password" required></label>
         <p id="platformLoginError" class="error"></p><button type="submit">Log ind</button>
       </form>
     </section>
     <section id="adminDashboard" hidden>
-      <div class="dashboard-head"><div><p class="eyebrow">TEAMS</p><h2>Oprettede tavler</h2></div><button id="platformLogout" class="secondary">Log ud</button></div>
-      <div id="teamCards"></div>
-      <div class="request-section"><h2>Nye oprettelsesforespørgsler</h2><div id="onboardingRequests"></div></div>
-      <div id="archivedSection" class="request-section" hidden><h2>Arkiverede kunder</h2><div id="archivedTeamCards"></div></div>
-      <div class="request-section"><h2>Hjælp til tavleadgang</h2><div id="accessHelpRequests"></div></div>
+      <div class="dashboard-head"><div><p class="eyebrow">OVERBLIK</p><h2>VisuPlanner-kunder</h2></div><button id="platformLogout" class="secondary">Log ud</button></div>
+      <div id="adminSummary" class="admin-summary"></div>
+      <section id="renewalSection" class="attention-section" hidden><h2>Kræver opmærksomhed</h2><div id="renewalCards"></div></section>
+      <section class="request-section"><h2>Nye oprettelsesforespørgsler</h2><div id="onboardingRequests"></div></section>
+      <section class="customer-section"><div id="customerCards"></div></section>
+      <section id="archivedSection" class="request-section" hidden><h2>Arkiverede tavler</h2><div id="archivedTeamCards"></div></section>
+      <section class="request-section"><h2>Hjælp til tavleadgang</h2><div id="accessHelpRequests"></div></section>
     </section>
   </main>
-  <div id="adminStatus" role="status"></div><script src="/admin.js?v=32"></script>
+  <div id="adminStatus" role="status" aria-live="polite"></div>
+  <script src="/admin.js?v=38"></script>
 </body>
 </html>

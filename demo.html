@@ -2,10 +2,10 @@
 <html lang="da">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="theme-color" content="#2563eb">
-  <link rel="stylesheet" href="/styles.css"><link rel="stylesheet" href="/demo.css"><title>Prøv VisuPlanner</title>
+  <link rel="stylesheet" href="/styles.css?v=38"><link rel="stylesheet" href="/demo.css?v=38"><title>Prøv VisuPlanner</title>
 </head>
 <body>
-  <div class="demo-banner"><strong>DEMOVERSION</strong><span>Alt behandles lokalt i denne browserfane</span><a href="/">Til forsiden</a></div>
+  <div class="demo-banner"><strong>DEMOVERSION</strong><span>Prøv den samme ugeplan og redigering som i den rigtige løsning – alt behandles lokalt i denne browserfane</span><a href="/priser">Se priser</a><a href="/">Til forsiden</a></div>
   <div class="app-shell">
     <header class="topbar"><div><p class="eyebrow">EKSEMPELTEAM</p><h1 class="app-wordmark-heading"><img class="app-wordmark" src="/assets/brand/wordmark.png" alt="VisuPlanner"></h1></div><button id="demoAdminButton" class="icon-button" aria-label="Rediger demo">⚙️</button></header>
     <nav id="demoDayTabs" class="day-tabs" aria-label="Vælg dag"></nav>
@@ -27,8 +27,9 @@
   <dialog id="demoLoginDialog"><form id="demoLoginForm" class="dialog-card"><p class="demo-code-note">Alle må prøve demoen<br><strong>Koden er 1234</strong></p><h2>Åbn redigering</h2><label>Demokode<input id="demoPin" name="password" type="password" inputmode="numeric" required></label><p id="demoLoginError" class="error"></p><div class="dialog-actions"><button id="demoLoginClose" type="button" class="secondary">Luk</button><button type="submit">Log ind</button></div></form></dialog>
 
   <dialog id="demoEditorDialog"><div class="dialog-card admin-card">
-    <div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Rediger dagen</h2></div><div class="admin-header-actions"><button id="demoOpenSettings" class="secondary settings-button" type="button">⚙ Grundindstillinger</button><button id="demoEditorClose" class="icon-button" aria-label="Luk">✕</button></div></div>
+    <div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Rediger ugeplan</h2></div><div class="admin-header-actions"><button id="demoOpenSettings" class="secondary settings-button" type="button">⚙ Grundindstillinger</button><button id="demoEditorClose" class="icon-button" aria-label="Luk">✕</button></div></div>
     <label>Vælg dag<select id="demoEditDay"></select></label>
+    <p class="note">Du kan redigere flere dage og gemme alle ændringer samlet, ligesom på en rigtig tavle. Speak og ugeopgaver er valgfrie moduler i den fulde version.</p>
     <div class="form-section"><h3>Personale</h3><div class="shift-editor-grid">
       <section id="demoMorningGroup" class="shift-editor-group"><div class="section-title-row"><h4>☀️ Morgen</h4><button class="secondary small" data-demo-add-shift="morning" type="button">+ Medarbejder</button></div><div id="demoMorningEditors" class="shift-editor-rows"></div></section>
       <section id="demoEveningGroup" class="shift-editor-group"><div class="section-title-row"><h4>🌙 Aften</h4><button class="secondary small" data-demo-add-shift="evening" type="button">+ Medarbejder</button></div><div id="demoEveningEditors" class="shift-editor-rows"></div></section>
@@ -46,6 +47,6 @@
   <dialog id="demoStaffDialog"><div class="dialog-card staff-manager-card"><div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Medarbejderliste</h2></div><button id="demoStaffClose" class="icon-button">✕</button></div><p class="demo-feature-note">I en oprettet tavle kan teamet tilføje, redigere og fjerne medarbejdere.</p><div id="demoStaffManager" class="staff-manager"></div></div></dialog>
 
   <dialog id="demoImageDialog" class="image-dialog"><div class="image-dialog-card"><button id="demoImageClose" class="image-dialog-close" aria-label="Luk billede">✕</button><img id="demoLargeImage" alt=""><p id="demoLargeCaption"></p></div></dialog>
-  <div id="demoStatus" class="sync-status" role="status"></div><script src="/demo.js"></script>
+  <div id="demoStatus" class="sync-status" role="status"></div><script src="/demo.js?v=38"></script>
 </body>
 </html>

@@ -1,5 +1,28 @@
 # VisuPlanner
 
+## v38 – kunder, priser, prøveperiode og betaling
+
+Version 38 samler flere selvstændige tavler under én betalende kunde og tilføjer:
+
+- 14 dages gratis prøve med én tavle. Efter udløb kan tavlen fortsat ses, mens redigering låses.
+- Pakker med op til 3, 8 eller 12 tavler samt skræddersyet tavlegrænse.
+- Kunde-, EAN-, faktura-, betalings- og fornyelsesoverblik i administrationen.
+- Separate aktiveringslinks, koder og URL'er til hver tavle under samme betaler.
+- Redigering af kunde-, arbejdsplads-, kommune- og tavlenavne uden automatisk ændring af URL.
+- Pris-, FAQ-, betingelses-, privatlivs-, databehandler- og underdatabehandlersider.
+- Automatisk daglig kontrol, der sender administratoren en mail ca. 30 dage før årsfornyelse.
+- Et dynamisk app-manifest, så hver tavle åbner den rigtige adresse, når den gemmes på telefonens hjemmeskærm.
+
+### Rækkefølge ved installation
+
+1. Kør `supabase-v38-commercial-foundation.sql` én gang i Supabase SQL Editor. Migrationen sletter ikke eksisterende tavler eller ugeplaner. Eksisterende tavler bliver aktive legacy-kunder og låses ikke.
+2. Upload alle v38-filer til GitHub/Vercel.
+3. Behold de eksisterende miljøvariabler `SUPABASE_SECRET_KEY`, `RESEND_API_KEY` og `PEXELS_API_KEY`.
+4. Opret en ny stærk, tilfældig Vercel-miljøvariabel med navnet `CRON_SECRET`, og redeploy. Den beskytter den daglige fornyelseskontrol.
+5. Kontrollér før kommerciel lancering CVR/adresse, faktisk Supabase-region, betalingsleverandør og få de juridiske tekster gennemgået fagligt.
+
+Priserne i v38 er ekskl. moms: op til 3 tavler 1.850 kr. første år og derefter 2.200 kr.; op til 8 tavler 3.200/3.800 kr.; op til 12 tavler 4.400/5.200 kr.
+
 ## v29 – rettelse til Speak-optagelser
 
 Kør `supabase-v29-audio-fix.sql` i Supabase, og upload derefter webfilerne. Rettelsen tillader lyd i medielageret og normaliserer browserens lydtype før upload.

@@ -126,6 +126,15 @@ input, select { width:100%; border:1px solid #d8dee8; background:#fff; padding:1
 .sync-status:empty { opacity:0; pointer-events:none; }
 .sync-status.success { background:#15803d; }
 .sync-status.error { background:#b42318; }
+.subscription-banner { display:flex; align-items:center; justify-content:space-between; gap:18px; margin:14px 0 18px; padding:16px 18px; border:1px solid #f3c56d; border-radius:15px; background:#fff8e7; color:#6b4707; }
+.subscription-banner[hidden] { display:none; }
+.subscription-banner strong { display:block; font-size:1rem; }
+.subscription-banner p { margin:4px 0 0; font-size:.9rem; line-height:1.4; }
+.subscription-banner button { flex:0 0 auto; border:0; border-radius:11px; padding:11px 14px; background:#8a5700; color:#fff; font-weight:850; }
+.subscription-banner.expired { border-color:#f1aaa5; background:#fff0ee; color:#8f201a; }
+.subscription-banner.expired button { background:#b42318; }
+.editor-locked .form-section, .editor-locked .staff-manager-launch { opacity:.62; }
+.editor-locked input:disabled, .editor-locked textarea:disabled, .editor-locked select:disabled { cursor:not-allowed; }
 .site-footer { margin:28px 0 6px; padding:18px 12px 4px; border-top:1px solid #d8dee8; color:#667085; text-align:center; font-size:.78rem; line-height:1.45; }
 .site-footer p { margin:2px 0; }
 .site-footer a { color:#475467; }
@@ -157,4 +166,6 @@ button:disabled { opacity:.6; cursor:wait; }
   .sticky-actions { flex-wrap:wrap; }
   .sticky-actions .publish-button { order:-1; width:100%; }
   .image-search-results { grid-template-columns:repeat(2, 1fr); }
+  .subscription-banner { align-items:stretch; flex-direction:column; }
+  .subscription-banner button { width:100%; }
 }

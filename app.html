@@ -4,8 +4,9 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#2563eb" />
-  <link rel="manifest" href="/manifest.webmanifest" />
-  <link rel="stylesheet" href="/styles.css?v=37" />
+  <link id="appManifest" rel="manifest" href="/manifest.webmanifest" />
+  <script>document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(location.pathname.split('/').filter(Boolean)[0]||'trekloeveret-team-2');</script>
+  <link rel="stylesheet" href="/styles.css?v=38" />
   <title>VisuPlanner</title>
 </head>
 <body>
@@ -112,6 +113,11 @@
           <button id="closeAdmin" class="icon-button" aria-label="Luk">✕</button>
         </div>
       </div>
+
+      <section id="subscriptionBanner" class="subscription-banner" hidden>
+        <div><strong id="subscriptionTitle"></strong><p id="subscriptionText"></p></div>
+        <button id="requestSubscriptionButton" type="button">Vi vil gerne fortsætte</button>
+      </section>
 
       <div class="week-editor-bar">
         <button id="previousEditWeek" class="secondary week-arrow" type="button" aria-label="Forrige uge">‹</button>
@@ -249,6 +255,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js?v=37"></script>
+  <script src="/app.js?v=38"></script>
 </body>
 </html>

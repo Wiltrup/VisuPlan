@@ -8,7 +8,17 @@
     { "source": "/opret", "destination": "/opret.html" },
     { "source": "/aktiver", "destination": "/aktiver.html" },
     { "source": "/saadan-virker-det", "destination": "/saadan-virker-det.html" },
+    { "source": "/priser", "destination": "/priser.html" },
+    { "source": "/ofte-spurgte-spoergsmaal", "destination": "/ofte-spurgte-spoergsmaal.html" },
+    { "source": "/faq", "destination": "/ofte-spurgte-spoergsmaal.html" },
+    { "source": "/betingelser", "destination": "/betingelser.html" },
+    { "source": "/privatliv", "destination": "/privatliv.html" },
+    { "source": "/databehandleraftale", "destination": "/databehandleraftale.html" },
+    { "source": "/underdatabehandlere", "destination": "/underdatabehandlere.html" },
     { "source": "/administration", "destination": "/admin" },
     { "source": "/:teamSlug", "destination": "/app" }
+  ],
+  "crons": [
+    { "path": "/api/renewal-reminders", "schedule": "0 7 * * *" }
   ]
 }
