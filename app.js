@@ -115,6 +115,10 @@ function isStaffSession() { return sessionRole() === 'editor' && state.session?.
 function isViewerSession() { return sessionRole() === 'viewer' && state.session?.user?.user_metadata?.team_slug === TEAM_SLUG; }
 function subscriptionCanEdit() { return state.team?.subscription?.can_edit !== false; }
 
+function daysRemaining(value) {
+  return Math.max(1, Math.ceil((new Date(value) - new Date()) / 86400000));
+}
+
 function requireEditable() {
   if (subscriptionCanEdit()) return true;
   setStatus('Prøveperioden er udløbet. Tavlen kan stadig ses, men redigering er låst.', 'error');
@@ -123,34 +127,59 @@ function requireEditable() {
 
 function renderSubscriptionBanner() {
   const banner = el('subscriptionBanner');
+  const settingsSection = el('settingsSubscriptionSection');
   const subscription = state.team?.subscription || { status: 'legacy', can_edit: true };
-  if (!isStaffSession() || !['trial', 'read_only'].includes(subscription.status)) {
+  const canRequest = isStaffSession() && ['trial', 'read_only'].includes(subscription.status);
+  if (!canRequest) {
     banner.hidden = true;
+    settingsSection.hidden = true;
     return;
   }
   banner.hidden = false;
+  settingsSection.hidden = false;
   banner.classList.toggle('expired', !subscription.can_edit);
-  const button = el('requestSubscriptionButton');
-  button.hidden = false;
-  button.disabled = Boolean(subscription.subscription_interest_at);
-  button.textContent = subscription.subscription_interest_at ? 'Forespørgsel sendt ✓' : 'Vi vil gerne fortsætte';
-  if (subscription.status === 'trial' && subscription.can_edit && subscription.trial_ends_at) {
-    const days = Math.max(1, Math.ceil((new Date(subscription.trial_ends_at) - new Date()) / 86400000));
+  const requested = Boolean(subscription.subscription_interest_at);
+  const bannerButton = el('requestSubscriptionButton');
+  const settingsButton = el('requestSubscriptionSettingsButton');
+  bannerButton.hidden = false;
+  bannerButton.disabled = requested;
+  bannerButton.textContent = requested ? 'Anmodning sendt ✓' : 'Aktiver';
+  settingsButton.disabled = requested;
+  settingsButton.textContent = requested ? 'Anmodning sendt ✓' : 'Aktiver';
+  if (subscription.status === 'trial' && subscription.can_edit && requested && subscription.activation_grace_ends_at) {
+    const days = daysRemaining(subscription.activation_grace_ends_at);
+    el('subscriptionTitle').textContent = `Aktivering anmodet · ${days} ${days === 1 ? 'dag' : 'dage'} tilbage`;
+    el('subscriptionText').textContent = 'Vi behandler jeres anmodning hurtigst muligt.';
+    el('settingsSubscriptionText').textContent = 'Vi behandler jeres anmodning hurtigst muligt.';
+  } else if (subscription.status === 'trial' && subscription.can_edit && subscription.trial_ends_at) {
+    const days = daysRemaining(subscription.trial_ends_at);
     el('subscriptionTitle').textContent = `Gratis prøveperiode · ${days} ${days === 1 ? 'dag' : 'dage'} tilbage`;
-    el('subscriptionText').textContent = 'I kan vælge en pakke og få fuld adgang før prøveperioden udløber.';
+    el('subscriptionText').textContent = 'Ønsker I at fortsætte? Vælg “Aktiver”.';
+    el('settingsSubscriptionText').textContent = `I har ${days} ${days === 1 ? 'dag' : 'dage'} tilbage af prøveperioden. Ønsker I at fortsætte? Vælg “Aktiver”.`;
   } else {
     el('subscriptionTitle').textContent = 'Redigering er låst';
-    el('subscriptionText').textContent = 'Tavlen kan fortsat ses. Send en forespørgsel, så aftaler vi pakke og betaling.';
+    el('subscriptionText').textContent = requested ? 'Aktiveringsfristen er udløbet. Techus Nord behandler jeres anmodning hurtigst muligt.' : 'Tavlen kan fortsat ses. Ønsker I at fortsætte? Vælg “Aktiver”.';
+    el('settingsSubscriptionText').textContent = requested
+      ? 'Aktiveringsfristen er udløbet. Vi behandler jeres anmodning hurtigst muligt.'
+      : 'Prøveperioden er udløbet. Ønsker I at fortsætte? Vælg “Aktiver”.';
   }
 }
 
 function setEditorLockedState() {
   const locked = !subscriptionCanEdit();
-  const allowed = new Set(['closeAdmin', 'logoutButton', 'previousEditWeek', 'nextEditWeek', 'adminDaySelect', 'requestSubscriptionButton']);
+  const allowed = new Set(['closeAdmin', 'logoutButton', 'previousEditWeek', 'nextEditWeek', 'adminDaySelect', 'requestSubscriptionButton', 'openSettingsButton']);
   el('adminDialog').querySelectorAll('input, textarea, select, button').forEach(control => {
     if (!allowed.has(control.id)) control.disabled = locked;
   });
   el('adminDialog').classList.toggle('editor-locked', locked);
+}
+
+function setSettingsLockedState() {
+  const locked = !subscriptionCanEdit();
+  const allowed = new Set(['closeSettingsButton', 'requestSubscriptionSettingsButton']);
+  el('settingsDialog').querySelectorAll('input, textarea, select, button').forEach(control => {
+    if (!allowed.has(control.id)) control.disabled = locked;
+  });
 }
 
 function activeShiftTypes() {
@@ -398,7 +427,11 @@ async function loadData({ quiet = false } = {}) {
     ]);
     if (teamStatus?.subscription) {
       state.team = { ...state.team, ...teamStatus };
-      if (el('adminDialog').open) { renderSubscriptionBanner(); setEditorLockedState(); }
+      if (el('adminDialog').open || el('settingsDialog').open) {
+        renderSubscriptionBanner();
+        setEditorLockedState();
+        setSettingsLockedState();
+      }
     }
     state.staff = await Promise.all((staff || []).map(async person => ({ ...person, photo_url: await resolvePhotoUrl(person.photo_url || ''), audio_url: await resolvePhotoUrl(person.audio_url || '') })));
     const savedWeekStart = settings?.[0]?.active_week_start || currentCalendarWeekStart();
@@ -1151,7 +1184,27 @@ function openSettings() {
   el('tasksEnabled').checked=state.tasksEnabled;
   el('speakEnabled').checked=state.speakEnabled;
   updateSettingsVisibility();
+  renderSubscriptionBanner();
+  setSettingsLockedState();
   el('settingsDialog').showModal();
+}
+
+async function requestSubscription(button) {
+  button.disabled = true;
+  button.textContent = 'Sender…';
+  try {
+    const result = await teamAccountAction('request-subscription');
+    state.team.subscription.subscription_interest_at = result.requested_at || new Date().toISOString();
+    state.team.subscription.activation_grace_ends_at = result.grace_ends_at || state.team.subscription.activation_grace_ends_at;
+    state.team.subscription.can_edit = result.can_edit !== false;
+    renderSubscriptionBanner();
+    setEditorLockedState();
+    setSettingsLockedState();
+    setStatus('Tak. Vi behandler jeres anmodning hurtigst muligt.', 'success');
+  } catch (error) {
+    renderSubscriptionBanner();
+    setStatus(error.message, 'error');
+  }
 }
 
 function updateSettingsVisibility() {
@@ -1347,21 +1400,8 @@ el('closeTasksManagerButton').addEventListener('click',()=>el('tasksManagerDialo
 el('addResidentButton').addEventListener('click',()=>addTaskDraft('resident'));
 el('addTaskButton').addEventListener('click',()=>addTaskDraft('task'));
 el('saveTasksButton').addEventListener('click',saveTasks);
-el('requestSubscriptionButton').addEventListener('click', async () => {
-  const button = el('requestSubscriptionButton');
-  button.disabled = true;
-  button.textContent = 'Sender…';
-  try {
-    const result = await teamAccountAction('request-subscription');
-    state.team.subscription.subscription_interest_at = result.requested_at || new Date().toISOString();
-    renderSubscriptionBanner();
-    setStatus('Tak. VisuPlanner har fået besked og kontakter jer om betaling og aktivering.', 'success');
-  } catch (error) {
-    button.disabled = false;
-    button.textContent = 'Vi vil gerne fortsætte';
-    setStatus(error.message, 'error');
-  }
-});
+el('requestSubscriptionButton').addEventListener('click', event => requestSubscription(event.currentTarget));
+el('requestSubscriptionSettingsButton').addEventListener('click', event => requestSubscription(event.currentTarget));
 el('openViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').showModal());
 el('closeViewerHelp').addEventListener('click',()=>el('viewerHelpDialog').close());
 el('viewerHelpForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('viewerHelpStatus').textContent='Sender…';try{const response=await fetch('/api/public-request',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'viewer-help',team_slug:TEAM_SLUG,contact_name:el('viewerHelpName').value,contact_email:el('viewerHelpEmail').value})});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Kunne ikke sende anmodningen.');event.target.reset();el('viewerHelpStatus').textContent='Anmodningen er sendt. Du bliver kontaktet på arbejdsmailen.'}catch(error){el('viewerHelpStatus').textContent=error.message}finally{button.disabled=false}});

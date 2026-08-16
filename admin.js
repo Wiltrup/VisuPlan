@@ -38,6 +38,9 @@ const dateTime = value => value ? new Intl.DateTimeFormat('da-DK', { dateStyle:'
 const inputDate = value => value ? String(value).slice(0, 10) : '';
 const daysUntil = value => value ? Math.ceil((new Date(value) - new Date()) / 86400000) : null;
 const fieldValue = (root, name) => root.querySelector(`[data-field="${name}"]`)?.value.trim() || '';
+const activationGraceEndsAt = customer => customer.subscription_interest_at && customer.trial_started_at
+  ? new Date(new Date(customer.trial_started_at).getTime() + 25 * 86400000).toISOString()
+  : null;
 
 function planOptions(selected = 'intro3') {
   return Object.entries(planLabels).filter(([key]) => key !== 'legacy').map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
@@ -59,7 +62,7 @@ function summaryHtml(customers) {
 function needsAttention(customer) {
   const renewalDays = daysUntil(customer.subscription_renews_at);
   const trialDays = daysUntil(customer.trial_ends_at);
-  return Boolean(customer.subscription_interest_at) ||
+  return Boolean(customer.subscription_status === 'trial' && customer.subscription_interest_at) ||
     (customer.subscription_status === 'trial' && trialDays !== null && trialDays <= 4) ||
     (renewalDays !== null && renewalDays <= 45);
 }
@@ -67,7 +70,14 @@ function needsAttention(customer) {
 function attentionHtml(customer) {
   const renewalDays = daysUntil(customer.subscription_renews_at);
   const trialDays = daysUntil(customer.trial_ends_at);
+  const graceEnd = activationGraceEndsAt(customer);
+  const graceDays = daysUntil(graceEnd);
   let text = 'Kunden har bedt om kontakt om betaling og aktivering.';
+  if (customer.subscription_status === 'trial' && customer.subscription_interest_at) text = graceDays === null
+    ? 'Aktivering er anmodet. Prøvens startdato mangler og bør kontrolleres.'
+    : graceDays < 0
+      ? 'Aktivering er anmodet, men fristen på dag 25 er udløbet.'
+      : `Aktivering er anmodet. Redigering er mulig i ${graceDays} ${graceDays === 1 ? 'dag' : 'dage'} endnu – til ${date(graceEnd)}.`;
   if (!customer.subscription_interest_at && customer.subscription_status === 'trial') text = trialDays < 0 ? 'Prøveperioden er udløbet.' : `Prøveperioden udløber om ${trialDays} dage.`;
   if (!customer.subscription_interest_at && renewalDays !== null && renewalDays <= 45) text = renewalDays < 0 ? 'Årsfornyelsen er overskredet.' : `Årsfornyelsen nærmer sig om ${renewalDays} dage.`;
   return `<article class="attention-card"><div><strong>${esc(customer.display_name)}</strong><p>${esc(text)}</p></div><span class="status-badge ${esc(customer.subscription_status)}">${esc(statusLabels[customer.subscription_status] || customer.subscription_status)}</span></article>`;
@@ -99,10 +109,15 @@ function teamCard(team, archived = false) {
 }
 
 function customerCard(customer) {
-  const trialText = customer.subscription_status === 'trial' ? `Prøve slutter: ${date(customer.trial_ends_at)}` : `Fornyelse: ${date(customer.subscription_renews_at)}`;
+  const graceEnd = activationGraceEndsAt(customer);
+  const trialText = customer.subscription_status === 'trial'
+    ? customer.subscription_interest_at
+      ? `Aktiveringsfrist: ${date(graceEnd)} (dag 25)`
+      : `Prøve slutter: ${date(customer.trial_ends_at)}`
+    : `Fornyelse: ${date(customer.subscription_renews_at)}`;
   return `<article class="customer-card" data-customer="${esc(customer.id)}">
     <div class="customer-head"><div><h3>${esc(customer.display_name)}</h3><p>${esc(customer.legal_name || customer.municipality || '')}</p></div><span class="status-badge ${esc(customer.subscription_status)}">${esc(statusLabels[customer.subscription_status] || customer.subscription_status)}</span></div>
-    <div class="customer-facts"><span>${esc(planLabels[customer.plan_code] || customer.plan_code)}</span><span>${customer.teams.length} af ${customer.board_limit} tavler</span><span>${esc(trialText)}</span>${customer.subscription_interest_at ? '<span class="interest-flag">Vil gerne fortsætte</span>' : ''}</div>
+    <div class="customer-facts"><span>${esc(planLabels[customer.plan_code] || customer.plan_code)}</span><span>${customer.teams.length} af ${customer.board_limit} tavler</span><span>${esc(trialText)}</span>${customer.subscription_status === 'trial' && customer.subscription_interest_at ? '<span class="interest-flag">Aktivering anmodet</span>' : ''}</div>
     <details><summary>Kunde- og fakturaoplysninger</summary>
       <div class="field-grid">
         <label>Visningsnavn<input data-field="display_name" value="${esc(customer.display_name)}"></label>
@@ -115,7 +130,7 @@ function customerCard(customer) {
         <label>CVR<input data-field="cvr" value="${esc(customer.cvr)}"></label>
         <label>EAN<input data-field="ean" value="${esc(customer.ean)}"></label>
         <label>Fakturareference<input data-field="invoice_reference" value="${esc(customer.invoice_reference)}"></label>
-        <label>Betalingsform<select data-field="payment_method"><option value="">Ikke valgt</option><option value="ean" ${customer.payment_method === 'ean' ? 'selected' : ''}>EAN</option><option value="card" ${customer.payment_method === 'card' ? 'selected' : ''}>Kort</option><option value="bank" ${customer.payment_method === 'bank' ? 'selected' : ''}>Bank</option><option value="other" ${customer.payment_method === 'other' ? 'selected' : ''}>Andet</option></select></label>
+        <label>Betalingsform<select data-field="payment_method"><option value="">Ikke valgt</option><option value="ean" ${customer.payment_method === 'ean' ? 'selected' : ''}>EAN</option><option value="card" ${customer.payment_method === 'card' ? 'selected' : ''}>Kort</option><option value="mobilepay" ${customer.payment_method === 'mobilepay' ? 'selected' : ''}>MobilePay</option><option value="bank" ${customer.payment_method === 'bank' ? 'selected' : ''}>Bank</option><option value="other" ${customer.payment_method === 'other' ? 'selected' : ''}>Andet</option></select></label>
         <label>Interne noter<textarea data-field="internal_notes" rows="3">${esc(customer.internal_notes)}</textarea></label>
       </div>
       <div class="action-row"><button data-customer-action="save-customer">Gem kundeoplysninger</button></div>
@@ -129,7 +144,7 @@ function customerCard(customer) {
         <label>Fakturanummer<input data-field="invoice_number" value="${esc(customer.invoice_number)}"></label>
         <label>Betalingsfrist<input data-field="invoice_due_at" type="date" value="${inputDate(customer.invoice_due_at)}"></label>
         <label>Fakturatype<select data-field="invoice_kind"><option value="first">Første år</option><option value="renewal">Årsfornyelse</option></select></label>
-        <label>Betalingsform<select data-field="invoice_payment_method"><option value="ean">EAN</option><option value="card">Kort</option><option value="bank">Bank</option><option value="other">Andet</option></select></label>
+        <label>Betalingsform<select data-field="invoice_payment_method"><option value="ean">EAN</option><option value="card">Kort</option><option value="mobilepay">MobilePay</option><option value="bank">Bank</option><option value="other">Andet</option></select></label>
       </div>
       <div class="action-row">
         <button data-customer-action="activate-subscription">Aktivér valgt pakke</button>

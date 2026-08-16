@@ -17,10 +17,19 @@ async function service(path, secret, options = {}) {
   return data(response);
 }
 
+function activationGraceEndsAt(customer) {
+  if (!customer?.subscription_interest_at || !customer.trial_started_at) return null;
+  return new Date(new Date(customer.trial_started_at).getTime() + 25 * 86400000).toISOString();
+}
+
 function canEdit(customer) {
   if (!customer) return true;
   if (['contracted', 'invoice_sent', 'active', 'overdue'].includes(customer.subscription_status)) return true;
-  return customer.subscription_status === 'trial' && customer.trial_ends_at && new Date(customer.trial_ends_at) > new Date();
+  if (customer.subscription_status !== 'trial') return false;
+  const now = new Date();
+  if (customer.trial_ends_at && new Date(customer.trial_ends_at) > now) return true;
+  const graceEndsAt = activationGraceEndsAt(customer);
+  return Boolean(graceEndsAt && new Date(graceEndsAt) > now);
 }
 
 function subscription(customer) {
@@ -30,6 +39,7 @@ function subscription(customer) {
     can_edit: canEdit(customer),
     trial_started_at: customer.trial_started_at,
     trial_ends_at: customer.trial_ends_at,
+    activation_grace_ends_at: activationGraceEndsAt(customer),
     subscription_renews_at: customer.subscription_renews_at,
     subscription_interest_at: customer.subscription_interest_at
   };

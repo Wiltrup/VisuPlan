@@ -31,7 +31,7 @@ create table if not exists public.customers (
   invoice_due_at date,
   invoice_period_end timestamptz,
   paid_at timestamptz,
-  payment_method text check (payment_method is null or payment_method in ('ean','card','bank','other')),
+  payment_method text check (payment_method is null or payment_method in ('ean','card','mobilepay','bank','other')),
   subscription_interest_at timestamptz,
   internal_notes text,
   archived_at timestamptz,
@@ -141,8 +141,9 @@ create policy customer_notifications_admin_read on public.customer_notifications
   using(public.is_visuplanner_admin());
 
 -- Et aktivt abonnement, en indgået aftale eller en gyldig prøveperiode giver
--- skriveret. Udløbet prøveperiode og read_only stopper skrivning i databasen,
--- mens den allerede gemte tavle fortsat kan læses.
+-- skriveret. En aktiveringsanmodning inden for prøveforløbet forlænger
+-- skriveretten til dag 25 fra prøvens start. Derefter stopper read_only eller
+-- en udløbet frist skrivning, mens den gemte tavle fortsat kan læses.
 create or replace function public.can_edit_team(team_slug text)
 returns boolean language sql stable security definer set search_path=public
 as $$
@@ -158,8 +159,14 @@ as $$
         or customer.subscription_status in ('contracted','invoice_sent','active','overdue')
         or (
           customer.subscription_status='trial'
-          and customer.trial_ends_at is not null
-          and now() < customer.trial_ends_at
+          and (
+            (customer.trial_ends_at is not null and now() < customer.trial_ends_at)
+            or (
+              customer.subscription_interest_at is not null
+              and customer.trial_started_at is not null
+              and now() < customer.trial_started_at + interval '25 days'
+            )
+          )
         )
       )
   )

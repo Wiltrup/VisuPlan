@@ -1,6 +1,6 @@
 const crypto = require('crypto');
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
-const TERMS_VERSION = '2026-08-13-v1';
+const TERMS_VERSION = '2026-08-16-v1.2';
 const hash = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 async function data(response) { const text = await response.text(); return text ? JSON.parse(text) : null; }
 async function service(path, secret, options = {}) {

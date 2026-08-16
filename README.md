@@ -1,5 +1,30 @@
 # VisuPlanner
 
+## v40 – aktivering, dag-10-mail og frist til dag 25
+
+Version 40 beholder den gratis prøveperiode på 14 dage. Hvis kunden vælger “Aktiver” under Grundindstillinger, fortsætter redigeringsadgangen frem til dag 25 fra prøvens start, mens Techus Nord behandler anmodningen. Uden en anmodning låses redigeringen efter dag 14. Tavlen kan fortsat ses efter en låsning.
+
+Den daglige Vercel-kontrol sender nu også kunden én automatisk påmindelse på prøvens 10. dag. Administrationen viser både den almindelige prøvefrist og nedtællingen til dag 25 for kunder, der har anmodet om aktivering.
+
+### Opdatering fra v38 eller v39
+
+1. Kør `supabase-v40-trial-activation.sql` én gang i Supabase SQL Editor. Scriptet inkluderer MobilePay-ændringen fra v39 og sletter ingen kunde-, tavle-, ugeplan- eller betalingsdata.
+2. Upload alle v40-filer til GitHub/Vercel.
+3. Behold de eksisterende miljøvariabler, herunder `CRON_SECRET`. Der skal ikke oprettes nye.
+
+## v39 – priser, Techus Nord og aktivering
+
+Version 39 opdaterer prissiden, FAQ og vejledningen, så teksterne følger den aftalte prøve- og fakturaproces. VisuPlanner fremgår nu tydeligt som et produkt fra Techus Nord, CVR 46689984, mens Jakob Wiltrup krediteres for design og udvikling.
+
+Derudover tilføjer versionen MobilePay som betalingsform i administrationen og placerer “Anmod om aktivering” under Grundindstillinger. Knappen er også tilgængelig, når prøveperioden er udløbet og den øvrige redigering er låst.
+
+### Opdatering fra v38
+
+1. Kør `supabase-v39-mobilepay.sql` én gang i Supabase SQL Editor. Scriptet sletter ingen kunde-, tavle- eller betalingsdata.
+2. Upload alle v39-filer til GitHub/Vercel.
+3. Der skal ikke oprettes nye miljøvariabler, hvis v38 allerede er sat op.
+4. Kontrollér før kommerciel lancering virksomhedens fysiske adresse, faktisk Supabase-region og konkret betalingsleverandør, og få de juridiske tekster gennemgået fagligt.
+
 ## v38 – kunder, priser, prøveperiode og betaling
 
 Version 38 samler flere selvstændige tavler under én betalende kunde og tilføjer:
@@ -19,7 +44,7 @@ Version 38 samler flere selvstændige tavler under én betalende kunde og tilfø
 2. Upload alle v38-filer til GitHub/Vercel.
 3. Behold de eksisterende miljøvariabler `SUPABASE_SECRET_KEY`, `RESEND_API_KEY` og `PEXELS_API_KEY`.
 4. Opret en ny stærk, tilfældig Vercel-miljøvariabel med navnet `CRON_SECRET`, og redeploy. Den beskytter den daglige fornyelseskontrol.
-5. Kontrollér før kommerciel lancering CVR/adresse, faktisk Supabase-region, betalingsleverandør og få de juridiske tekster gennemgået fagligt.
+5. Kontrollér før kommerciel lancering virksomhedens fysiske adresse, faktisk Supabase-region, betalingsleverandør og få de juridiske tekster gennemgået fagligt.
 
 Priserne i v38 er ekskl. moms: op til 3 tavler 1.850 kr. første år og derefter 2.200 kr.; op til 8 tavler 3.200/3.800 kr.; op til 12 tavler 4.400/5.200 kr.
 

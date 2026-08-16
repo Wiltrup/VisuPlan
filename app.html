@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2563eb" />
   <link id="appManifest" rel="manifest" href="/manifest.webmanifest" />
   <script>document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(location.pathname.split('/').filter(Boolean)[0]||'trekloeveret-team-2');</script>
-  <link rel="stylesheet" href="/styles.css?v=38" />
+  <link rel="stylesheet" href="/styles.css?v=40" />
   <title>VisuPlanner</title>
 </head>
 <body>
@@ -65,8 +65,8 @@
     </main>
 
     <footer class="site-footer">
-      <p>VisuPlanner er designet og udviklet af Jakob Wiltrup © 2026.</p>
-      <p>Alle rettigheder tilhører Jakob Wiltrup · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></p>
+      <p>VisuPlanner er et produkt fra Techus Nord · CVR 46689984.</p>
+      <p>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></p>
     </footer>
   </div>
 
@@ -116,7 +116,7 @@
 
       <section id="subscriptionBanner" class="subscription-banner" hidden>
         <div><strong id="subscriptionTitle"></strong><p id="subscriptionText"></p></div>
-        <button id="requestSubscriptionButton" type="button">Vi vil gerne fortsætte</button>
+        <button id="requestSubscriptionButton" type="button">Aktiver</button>
       </section>
 
       <div class="week-editor-bar">
@@ -192,6 +192,11 @@
         <button id="closeSettingsButton" class="icon-button" aria-label="Luk">✕</button>
       </div>
       <p class="note">Tilpas tavlens faste opbygning. Valgene gælder for hele teamet og fylder ikke i den daglige redigering.</p>
+      <section id="settingsSubscriptionSection" class="settings-account-section settings-subscription-section" hidden>
+        <h3>Abonnement</h3>
+        <p id="settingsSubscriptionText" class="note"></p>
+        <button id="requestSubscriptionSettingsButton" type="button">Aktiver</button>
+      </section>
       <div class="settings-fields">
         <label>Opdeling af dagvagten<select id="shiftMode"><option value="1">Heldagsvagt</option><option value="2">Døgnvagt</option><option value="3">Dagvagt delt op i morgen og aften</option></select></label>
         <label id="nightEnabledSetting" class="toggle-setting"><input id="nightEnabled" type="checkbox"><span><strong>Nattevagt</strong><small>Vælg ja, hvis nattevagten skal vises på tavlen.</small></span></label>
@@ -255,6 +260,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js?v=38"></script>
+  <script src="/app.js?v=40"></script>
 </body>
 </html>
