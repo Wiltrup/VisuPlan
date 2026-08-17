@@ -1,5 +1,9 @@
 # VisuPlanner
 
+## v41 – udfyldt demo og opdateret forsideeksempel
+
+Version 41 tilføjer Demo til forsidenavigationen. Demoen åbner nu med en færdig eksempeluge med fiktive medarbejdere, personalefotos, måltider og aktiviteter. Eksempelonsdagen viser lasagne med et lokalt billedaktiv, og forsidens tavleeksempel bruger de samme navne, fotos, måltid og aktiviteter som demoen.
+
 ## v40 – aktivering, dag-10-mail og frist til dag 25
 
 Version 40 beholder den gratis prøveperiode på 14 dage. Hvis kunden vælger “Aktiver” under Grundindstillinger, fortsætter redigeringsadgangen frem til dag 25 fra prøvens start, mens Techus Nord behandler anmodningen. Uden en anmodning låses redigeringen efter dag 14. Tavlen kan fortsat ses efter en låsning.

@@ -1,11 +1,19 @@
 const DEMO_DAYS=[['Man','MANDAG','#eab308'],['Tir','TIRSDAG','#ef4444'],['Ons','ONSDAG','#22c55e'],['Tor','TORSDAG','#f97316'],['Fre','FREDAG','#3b82f6'],['Lør','LØRDAG','#a855f7'],['Søn','SØNDAG','#ec4899']];
 const DEMO_STAFF=[['Anna','00'],['Jonas','01'],['Lene','02'],['Mikkel','03'],['Henrik','04'],['Sofie','05'],['Fatima','06'],['Noah','07']].map(([name,id])=>({name,photo:`/assets/demo-staff/person-${id}.webp`}));
-const KEY='visuplanner-demo-session-v4';
+const KEY='visuplanner-demo-session-v5';
 const $=id=>document.getElementById(id);
 const esc=value=>String(value||'').replace(/[&<>"']/g,character=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[character]));
 const blankDay=()=>({morning:['',''],evening:['',''],night:['',''],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'',dinnerPhoto:'',activities:[]});
-const defaultState=()=>({week:DEMO_DAYS.map(blankDay),settings:{morning:2,evening:2,night:2,showDates:true,shiftMode:3,nightEnabled:true,showBreakfast:false,showLunch:false}});
-let demoState=loadState(),selected=(new Date().getDay()+6)%7,editActivities=[],editShifts={morning:[],evening:[],night:[]},editMealPhotos={breakfast:'',lunch:'',dinner:''},demoEditorBaseline='';
+const defaultState=()=>({week:[
+  {morning:['Anna','Jonas'],evening:['Lene','Mikkel'],night:['Henrik'],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'Kylling i karry med ris',dinnerPhoto:'',activities:[{time:'10:00',name:'Gåtur i nærområdet',photo:''},{time:'14:30',name:'Fælles kaffe',photo:''}]},
+  {morning:['Fatima','Noah'],evening:['Anna','Sofie'],night:['Jonas'],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'Frikadeller med kartofler',dinnerPhoto:'',activities:[{time:'09:30',name:'Kreativt værksted',photo:''},{time:'15:00',name:'Musik i fællesrummet',photo:''}]},
+  {morning:['Anna','Jonas'],evening:['Fatima','Mikkel'],night:['Lene'],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'Lasagne',dinnerPhoto:'/assets/demo/lasagne.webp',activities:[{time:'10:00',name:'Indkøbstur',photo:''},{time:'13:30',name:'Banko i fællesrummet',photo:''}]},
+  {morning:['Sofie','Henrik'],evening:['Noah','Lene'],night:['Mikkel'],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'Fiskefrikadeller med rugbrød',dinnerPhoto:'',activities:[{time:'11:00',name:'Tur på biblioteket',photo:''}]},
+  {morning:['Jonas','Fatima'],evening:['Anna','Henrik'],night:['Sofie'],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'Tacos',dinnerPhoto:'',activities:[{time:'10:30',name:'Svømmehal',photo:''},{time:'19:00',name:'Filmaften',photo:''}]},
+  {morning:['Mikkel','Lene'],evening:['Noah','Fatima'],night:['Henrik'],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'Hjemmelavet pizza',dinnerPhoto:'',activities:[{time:'11:00',name:'Tur til stranden',photo:''},{time:'15:30',name:'Eftermiddagskaffe',photo:''}]},
+  {morning:['Anna','Sofie'],evening:['Jonas','Mikkel'],night:['Noah'],breakfast:'',breakfastPhoto:'',lunch:'',lunchPhoto:'',dinner:'Boller i karry',dinnerPhoto:'',activities:[{time:'10:00',name:'Rolig formiddag',photo:''},{time:'14:00',name:'Besøg af pårørende',photo:''}]}
+],settings:{morning:2,evening:2,night:1,showDates:true,shiftMode:3,nightEnabled:true,showBreakfast:false,showLunch:false}});
+let demoState=loadState(),selected=2,editActivities=[],editShifts={morning:[],evening:[],night:[]},editMealPhotos={breakfast:'',lunch:'',dinner:''},demoEditorBaseline='';
 
 function loadState(){try{const saved=JSON.parse(sessionStorage.getItem(KEY)||'null');return saved?.week&&saved?.settings?saved:defaultState()}catch{return defaultState()}}
 function saveState(){try{sessionStorage.setItem(KEY,JSON.stringify(demoState));return true}catch{status('Billedet er for stort til demosessionen. Prøv et mindre billede.');return false}}
