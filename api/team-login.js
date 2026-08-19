@@ -70,8 +70,15 @@ module.exports = async function handler(request, response) {
     const input = request.method === 'GET' ? request.query : (request.body || {});
     const { slug, action, password, email } = input;
     if (request.method === 'GET' && !slug) {
-      const directory = await service('/rest/v1/teams_registry?onboarding_status=eq.active&archived_at=is.null&select=slug,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc', secret);
-      return response.status(200).json(directory || []);
+      const [teams, offers] = await Promise.all([
+        service('/rest/v1/teams_registry?onboarding_status=eq.active&archived_at=is.null&select=slug,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc', secret),
+        service('/rest/v1/shared_offers?own_board_enabled=eq.true&archived_at=is.null&select=slug,customer_slug,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc', secret)
+      ]);
+      const directory = [
+        ...(teams || []).map(team => ({ ...team, kind:'team', path:`/${team.slug}` })),
+        ...(offers || []).map(offer => ({ ...offer, kind:'club', path:`/${offer.customer_slug || 'tilbud'}/${offer.slug}` }))
+      ].sort((a, b) => `${a.municipality}\0${a.workplace}\0${a.kind}\0${a.name}`.localeCompare(`${b.municipality}\0${b.workplace}\0${b.kind}\0${b.name}`, 'da'));
+      return response.status(200).json(directory);
     }
     if (!/^[a-z0-9-]{3,120}$/.test(String(slug || ''))) return response.status(404).json({ error: 'Teamet blev ikke fundet.' });
     const teams = await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=*`, secret);
