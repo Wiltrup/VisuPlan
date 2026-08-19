@@ -88,8 +88,8 @@ dialog::backdrop { background:rgba(14,23,38,.58); backdrop-filter:blur(3px); }
 .image-dialog { width:min(900px,calc(100% - 20px)); box-shadow:none; }
 .image-dialog img { max-width:100%; max-height:86vh; border-radius:18px; }
 .image-close { position:fixed; top:25px; right:25px; border-radius:50%; background:#fff; color:#111; }
-#offerStatus { position:fixed; z-index:10; left:50%; bottom:max(18px,env(safe-area-inset-bottom)); max-width:calc(100vw - 32px); padding:12px 18px; transform:translateX(-50%); border-radius:999px; background:#172033; color:#fff; text-align:center; font-weight:850; box-shadow:0 10px 30px rgba(0,0,0,.26); }
-#offerStatus:empty { display:none; }
+#offerStatus,#offerImageSearchStatus { position:fixed; z-index:10; left:50%; bottom:max(18px,env(safe-area-inset-bottom)); max-width:calc(100vw - 32px); padding:12px 18px; transform:translateX(-50%); border-radius:999px; background:#172033; color:#fff; text-align:center; font-weight:850; box-shadow:0 10px 30px rgba(0,0,0,.26); }
+#offerStatus:empty,#offerImageSearchStatus:empty { display:none; }
 button:disabled { opacity:.6; cursor:wait; }
 @media(max-width:760px) {
   .offer-shell { padding:12px; }

@@ -36,7 +36,11 @@ function add(date, numberOfDays) { const value = new Date(`${date}T12:00:00`); v
 function dateAt(index) { return add(weekStart, index); }
 function format(date) { return new Intl.DateTimeFormat('da-DK', { day:'numeric', month:'long' }).format(new Date(`${date}T12:00:00`)); }
 function headers(extra = {}) { return { apikey:SUPABASE_KEY, Authorization:`Bearer ${session?.access_token || SUPABASE_KEY}`, ...extra }; }
-function status(text) { $('offerStatus').textContent = text; if (text) setTimeout(() => { if ($('offerStatus').textContent === text) $('offerStatus').textContent = ''; }, 3500); }
+function status(text) {
+  const target = $('offerImageSearchDialog').open ? $('offerImageSearchStatus') : $('offerStatus');
+  target.textContent = text;
+  if (text) setTimeout(() => { if (target.textContent === text) target.textContent = ''; }, 3500);
+}
 
 async function api(path, options = {}) {
   const response = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers:headers(options.headers) });
