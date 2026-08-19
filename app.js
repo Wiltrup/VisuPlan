@@ -417,7 +417,16 @@ async function fetchWeek(weekStart) {
 }
 
 async function loadSharedOffers(weekStart) {
-  const links = await apiFetch(`/rest/v1/shared_offer_team_links?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&select=offer_id,team_slug,visible_on_team`, {}, true) || [];
+  let links = [];
+  try {
+    links = await apiFetch(`/rest/v1/shared_offer_team_links?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&select=offer_id,team_slug,visible_on_team`, {}, true) || [];
+  } catch (error) {
+    // Webkoden kan blive deployet få minutter før v42-migrationen køres.
+    // Eksisterende tavler skal fortsætte normalt i det korte mellemrum.
+    console.warn('Fælles tilbud er endnu ikke installeret i databasen.', error);
+    state.sharedOffers = [];
+    return;
+  }
   if (!links.length) { state.sharedOffers = []; return; }
   const ids = links.map(link => link.offer_id);
   const idFilter = `(${ids.join(',')})`;
