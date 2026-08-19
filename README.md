@@ -1,5 +1,18 @@
 # VisuPlanner
 
+## v42 – fælles tilbud og klubtavler
+
+Version 42 tilføjer et centralt styret modul til fælles tilbud, fx “Trekløverets Klub”. Et tilbud har sit eget redigeringslogin, sin egen visningskode og kan valgfrit have en selvstændig tavle på `/tilbud/tilbuddets-navn`. Mad, aktiviteter og en kort besked redigeres ét sted og opdateres automatisk på alle tilknyttede teamtavler.
+
+Platformadministratoren opretter tilbuddet under den betalende kunde og vælger, hvilke af kundens tavler der må bruge det. Hvert tilknyttet team kan derefter selv vælge at vise eller skjule tilbuddet under Grundindstillinger; teamet kan ikke tilknytte sig andre tilbud eller redigere klubbens indhold.
+
+### Opdatering fra v40 eller v41
+
+1. Kør `supabase-v42-shared-offers.sql` én gang i Supabase SQL Editor. Scriptet sletter eller ændrer ikke eksisterende tavler og ugeplaner.
+2. Upload alle v42-filer til GitHub/Vercel.
+3. Der skal ikke oprettes nye miljøvariabler.
+4. Opret derefter det første fælles tilbud under den relevante kunde i `/administration`.
+
 ## v41 – udfyldt demo og opdateret forsideeksempel
 
 Version 41 tilføjer Demo til forsidenavigationen. Demoen åbner nu med en færdig eksempeluge med fiktive medarbejdere, personalefotos, måltider og aktiviteter. Eksempelonsdagen viser lasagne med et lokalt billedaktiv, og forsidens tavleeksempel bruger de samme navne, fotos, måltid og aktiviteter som demoen.

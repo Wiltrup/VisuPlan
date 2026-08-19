@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2563eb" />
   <link id="appManifest" rel="manifest" href="/manifest.webmanifest" />
   <script>document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(location.pathname.split('/').filter(Boolean)[0]||'trekloeveret-team-2');</script>
-  <link rel="stylesheet" href="/styles.css?v=40" />
+  <link rel="stylesheet" href="/styles.css?v=42" />
   <title>VisuPlanner</title>
 </head>
 <body>
@@ -60,7 +60,9 @@
           <h3>🎯 Aktiviteter</h3>
           <div id="activitiesList" class="activities"></div>
         </article>
-      </section></div>
+      </section>
+      <section id="sharedOffersSection" class="shared-offers-section" hidden><p class="shared-offers-heading">I KLUBBEN I DAG</p><div id="sharedOffersList"></div></section>
+      </div>
       <section id="tasksView" class="tasks-view" hidden><div class="tasks-heading"><p class="eyebrow">DENNE UGE</p><h2>Ugeopgaver</h2><p id="tasksWeekLabel"></p></div><div id="taskAssignments" class="task-assignments"></div></section>
     </main>
 
@@ -208,6 +210,7 @@
         <label class="toggle-setting"><input id="showLunch" type="checkbox"><span><strong>Vis frokost</strong><small>Tilføjer frokost til tavlen og redigeringen.</small></span></label>
         <label class="toggle-setting"><input id="tasksEnabled" type="checkbox"><span><strong>Ugeopgaver</strong><small>Tilføjer en separat fane med beboernes team-opgaver.</small></span></label>
         <label class="toggle-setting"><input id="speakEnabled" type="checkbox"><span><strong>VisuPlanner Speak</strong><small>Tilføjer oplæsning af ugedage, vagter og indtalte medarbejdernavne.</small></span></label>
+        <section id="sharedOfferSettings" class="shared-offer-settings" hidden><h3>Fælles tilbud</h3><p class="note">Vælg, hvilke tilbud der skal vises nederst på jeres tavle. Tilbuddene oprettes og tilknyttes af Techus Nord.</p><div id="sharedOfferSettingsList"></div></section>
       </div>
       <button id="openTasksManagerButton" class="staff-manager-launch" type="button" hidden><span class="avatar-stack"><i>✓</i><i>↻</i></span><span><strong>Indstil ugeopgaver</strong><small>Navne, opgaver og automatisk rotation</small></span><b>›</b></button>
       <div class="settings-account-section"><h3>Adgang til tavlen</h3><p class="note">Af sikkerhedshensyn kan den nuværende tavlekode ikke aflæses. Du kan altid erstatte den med en ny.</p><label>Ny tavlekode<div class="password-row"><input id="newViewerCode" type="password" minlength="6" autocomplete="new-password" placeholder="Mindst 6 tegn"><button id="toggleViewerCode" class="secondary" type="button">Vis</button></div></label><button id="saveViewerCode" class="danger-button" type="button">Sæt ny tavlekode</button></div>
@@ -260,6 +263,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js?v=40"></script>
+  <script src="/app.js?v=42"></script>
 </body>
 </html>

@@ -108,6 +108,28 @@ function teamCard(team, archived = false) {
   </article>`;
 }
 
+function teamLinkOptions(customer, selected = []) {
+  const chosen = new Set(selected);
+  return customer.teams.map(team => `<label class="offer-team-choice"><input type="checkbox" data-offer-team value="${esc(team.slug)}" ${chosen.has(team.slug) ? 'checked' : ''}><span>${esc(team.name)}</span></label>`).join('') || '<p class="slug-note">Kunden har ingen aktive tavler.</p>';
+}
+
+function sharedOfferCard(offer, customer) {
+  const selected = (offer.team_links || []).map(link => link.team_slug);
+  return `<article class="board-card shared-offer-card" data-offer="${esc(offer.id)}">
+    <div class="board-title"><div><h5>${esc(offer.name)}</h5><code>visuplanner.dk/tilbud/${esc(offer.slug)}</code></div><span class="status-badge">Fælles tilbud</span></div>
+    <div class="field-grid">
+      <label>Navn<input data-offer-field="name" value="${esc(offer.name)}"></label>
+      <label>Arbejdsplads<input data-offer-field="workplace" value="${esc(offer.workplace)}"></label>
+      <label>Kommune<input data-offer-field="municipality" value="${esc(offer.municipality)}"></label>
+      <label>Ansvarlig arbejdsmail<input data-offer-field="recovery_email" type="email" value="${esc(offer.recovery_email)}"></label>
+      <label class="toggle-setting"><input data-offer-field="own_board_enabled" type="checkbox" ${offer.own_board_enabled ? 'checked' : ''}><span><strong>Egen tavle</strong><small>Kan åbnes på tablet og af eksterne beboere.</small></span></label>
+    </div>
+    <div class="offer-team-grid"><strong>Tilgængeligt for disse tavler</strong>${teamLinkOptions(customer, selected)}</div>
+    <div class="board-actions"><a href="/tilbud/${esc(offer.slug)}" target="_blank" rel="noopener">Åbn tilbudstavle</a><button data-offer-action="save-shared-offer">Gem tilbud og tilknytninger</button></div>
+    <details><summary>Nødhjælp: skift tilbuddets koder</summary><div class="field-grid two"><label>Ny redigeringskode<input data-offer-field="editor_password" type="password" minlength="8"></label><label>Ny visningskode<input data-offer-field="viewer_password" type="password" minlength="6"></label></div><div class="board-actions"><button data-offer-action="reset-editor-code">Sæt redigeringskode</button><button data-offer-action="reset-viewer-code">Sæt visningskode</button></div></details>
+  </article>`;
+}
+
 function customerCard(customer) {
   const graceEnd = activationGraceEndsAt(customer);
   const trialText = customer.subscription_status === 'trial'
@@ -166,6 +188,20 @@ function customerCard(customer) {
           <p class="slug-note" data-slug-status>URL’en kontrolleres, før tavlen oprettes.</p>
         </div>
       </details>
+    </section>
+    <section class="boards-block shared-offers-block"><h4>Fælles tilbud</h4><p class="slug-note">Et fælles tilbud redigeres ét sted og kan vises på flere af kundens tavler.</p><div class="board-list">${(customer.shared_offers || []).length ? customer.shared_offers.map(offer => sharedOfferCard(offer, customer)).join('') : '<p>Ingen fælles tilbud endnu.</p>'}</div>
+      <details><summary>Opret fælles tilbud til kunden</summary><div class="inline-create shared-offer-create">
+        <label>Navn<input data-new-offer="name" placeholder="Fx Trekløverets Klub"></label>
+        <label>Arbejdsplads<input data-new-offer="workplace" value="${esc(customer.display_name)}"></label>
+        <label>Kommune<input data-new-offer="municipality" value="${esc(customer.municipality)}"></label>
+        <label>Kontaktmail<input data-new-offer="recovery_email" type="email" value="${esc(customer.contact_email)}"></label>
+        <label>Ønsket adresse<input data-new-offer="slug" placeholder="trekloeverets-klub"></label>
+        <label>Redigeringskode<input data-new-offer="editor_password" type="password" minlength="8"></label>
+        <label>Visningskode<input data-new-offer="viewer_password" type="password" minlength="6"></label>
+        <label class="toggle-setting"><input data-new-offer="own_board_enabled" type="checkbox" checked><span><strong>Opret egen klubtavle</strong><small>Kan bruges på klubbens tablet og af eksterne beboere.</small></span></label>
+        <div class="offer-team-grid"><strong>Gør tilbuddet tilgængeligt for</strong>${teamLinkOptions(customer)}</div>
+        <button data-customer-action="create-shared-offer">Opret fælles tilbud</button>
+      </div></details>
     </section>
   </article>`;
 }
@@ -230,6 +266,10 @@ function customerPayload(card, action) {
     payload.payment_method = fieldValue(card, 'invoice_payment_method');
   } else if (action === 'create-board') {
     card.querySelectorAll('[data-new-board]').forEach(input => payload[input.dataset.newBoard] = input.value.trim());
+  } else if (action === 'create-shared-offer') {
+    const create = card.querySelector('.shared-offer-create');
+    create.querySelectorAll('[data-new-offer]').forEach(input => payload[input.dataset.newOffer] = input.type === 'checkbox' ? input.checked : input.value.trim());
+    payload.team_slugs = [...create.querySelectorAll('[data-offer-team]:checked')].map(input => input.value);
   }
   return payload;
 }
@@ -244,7 +284,30 @@ function bindActions() {
     try {
       const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify(customerPayload(card, action)) });
       await copyFallback(result, 'Tavlen er oprettet.');
-      status(action === 'create-board' ? 'Tavlen er oprettet, og invitationen er sendt.' : 'Kundens aftale er opdateret.', 'success');
+      status(action === 'create-board' ? 'Tavlen er oprettet, og invitationen er sendt.' : action === 'create-shared-offer' ? 'Det fælles tilbud er oprettet.' : 'Kundens aftale er opdateret.', 'success');
+      await openDashboard();
+    } catch (error) { status(error.message, 'error'); button.disabled = false; }
+  });
+
+  document.querySelectorAll('[data-offer-action]').forEach(button => button.onclick = async () => {
+    const offerCard = button.closest('[data-offer]');
+    const customerCard = button.closest('[data-customer]');
+    const action = button.dataset.offerAction;
+    const payload = { customerId:customerCard.dataset.customer, offer_id:offerCard.dataset.offer };
+    if (action === 'save-shared-offer') {
+      payload.action = action;
+      offerCard.querySelectorAll('[data-offer-field]').forEach(input => payload[input.dataset.offerField] = input.type === 'checkbox' ? input.checked : input.value.trim());
+      payload.team_slugs = [...offerCard.querySelectorAll('[data-offer-team]:checked')].map(input => input.value);
+    } else {
+      payload.action = 'reset-shared-offer-code';
+      payload.code_kind = action === 'reset-viewer-code' ? 'viewer' : 'editor';
+      payload.value = offerCard.querySelector(`[data-offer-field="${payload.code_kind === 'viewer' ? 'viewer_password' : 'editor_password'}"]`)?.value || '';
+      if (!confirm(`Sæt en ny ${payload.code_kind === 'viewer' ? 'visningskode' : 'redigeringskode'} til tilbuddet?`)) return;
+    }
+    button.disabled = true;
+    try {
+      await api('/api/platform-admin', { method:'POST', body:JSON.stringify(payload) });
+      status(action === 'save-shared-offer' ? 'Tilbuddet og tilknytningerne er gemt.' : 'Koden er ændret.', 'success');
       await openDashboard();
     } catch (error) { status(error.message, 'error'); button.disabled = false; }
   });

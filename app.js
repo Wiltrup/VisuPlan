@@ -30,6 +30,7 @@ const state = {
   speakEnabled: false,
   residents: [],
   teamTasks: [],
+  sharedOffers: [],
   session: null
 };
 let activeModule='board';
@@ -415,6 +416,29 @@ async function fetchWeek(weekStart) {
   return week;
 }
 
+async function loadSharedOffers(weekStart) {
+  const links = await apiFetch(`/rest/v1/shared_offer_team_links?team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&select=offer_id,team_slug,visible_on_team`, {}, true) || [];
+  if (!links.length) { state.sharedOffers = []; return; }
+  const ids = links.map(link => link.offer_id);
+  const idFilter = `(${ids.join(',')})`;
+  const dates = weekDates(weekStart);
+  const dateFilter = `(${dates.join(',')})`;
+  const [offers, dayRows, activityRows] = await Promise.all([
+    apiFetch(`/rest/v1/shared_offers?id=in.${idFilter}&archived_at=is.null&select=id,name,slug,own_board_enabled`, {}, true),
+    apiFetch(`/rest/v1/shared_offer_days?offer_id=in.${idFilter}&plan_date=in.${dateFilter}&select=*`, {}, true),
+    apiFetch(`/rest/v1/shared_offer_activities?offer_id=in.${idFilter}&plan_date=in.${dateFilter}&select=*&order=activity_time.asc,sort_order.asc`, {}, true)
+  ]);
+  const secureDays = await Promise.all((dayRows || []).map(async row => ({ ...row, meal_photo_url: await resolvePhotoUrl(row.meal_photo_url || '') })));
+  state.sharedOffers = (offers || []).map(offer => ({
+    ...offer,
+    link: links.find(link => link.offer_id === offer.id),
+    days: Object.fromEntries(dates.map(date => [date, {
+      ...(secureDays.find(row => row.offer_id === offer.id && row.plan_date === date) || {}),
+      activities: (activityRows || []).filter(row => row.offer_id === offer.id && row.plan_date === date)
+    }]))
+  }));
+}
+
 async function loadData({ quiet = false } = {}) {
   if (!quiet) setStatus('Henter ugeplan…');
   try {
@@ -454,6 +478,7 @@ async function loadData({ quiet = false } = {}) {
     state.residents=residents||[];state.teamTasks=teamTasks||[];
     if (state.activeWeekStart !== currentCalendarWeekStart()) selectedIndex = 0;
     state.week = await fetchWeek(state.activeWeekStart);
+    await loadSharedOffers(state.activeWeekStart);
     render();
     setStatus('Opdateret', 'success');
     return true;
@@ -533,10 +558,24 @@ function render() {
     ${activity.photoUrl ? `<button class="activity-photo image-button" data-enlarge-image="${escapeHtml(activity.photoUrl)}" data-image-caption="${escapeHtml(activity.name)}" aria-label="Vis stort billede af ${escapeHtml(activity.name)}"><img src="${escapeHtml(activity.photoUrl)}" alt=""></button>` : ''}
     <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">👂</button>`:''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
+  renderSharedOffers();
   renderTabs();
   renderTaskAssignments();
   bindSpeakButtons();
   bindImageEnlargement();
+}
+
+function renderSharedOffers() {
+  const section = el('sharedOffersSection');
+  const visible = state.sharedOffers.filter(offer => offer.link?.visible_on_team);
+  section.hidden = !visible.length;
+  if (!visible.length) { el('sharedOffersList').innerHTML = ''; return; }
+  const date = isoDate(dateForIndex(selectedIndex, state.activeWeekStart));
+  el('sharedOffersList').innerHTML = visible.map(offer => {
+    const data = offer.days?.[date] || { activities: [] };
+    const items = data.activities || [];
+    return `<article class="shared-offer-panel"><div class="shared-offer-name"><h3>${escapeHtml(offer.name)}</h3>${offer.own_board_enabled ? `<a href="/tilbud/${escapeHtml(offer.slug)}">Åbn tilbuddets egen tavle</a>` : ''}</div><div class="shared-offer-content"><section><h4>🍽️ Mad</h4>${data.meal_photo_url ? `<button class="shared-offer-photo image-button" data-enlarge-image="${escapeHtml(data.meal_photo_url)}" data-image-caption="${escapeHtml(data.meal_name || 'Mad i klubben')}"><img src="${escapeHtml(data.meal_photo_url)}" alt=""></button>` : ''}<strong>${escapeHtml(data.meal_name || 'Ikke udfyldt')}</strong></section><section><h4>🎯 Aktiviteter</h4>${items.length ? items.map(item => `<div class="shared-offer-activity"><time>${escapeHtml((item.activity_time || '').slice(0,5))}</time><span>${escapeHtml(item.name)}</span></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>'}</section></div>${data.message ? `<p class="shared-offer-message">💬 ${escapeHtml(data.message)}</p>` : ''}</article>`;
+  }).join('');
 }
 
 function weeksSince(start,end){
@@ -1183,10 +1222,17 @@ function openSettings() {
   el('showLunch').checked = state.meals.lunch;
   el('tasksEnabled').checked=state.tasksEnabled;
   el('speakEnabled').checked=state.speakEnabled;
+  renderSharedOfferSettings();
   updateSettingsVisibility();
   renderSubscriptionBanner();
   setSettingsLockedState();
   el('settingsDialog').showModal();
+}
+
+function renderSharedOfferSettings() {
+  const section = el('sharedOfferSettings');
+  section.hidden = !state.sharedOffers.length;
+  el('sharedOfferSettingsList').innerHTML = state.sharedOffers.map(offer => `<label class="toggle-setting"><input type="checkbox" data-shared-offer-toggle="${escapeHtml(offer.id)}" ${offer.link?.visible_on_team ? 'checked' : ''}><span><strong>Vis ${escapeHtml(offer.name)}</strong><small>Mad og aktiviteter vises nederst på den almindelige tavle.</small></span></label>`).join('');
 }
 
 async function requestSubscription(button) {
@@ -1239,6 +1285,11 @@ async function saveSettings() {
       tasks_enabled:el('tasksEnabled').checked,
       speak_enabled:el('speakEnabled').checked
     });
+    await Promise.all(state.sharedOffers.map(offer => {
+      const toggle = document.querySelector(`[data-shared-offer-toggle="${offer.id}"]`);
+      if (!toggle || toggle.checked === offer.link?.visible_on_team) return Promise.resolve();
+      return apiFetch(`/rest/v1/shared_offer_team_links?offer_id=eq.${encodeURIComponent(offer.id)}&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, { method:'PATCH', headers:{'Content-Type':'application/json',Prefer:'return=minimal'}, body:JSON.stringify({ visible_on_team:toggle.checked, updated_at:new Date().toISOString() }) }, true).then(() => { offer.link.visible_on_team = toggle.checked; });
+    }));
     state.staffingDefaults = defaults;
     state.showDatesPublic = el('showDatesPublic').checked;
     state.shiftMode = Number(el('shiftMode').value);

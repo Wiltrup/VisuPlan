@@ -81,6 +81,66 @@ async function uniqueSlug(base, secret) {
   return candidate;
 }
 
+async function offerSlugAvailable(slug, secret, currentSlug = '') {
+  if (!/^[a-z0-9-]{3,120}$/.test(slug)) return false;
+  if (slug === currentSlug) return true;
+  const rows = await serviceFetch(`/rest/v1/shared_offers?slug=eq.${encodeURIComponent(slug)}&select=slug`, secret);
+  return !rows?.length;
+}
+
+async function uniqueOfferSlug(base, secret) {
+  const stem = slugify(base);
+  let candidate = stem;
+  let suffix = 2;
+  while (!(await offerSlugAvailable(candidate, secret))) candidate = `${stem}-${suffix++}`;
+  return candidate;
+}
+
+async function createSharedOffer(input, customer, secret) {
+  const name = clean(input.name, 150);
+  const recoveryEmail = clean(input.recovery_email || customer.contact_email, 200).toLowerCase();
+  const editorPassword = String(input.editor_password || '');
+  const viewerPassword = String(input.viewer_password || '');
+  if (!name || !/^\S+@\S+\.\S+$/.test(recoveryEmail)) throw new Error('Tilbuddets navn og kontaktmail skal udfyldes.');
+  if (editorPassword.length < 8 || viewerPassword.length < 6) throw new Error('Redigeringskoden skal have mindst 8 tegn, og visningskoden mindst 6 tegn.');
+  const requested = clean(input.slug, 120);
+  const slug = requested ? slugify(requested) : await uniqueOfferSlug(`${customer.display_name}-${name}`, secret);
+  if (!(await offerSlugAvailable(slug, secret))) throw new Error('Den ønskede tilbudsadresse er allerede i brug.');
+  let editor = null;
+  let viewer = null;
+  let offer = null;
+  try {
+    editor = await serviceFetch('/auth/v1/admin/users', secret, {
+      method: 'POST', body: JSON.stringify({ email: `${slug}-offer-editor@visuplanner.invalid`, password: editorPassword, email_confirm: true, user_metadata: { role: 'offer_editor', offer_slug: slug } })
+    });
+    viewer = await serviceFetch('/auth/v1/admin/users', secret, {
+      method: 'POST', body: JSON.stringify({ email: `${slug}-offer-viewer@visuplanner.invalid`, password: viewerPassword, email_confirm: true, user_metadata: { role: 'offer_viewer', offer_slug: slug } })
+    });
+    const rows = await serviceFetch('/rest/v1/shared_offers?select=*', secret, {
+      method: 'POST', headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({
+        customer_id: customer.id, slug, name,
+        workplace: clean(input.workplace || customer.display_name, 200) || null,
+        municipality: clean(input.municipality || customer.municipality, 150) || null,
+        recovery_email: recoveryEmail, editor_user_id: editor.id, viewer_user_id: viewer.id,
+        own_board_enabled: input.own_board_enabled !== false
+      })
+    });
+    offer = rows?.[0];
+    const teamSlugs = Array.isArray(input.team_slugs) ? input.team_slugs.filter(value => /^[a-z0-9-]{3,120}$/.test(value)) : [];
+    if (offer && teamSlugs.length) await serviceFetch('/rest/v1/shared_offer_team_links', secret, {
+      method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify(teamSlugs.map(team_slug => ({ offer_id: offer.id, team_slug, visible_on_team: true })))
+    });
+    return offer;
+  } catch (error) {
+    if (offer?.id) await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
+    if (viewer?.id) await serviceFetch(`/auth/v1/admin/users/${viewer.id}`, secret, { method: 'DELETE' }).catch(() => {});
+    if (editor?.id) await serviceFetch(`/auth/v1/admin/users/${editor.id}`, secret, { method: 'DELETE' }).catch(() => {});
+    throw error;
+  }
+}
+
 async function sendInvitation(email, name, link, purpose = 'activation') {
   const key = process.env.RESEND_API_KEY;
   if (!key) return false;
@@ -165,7 +225,7 @@ async function createBoard(input, customer, secret, host) {
 function publicAdminError(error) {
   const message = String(error?.message || error || '');
   if (/already.*registered|duplicate.*email/i.test(message)) return { status: 409, message: 'Et teknisk login findes allerede. Vælg en anden tavleadresse.' };
-  if (/allerede i brug|Tavlens navn|ønskede tavleadresse|pakken tillader|prøveperioden/i.test(message)) return { status: 400, message };
+  if (/allerede i brug|Tavlens navn|Tilbuddets navn|redigeringskoden|visningskoden|ønskede tavleadresse|tilbudsadresse|pakken tillader|prøveperioden/i.test(message)) return { status: 400, message };
   return { status: 500, message: 'Administratorhandlingen mislykkedes. Ingen eksisterende tavledata blev slettet.' };
 }
 
@@ -178,17 +238,20 @@ module.exports = async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const [customers, teams, archivedTeams, onboarding, accessHelp, acceptances] = await Promise.all([
+      const [customers, teams, archivedTeams, onboarding, accessHelp, acceptances, sharedOffers, sharedOfferLinks] = await Promise.all([
         serviceFetch('/rest/v1/customers?archived_at=is.null&select=*&order=display_name.asc', secret),
         serviceFetch('/rest/v1/teams_registry?archived_at=is.null&select=*&order=name.asc', secret),
         serviceFetch('/rest/v1/teams_registry?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
         serviceFetch('/rest/v1/onboarding_requests?status=eq.new&select=*&order=created_at.desc&limit=100', secret),
         serviceFetch('/rest/v1/access_help_requests?select=*&order=created_at.desc&limit=100', secret),
-        serviceFetch('/rest/v1/customer_acceptances?select=customer_id,terms_version,accepted_by_name,accepted_at&order=accepted_at.desc', secret)
+        serviceFetch('/rest/v1/customer_acceptances?select=customer_id,terms_version,accepted_by_name,accepted_at&order=accepted_at.desc', secret),
+        serviceFetch('/rest/v1/shared_offers?archived_at=is.null&select=*&order=name.asc', secret),
+        serviceFetch('/rest/v1/shared_offer_team_links?select=*&order=created_at.asc', secret)
       ]);
       const grouped = (customers || []).map(customer => ({
         ...customer,
         teams: (teams || []).filter(team => team.customer_id === customer.id),
+        shared_offers: (sharedOffers || []).filter(offer => offer.customer_id === customer.id).map(offer => ({ ...offer, team_links: (sharedOfferLinks || []).filter(link => link.offer_id === offer.id) })),
         latest_acceptance: (acceptances || []).find(item => item.customer_id === customer.id) || null
       }));
       return response.status(200).json({ customers: grouped, ungroupedTeams: (teams || []).filter(team => !team.customer_id), archivedTeams: archivedTeams || [], onboarding: onboarding || [], accessHelp: accessHelp || [], termsVersion: TERMS_VERSION });
@@ -201,6 +264,49 @@ module.exports = async function handler(request, response) {
     if (action === 'check-slug') {
       const candidate = slugify(body.value || body.slug);
       return response.status(200).json({ slug: candidate, available: await slugAvailable(candidate, secret) });
+    }
+    if (action === 'create-shared-offer') {
+      const customers = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
+      const customer = customers?.[0];
+      if (!customer) return response.status(404).json({ error: 'Kunden blev ikke fundet.' });
+      const customerTeams = await serviceFetch(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customerId)}&archived_at=is.null&select=slug`, secret);
+      const allowed = new Set((customerTeams || []).map(team => team.slug));
+      body.team_slugs = (Array.isArray(body.team_slugs) ? body.team_slugs : []).filter(teamSlug => allowed.has(teamSlug));
+      const offer = await createSharedOffer(body, customer, secret);
+      return response.status(200).json({ ok: true, offer, boardUrl: `/tilbud/${offer.slug}` });
+    }
+    if (action === 'save-shared-offer') {
+      const offerId = clean(body.offer_id, 60);
+      const offers = await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offerId)}&customer_id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
+      const offer = offers?.[0];
+      if (!offer) return response.status(404).json({ error: 'Tilbuddet blev ikke fundet.' });
+      const update = {
+        name: clean(body.name, 150), workplace: clean(body.workplace, 200) || null,
+        municipality: clean(body.municipality, 150) || null, recovery_email: clean(body.recovery_email, 200).toLowerCase(),
+        own_board_enabled: body.own_board_enabled !== false, updated_at: new Date().toISOString()
+      };
+      if (!update.name || !/^\S+@\S+\.\S+$/.test(update.recovery_email)) return response.status(400).json({ error: 'Udfyld navn og en gyldig kontaktmail.' });
+      await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(update) });
+      const customerTeams = await serviceFetch(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customerId)}&archived_at=is.null&select=slug`, secret);
+      const allowed = new Set((customerTeams || []).map(team => team.slug));
+      const selected = new Set((Array.isArray(body.team_slugs) ? body.team_slugs : []).filter(teamSlug => allowed.has(teamSlug)));
+      const existingLinks = await serviceFetch(`/rest/v1/shared_offer_team_links?offer_id=eq.${encodeURIComponent(offer.id)}&select=team_slug,visible_on_team`, secret);
+      const existing = new Set((existingLinks || []).map(link => link.team_slug));
+      const removed = [...existing].filter(teamSlug => !selected.has(teamSlug));
+      const added = [...selected].filter(teamSlug => !existing.has(teamSlug));
+      if (removed.length) await serviceFetch(`/rest/v1/shared_offer_team_links?offer_id=eq.${encodeURIComponent(offer.id)}&team_slug=in.(${removed.map(encodeURIComponent).join(',')})`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      if (added.length) await serviceFetch('/rest/v1/shared_offer_team_links', secret, { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(added.map(team_slug => ({ offer_id: offer.id, team_slug, visible_on_team: true }))) });
+      return response.status(200).json({ ok: true });
+    }
+    if (action === 'reset-shared-offer-code') {
+      const offers = await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(clean(body.offer_id, 60))}&customer_id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
+      const offer = offers?.[0];
+      if (!offer) return response.status(404).json({ error: 'Tilbuddet blev ikke fundet.' });
+      const kind = body.code_kind === 'viewer' ? 'viewer' : 'editor';
+      const value = String(body.value || '');
+      if (value.length < (kind === 'viewer' ? 6 : 8)) return response.status(400).json({ error: kind === 'viewer' ? 'Visningskoden skal have mindst 6 tegn.' : 'Redigeringskoden skal have mindst 8 tegn.' });
+      await serviceFetch(`/auth/v1/admin/users/${offer[`${kind}_user_id`]}`, secret, { method: 'PUT', body: JSON.stringify({ password: value }) });
+      return response.status(200).json({ ok: true });
     }
     if (action === 'delete-request') {
       if (!requestId) return response.status(400).json({ error: 'Forespørgslen mangler.' });
