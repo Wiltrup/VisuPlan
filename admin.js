@@ -3,6 +3,7 @@ const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 let session = null;
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
+const slugify = value => String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/æ/g, 'ae').replace(/ø/g, 'oe').replace(/å/g, 'aa').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kunde';
 const planLabels = { intro3:'Op til 3 tavler', intro8:'Op til 8 tavler', intro12:'Op til 12 tavler', custom:'Skræddersyet', legacy:'Eksisterende kunde' };
 const statusLabels = { trial:'Prøveperiode', contracted:'Aftale indgået', invoice_sent:'Faktura sendt', active:'Betalt og aktiv', overdue:'Forfalden', read_only:'Kun visning', cancelled:'Opsagt' };
 
@@ -115,8 +116,10 @@ function teamLinkOptions(customer, selected = []) {
 
 function sharedOfferCard(offer, customer) {
   const selected = (offer.team_links || []).map(link => link.team_slug);
+  const customerSlug = offer.customer_slug || customer.url_slug || slugify(customer.display_name);
+  const offerPath = `/${customerSlug}/${offer.slug}`;
   return `<article class="board-card shared-offer-card" data-offer="${esc(offer.id)}">
-    <div class="board-title"><div><h5>${esc(offer.name)}</h5><code>visuplanner.dk/tilbud/${esc(offer.slug)}</code></div><span class="status-badge">Fælles tilbud</span></div>
+    <div class="board-title"><div><h5>${esc(offer.name)}</h5><code>visuplanner.dk${esc(offerPath)}</code></div><span class="status-badge">Fælles tilbud</span></div>
     <div class="field-grid">
       <label>Navn<input data-offer-field="name" value="${esc(offer.name)}"></label>
       <label>Arbejdsplads<input data-offer-field="workplace" value="${esc(offer.workplace)}"></label>
@@ -125,7 +128,7 @@ function sharedOfferCard(offer, customer) {
       <label class="toggle-setting"><input data-offer-field="own_board_enabled" type="checkbox" ${offer.own_board_enabled ? 'checked' : ''}><span><strong>Egen tavle</strong><small>Kan åbnes på tablet og af eksterne beboere.</small></span></label>
     </div>
     <div class="offer-team-grid"><strong>Tilgængeligt for disse tavler</strong>${teamLinkOptions(customer, selected)}</div>
-    <div class="board-actions"><a href="/tilbud/${esc(offer.slug)}" target="_blank" rel="noopener">Åbn tilbudstavle</a><button data-offer-action="save-shared-offer">Gem tilbud og tilknytninger</button></div>
+    <div class="board-actions"><a href="${esc(offerPath)}" target="_blank" rel="noopener">Åbn tilbudstavle</a><button data-offer-action="save-shared-offer">Gem tilbud og tilknytninger</button></div>
     <details><summary>Nødhjælp: skift tilbuddets koder</summary><div class="field-grid two"><label>Ny redigeringskode<input data-offer-field="editor_password" type="password" minlength="8"></label><label>Ny visningskode<input data-offer-field="viewer_password" type="password" minlength="6"></label></div><div class="board-actions"><button data-offer-action="reset-editor-code">Sæt redigeringskode</button><button data-offer-action="reset-viewer-code">Sæt visningskode</button></div></details>
   </article>`;
 }
@@ -203,6 +206,16 @@ function customerCard(customer) {
         <button data-customer-action="create-shared-offer">Opret fælles tilbud</button>
       </div></details>
     </section>
+    <details class="customer-danger-zone"><summary>Arkivér kunden</summary><p>Alle kundens tavler og klubtilbud lukkes, men data og filer bevares. Kunden kan gendannes fra listen over arkiverede kunder.</p><button data-customer-action="archive-customer" class="danger">Arkivér hele kunden</button></details>
+  </article>`;
+}
+
+function archivedCustomerCard(customer) {
+  return `<article class="customer-card archived-customer-card" data-customer="${esc(customer.id)}">
+    <div class="customer-head"><div><h3>${esc(customer.display_name)}</h3><p>Arkiveret ${dateTime(customer.archived_at)}</p></div><span class="status-badge read_only">Arkiveret kunde</span></div>
+    <div class="customer-facts"><span>${customer.teams.length} tavler</span><span>${customer.shared_offers.length} klubtilbud</span><span>Indholdet er bevaret</span></div>
+    <div class="action-row"><button data-customer-action="restore-customer">Gendan kunden</button><button data-customer-action="delete-customer" class="permanent-delete">Slet kunden permanent</button></div>
+    <p class="archived-note">Permanent sletning fjerner alle kundens tavler, klubtilbud, ugeplaner, billeder, lydfiler og loginbrugere.</p>
   </article>`;
 }
 
@@ -236,6 +249,8 @@ async function openDashboard() {
   $('renewalCards').innerHTML = attention.map(attentionHtml).join('');
   $('onboardingRequests').innerHTML = data.onboarding.length ? data.onboarding.map(requestCard).join('') : '<p class="empty-requests">Ingen nye forespørgsler.</p>';
   $('customerCards').innerHTML = data.customers.length ? data.customers.map(customerCard).join('') : '<p class="empty-requests">Ingen kunder endnu.</p>';
+  $('archivedCustomersSection').hidden = !data.archivedCustomers.length;
+  $('archivedCustomerCards').innerHTML = data.archivedCustomers.map(archivedCustomerCard).join('');
   $('archivedSection').hidden = !data.archivedTeams.length;
   $('archivedTeamCards').innerHTML = data.archivedTeams.map(team => teamCard(team, true)).join('');
   $('accessHelpRequests').innerHTML = data.accessHelp.length ? data.accessHelp.map(item => `<article class="request-card"><strong>${esc(item.contact_name)}</strong><p><a href="mailto:${esc(item.contact_email)}">${esc(item.contact_email)}</a></p><p>Tavle: ${esc(item.team_slug)}</p><small>${dateTime(item.created_at)}</small></article>`).join('') : '<p class="empty-requests">Ingen anmodninger om hjælp.</p>';
@@ -270,6 +285,8 @@ function customerPayload(card, action) {
     const create = card.querySelector('.shared-offer-create');
     create.querySelectorAll('[data-new-offer]').forEach(input => payload[input.dataset.newOffer] = input.type === 'checkbox' ? input.checked : input.value.trim());
     payload.team_slugs = [...create.querySelectorAll('[data-offer-team]:checked')].map(input => input.value);
+  } else if (action === 'delete-customer') {
+    payload.confirmation = 'SLET KUNDE';
   }
   return payload;
 }
@@ -280,11 +297,18 @@ function bindActions() {
     const action = button.dataset.customerAction;
     if (action === 'set-read-only' && !confirm('Lås kundens redigering? Tavlerne kan stadig ses.')) return;
     if (action === 'mark-paid' && !confirm('Bekræft, at betalingen er modtaget.')) return;
+    if (action === 'archive-customer' && !confirm('Arkivér hele kunden? Alle kundens tavler og klubtilbud lukkes, men indholdet bevares.')) return;
+    if (action === 'restore-customer' && !confirm('Gendan kunden og de tavler og klubtilbud, der blev lukket sammen med kunden?')) return;
+    if (action === 'delete-customer') {
+      if (!confirm('Dette sletter hele kunden permanent – inklusive alle tavler, klubtilbud, planer, billeder, lyd og loginbrugere. Handlingen kan ikke fortrydes.')) return;
+      if (prompt('Skriv SLET KUNDE for at bekræfte:') !== 'SLET KUNDE') return;
+    }
     button.disabled = true;
     try {
       const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify(customerPayload(card, action)) });
       await copyFallback(result, 'Tavlen er oprettet.');
-      status(action === 'create-board' ? 'Tavlen er oprettet, og invitationen er sendt.' : action === 'create-shared-offer' ? 'Det fælles tilbud er oprettet.' : 'Kundens aftale er opdateret.', 'success');
+      const messages = { 'create-board':'Tavlen er oprettet, og invitationen er sendt.', 'create-shared-offer':'Det fælles tilbud er oprettet.', 'archive-customer':'Kunden og alle tilknyttede tavler er arkiveret.', 'restore-customer':'Kunden er gendannet.', 'delete-customer':'Kunden og alle tilknyttede data er slettet permanent.' };
+      status(messages[action] || 'Kundens aftale er opdateret.', 'success');
       await openDashboard();
     } catch (error) { status(error.message, 'error'); button.disabled = false; }
   });

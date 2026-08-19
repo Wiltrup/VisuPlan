@@ -14,6 +14,12 @@ const DAYS = [
   { key: 'saturday', short: 'Lør', name: 'LØRDAG', color: '#a855f7' },
   { key: 'sunday', short: 'Søn', name: 'SØNDAG', color: '#ec4899' }
 ];
+const activityTimeLabel = (start, end) => {
+  const from = String(start || '').slice(0, 5);
+  const to = String(end || '').slice(0, 5);
+  return from && to ? `${from}–${to}` : from || (to ? `Til ${to}` : '');
+};
+const offerBoardPath = offer => `/${offer.customer_slug || 'tilbud'}/${offer.slug}`;
 
 const emptyDay = () => ({ morning: ['', ''], evening: ['', ''], night: ['', ''], breakfast: '', breakfastPhotoUrl: '', breakfastAudioUrl: '', lunch: '', lunchPhotoUrl: '', lunchAudioUrl: '', dinner: '', dinnerPhotoUrl: '', dinnerAudioUrl: '', activities: [] });
 const state = {
@@ -408,6 +414,7 @@ async function fetchWeek(weekStart) {
       data.activities = secureActivities.filter(item => item.plan_date === date).map(item => ({
         id: item.id,
         time: item.activity_time ? item.activity_time.slice(0, 5) : '',
+        endTime: item.activity_end_time ? item.activity_end_time.slice(0, 5) : '',
         name: item.name,
         photoUrl: item.photo_url || '',
         audioUrl: item.audio_url || ''
@@ -433,7 +440,7 @@ async function loadSharedOffers(weekStart) {
   const dates = weekDates(weekStart);
   const dateFilter = `(${dates.join(',')})`;
   const [offers, dayRows, activityRows] = await Promise.all([
-    apiFetch(`/rest/v1/shared_offers?id=in.${idFilter}&archived_at=is.null&select=id,name,slug,own_board_enabled`, {}, true),
+    apiFetch(`/rest/v1/shared_offers?id=in.${idFilter}&archived_at=is.null&select=*`, {}, true),
     apiFetch(`/rest/v1/shared_offer_days?offer_id=in.${idFilter}&plan_date=in.${dateFilter}&select=*`, {}, true),
     apiFetch(`/rest/v1/shared_offer_activities?offer_id=in.${idFilter}&plan_date=in.${dateFilter}&select=*&order=activity_time.asc,sort_order.asc`, {}, true)
   ]);
@@ -565,7 +572,7 @@ function render() {
   activityHeading.classList.toggle('speak-heading',state.speakEnabled);activityHeading.innerHTML=`<span>🎯 Aktiviteter</span>${state.speakEnabled?'<button class="speak-button inline-speak" data-fixed-audio="activity" type="button" aria-label="Afspil aktivitet">👂</button>':''}`;
   el('activitiesList').innerHTML = data.activities.length ? data.activities.map(activity => `<div class="activity">
     ${activity.photoUrl ? `<button class="activity-photo image-button" data-enlarge-image="${escapeHtml(activity.photoUrl)}" data-image-caption="${escapeHtml(activity.name)}" aria-label="Vis stort billede af ${escapeHtml(activity.name)}"><img src="${escapeHtml(activity.photoUrl)}" alt=""></button>` : ''}
-    <div class="activity-time">${escapeHtml(activity.time)}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">👂</button>`:''}
+    <div class="activity-time">${escapeHtml(activityTimeLabel(activity.time, activity.endTime))}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">👂</button>`:''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
   renderSharedOffers();
   renderTabs();
@@ -583,7 +590,7 @@ function renderSharedOffers() {
   el('sharedOffersList').innerHTML = visible.map(offer => {
     const data = offer.days?.[date] || { activities: [] };
     const items = data.activities || [];
-    return `<article class="shared-offer-panel"><div class="shared-offer-name"><h3>${escapeHtml(offer.name)}</h3>${offer.own_board_enabled ? `<a href="/tilbud/${escapeHtml(offer.slug)}">Åbn tilbuddets egen tavle</a>` : ''}</div><div class="shared-offer-content"><section><h4>🍽️ Mad</h4>${data.meal_photo_url ? `<button class="shared-offer-photo image-button" data-enlarge-image="${escapeHtml(data.meal_photo_url)}" data-image-caption="${escapeHtml(data.meal_name || 'Mad i klubben')}"><img src="${escapeHtml(data.meal_photo_url)}" alt=""></button>` : ''}<strong>${escapeHtml(data.meal_name || 'Ikke udfyldt')}</strong></section><section><h4>🎯 Aktiviteter</h4>${items.length ? items.map(item => `<div class="shared-offer-activity"><time>${escapeHtml((item.activity_time || '').slice(0,5))}</time><span>${escapeHtml(item.name)}</span></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>'}</section></div>${data.message ? `<p class="shared-offer-message">💬 ${escapeHtml(data.message)}</p>` : ''}</article>`;
+    return `<article class="shared-offer-panel"><div class="shared-offer-name"><h3>${escapeHtml(offer.name)}</h3>${offer.own_board_enabled ? `<a href="${escapeHtml(offerBoardPath(offer))}">Åbn tilbuddets egen tavle</a>` : ''}</div><div class="shared-offer-content"><section><h4>🍽️ Mad</h4>${data.meal_photo_url ? `<button class="shared-offer-photo image-button" data-enlarge-image="${escapeHtml(data.meal_photo_url)}" data-image-caption="${escapeHtml(data.meal_name || 'Mad i klubben')}"><img src="${escapeHtml(data.meal_photo_url)}" alt=""></button>` : ''}<strong>${escapeHtml(data.meal_name || 'Ikke udfyldt')}</strong></section><section><h4>🎯 Aktiviteter</h4>${items.length ? items.map(item => `<div class="shared-offer-activity"><time>${escapeHtml(activityTimeLabel(item.activity_time, item.activity_end_time))}</time><span>${escapeHtml(item.name)}</span></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>'}</section></div>${data.message ? `<p class="shared-offer-message">💬 ${escapeHtml(data.message)}</p>` : ''}</article>`;
   }).join('');
 }
 
@@ -726,6 +733,7 @@ function draftDayState(data) {
   const activities = (data.activities || []).map(activity => ({
     id: activity.id || '',
     time: activity.time || '',
+    endTime: activity.endTime || '',
     name: activity.name || '',
     photoUrl: activity.photoUrl || '',
     photo: draftFileFingerprint(activity.photoFile),
@@ -842,7 +850,8 @@ function renderShiftEditors() {
 
 function renderActivityEditor() {
   el('activityEditor').innerHTML = editingActivities.length ? editingActivities.map((activity, index) => `<div class="activity-edit-row">
-    <input type="time" value="${escapeHtml(activity.time)}" data-index="${index}" data-field="time">
+    <label class="activity-time-input"><span>Start</span><input type="time" value="${escapeHtml(activity.time)}" data-index="${index}" data-field="time"></label>
+    <label class="activity-time-input"><span>Slut</span><input type="time" value="${escapeHtml(activity.endTime || '')}" data-index="${index}" data-field="endTime"></label>
     <input value="${escapeHtml(activity.name)}" placeholder="Aktivitet" data-index="${index}" data-field="name">
     <button class="remove-row" data-remove="${index}" type="button">✕</button>
     <label class="activity-upload-button">${activity.photoFile ? 'Nyt billede valgt ✓' : activity.photoUrl ? 'Skift aktivitetsbillede' : '+ Billede til aktiviteten'}<input type="file" accept="image/jpeg,image/png,image/webp" data-activity-photo="${index}"></label>
@@ -1112,6 +1121,7 @@ async function saveEditingDay(index, draft) {
       api: {
         team_slug: TEAM_SLUG, plan_date: planDate,
         activity_time: activity.time || null,
+        activity_end_time: activity.endTime || null,
         name,
         photo_url: photoUrl || null,
         audio_url: audioUrl || null,
@@ -1152,6 +1162,8 @@ async function saveWeekChanges() {
   button.disabled = true;
   button.textContent = 'Gemmer…';
   try {
+    // Kontrollér v43-kolonnen før eksisterende aktivitetsrækker udskiftes.
+    await apiFetch('/rest/v1/activities?select=activity_end_time&limit=0', {}, true);
     for (const index of changedIndexes) {
       const day = DAYS[index];
       await saveEditingDay(index, editingWeek[day.key]);
@@ -1176,7 +1188,7 @@ async function saveWeekChanges() {
     console.error(error);
     loadAdminDay();
     button.textContent = 'Prøv igen';
-    setStatus('Nogle ændringer kunne ikke gemmes. Prøv igen.', 'error');
+    setStatus(String(error?.message || '').includes('activity_end_time') ? 'Databaseopdatering v43 mangler. Ingen aktiviteter blev overskrevet.' : 'Nogle ændringer kunne ikke gemmes. Prøv igen.', 'error');
   } finally {
     button.disabled = false;
     setTimeout(() => { button.textContent = 'Gem ændringer'; }, 1600);
@@ -1444,7 +1456,7 @@ el('closeSettingsButton').addEventListener('click', () => el('settingsDialog').c
 el('saveSettingsButton').addEventListener('click', saveSettings);
 el('saveViewerCode').addEventListener('click',saveViewerCode);
 el('toggleViewerCode').addEventListener('click',()=>{const input=el('newViewerCode');input.type=input.type==='password'?'text':'password';el('toggleViewerCode').textContent=input.type==='password'?'Vis':'Skjul'});
-el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', name: '' }); renderActivityEditor(); });
+el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', endTime: '', name: '' }); renderActivityEditor(); });
 el('saveDayButton').addEventListener('click', saveWeekChanges);
 el('addStaffButton').addEventListener('click', addStaff);
 ['breakfast','lunch','dinner'].forEach(type=>el(`${type}PhotoInput`).addEventListener('change',event=>{pendingMealPhotos[type]=event.target.files?.[0]||null;if(type==='dinner'){pendingDinnerPhoto=pendingMealPhotos[type];selectedPexelsPhoto=null}el(`${type}PhotoName`).textContent=pendingMealPhotos[type]?pendingMealPhotos[type].name:'Intet billede valgt.'}));

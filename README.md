@@ -1,5 +1,17 @@
 # VisuPlanner
 
+## v43 – hele kunder, sluttider og ens klubtavler
+
+Version 43 gør det muligt at arkivere og gendanne en hel kunde fra administrationen. En arkiveret kunde kan derefter slettes permanent med en ekstra tekstbekræftelse; det fjerner kundens tavler, klubtilbud, planer, filer og tekniske loginbrugere.
+
+Aktiviteter på både team- og klubtavler kan nu have start- og sluttid. Klubtavlen har fået Pexels-billedsøgning og bruger samme dagsfarver, typografi, sidebredde, kortproportioner og footer som teamtavlerne. Nye klubadresser vises som `visuplanner.dk/kunde/klub`, mens de gamle `/tilbud/klub`-adresser fortsat virker.
+
+### Opdatering fra v42
+
+1. Kør `supabase-v43-customer-admin-and-activity-times.sql` én gang i Supabase SQL Editor. Scriptet tilføjer kun nye kolonner og bevarer eksisterende data.
+2. Udgiv derefter v43-filerne via GitHub/Vercel.
+3. Der skal ikke oprettes nye miljøvariabler.
+
 ## v42 – fælles tilbud og klubtavler
 
 Version 42 tilføjer et centralt styret modul til fælles tilbud, fx “Trekløverets Klub”. Et tilbud har sit eget redigeringslogin, sin egen visningskode og kan valgfrit have en selvstændig tavle på `/tilbud/tilbuddets-navn`. Mad, aktiviteter og en kort besked redigeres ét sted og opdateres automatisk på alle tilknyttede teamtavler.

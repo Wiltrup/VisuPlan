@@ -17,6 +17,7 @@
     { "source": "/underdatabehandlere", "destination": "/underdatabehandlere.html" },
     { "source": "/administration", "destination": "/admin" },
     { "source": "/tilbud/:offerSlug", "destination": "/shared-offer" },
+    { "source": "/:customerSlug/:offerSlug", "destination": "/shared-offer" },
     { "source": "/:teamSlug", "destination": "/app" }
   ],
   "crons": [

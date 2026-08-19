@@ -57,13 +57,35 @@ async function listStorageFiles(prefix, secret) {
   return files;
 }
 
-async function deleteTeamStorage(slug, secret) {
-  const files = await listStorageFiles(slug, secret);
+async function deleteStoragePrefix(prefix, secret) {
+  const files = await listStorageFiles(prefix, secret);
   for (let index = 0; index < files.length; index += 100) {
     await serviceFetch('/storage/v1/object/visuplan-images', secret, {
       method: 'DELETE', body: JSON.stringify({ prefixes: files.slice(index, index + 100) })
     });
   }
+}
+
+async function deleteAuthUser(userId, secret) {
+  if (!userId) return;
+  await serviceFetch(`/auth/v1/admin/users/${userId}`, secret, { method: 'DELETE' }).catch(error => {
+    console.warn('Loginbrugeren kunne ikke slettes eller var allerede slettet.', userId, error.message);
+  });
+}
+
+async function deleteTeamCompletely(team, secret) {
+  await deleteStoragePrefix(team.slug, secret);
+  await deleteAuthUser(team.editor_user_id, secret);
+  await deleteAuthUser(team.viewer_user_id, secret);
+  await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(team.slug)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+  await serviceFetch(`/rest/v1/access_help_requests?team_slug=eq.${encodeURIComponent(team.slug)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+}
+
+async function deleteSharedOfferCompletely(offer, secret) {
+  await deleteStoragePrefix(`offers/${offer.id}`, secret);
+  await deleteAuthUser(offer.editor_user_id, secret);
+  await deleteAuthUser(offer.viewer_user_id, secret);
+  await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
 }
 
 async function slugAvailable(slug, secret, currentSlug = '') {
@@ -127,6 +149,13 @@ async function createSharedOffer(input, customer, secret) {
       })
     });
     offer = rows?.[0];
+    const customerSlug = customer.url_slug || slugify(customer.display_name);
+    if (offer?.id) {
+      offer.customer_slug = customerSlug;
+      await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, {
+        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ customer_slug: customerSlug })
+      }).catch(() => {});
+    }
     const teamSlugs = Array.isArray(input.team_slugs) ? input.team_slugs.filter(value => /^[a-z0-9-]{3,120}$/.test(value)) : [];
     if (offer && teamSlugs.length) await serviceFetch('/rest/v1/shared_offer_team_links', secret, {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
@@ -238,14 +267,16 @@ module.exports = async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const [customers, teams, archivedTeams, onboarding, accessHelp, acceptances, sharedOffers, sharedOfferLinks] = await Promise.all([
+      const [customers, archivedCustomers, teams, archivedTeams, onboarding, accessHelp, acceptances, sharedOffers, archivedSharedOffers, sharedOfferLinks] = await Promise.all([
         serviceFetch('/rest/v1/customers?archived_at=is.null&select=*&order=display_name.asc', secret),
+        serviceFetch('/rest/v1/customers?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
         serviceFetch('/rest/v1/teams_registry?archived_at=is.null&select=*&order=name.asc', secret),
         serviceFetch('/rest/v1/teams_registry?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
         serviceFetch('/rest/v1/onboarding_requests?status=eq.new&select=*&order=created_at.desc&limit=100', secret),
         serviceFetch('/rest/v1/access_help_requests?select=*&order=created_at.desc&limit=100', secret),
         serviceFetch('/rest/v1/customer_acceptances?select=customer_id,terms_version,accepted_by_name,accepted_at&order=accepted_at.desc', secret),
         serviceFetch('/rest/v1/shared_offers?archived_at=is.null&select=*&order=name.asc', secret),
+        serviceFetch('/rest/v1/shared_offers?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
         serviceFetch('/rest/v1/shared_offer_team_links?select=*&order=created_at.asc', secret)
       ]);
       const grouped = (customers || []).map(customer => ({
@@ -254,7 +285,20 @@ module.exports = async function handler(request, response) {
         shared_offers: (sharedOffers || []).filter(offer => offer.customer_id === customer.id).map(offer => ({ ...offer, team_links: (sharedOfferLinks || []).filter(link => link.offer_id === offer.id) })),
         latest_acceptance: (acceptances || []).find(item => item.customer_id === customer.id) || null
       }));
-      return response.status(200).json({ customers: grouped, ungroupedTeams: (teams || []).filter(team => !team.customer_id), archivedTeams: archivedTeams || [], onboarding: onboarding || [], accessHelp: accessHelp || [], termsVersion: TERMS_VERSION });
+      const archivedGrouped = (archivedCustomers || []).map(customer => ({
+        ...customer,
+        teams: [...(teams || []), ...(archivedTeams || [])].filter(team => team.customer_id === customer.id),
+        shared_offers: [...(sharedOffers || []), ...(archivedSharedOffers || [])].filter(offer => offer.customer_id === customer.id),
+        latest_acceptance: (acceptances || []).find(item => item.customer_id === customer.id) || null
+      }));
+      const archivedCustomerIds = new Set((archivedCustomers || []).map(customer => customer.id));
+      return response.status(200).json({
+        customers: grouped,
+        archivedCustomers: archivedGrouped,
+        ungroupedTeams: (teams || []).filter(team => !team.customer_id),
+        archivedTeams: (archivedTeams || []).filter(team => !archivedCustomerIds.has(team.customer_id)),
+        onboarding: onboarding || [], accessHelp: accessHelp || [], termsVersion: TERMS_VERSION
+      });
     }
     if (request.method !== 'POST') return response.status(405).json({ error: 'Kun GET og POST er tilladt.' });
 
@@ -273,7 +317,7 @@ module.exports = async function handler(request, response) {
       const allowed = new Set((customerTeams || []).map(team => team.slug));
       body.team_slugs = (Array.isArray(body.team_slugs) ? body.team_slugs : []).filter(teamSlug => allowed.has(teamSlug));
       const offer = await createSharedOffer(body, customer, secret);
-      return response.status(200).json({ ok: true, offer, boardUrl: `/tilbud/${offer.slug}` });
+      return response.status(200).json({ ok: true, offer, boardUrl: `/${offer.customer_slug || slugify(customer.display_name)}/${offer.slug}` });
     }
     if (action === 'save-shared-offer') {
       const offerId = clean(body.offer_id, 60);
@@ -332,6 +376,11 @@ module.exports = async function handler(request, response) {
           })
         });
         customer = customerRows?.[0];
+        const customerSlug = slugify(customer.display_name);
+        customer.url_slug = customerSlug;
+        await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, {
+          method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ url_slug: customerSlug })
+        }).catch(() => {});
         const created = await createBoard({
           name: body.team_name || item.team_name, municipality: body.municipality || item.municipality,
           workplace: body.workplace || item.workplace, recovery_email: item.contact_email, slug: body.desired_slug
@@ -357,6 +406,38 @@ module.exports = async function handler(request, response) {
       const update = Object.fromEntries(allowed.filter(key => Object.prototype.hasOwnProperty.call(body, key)).map(key => [key, clean(body[key], key === 'internal_notes' ? 2000 : 300) || null]));
       update.updated_at = new Date().toISOString();
       await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(update) });
+      return response.status(200).json({ ok: true });
+    }
+    if (['archive-customer','restore-customer','delete-customer'].includes(action)) {
+      const rows = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
+      const customer = rows?.[0];
+      if (!customer) return response.status(404).json({ error: 'Kunden blev ikke fundet.' });
+      if (action === 'archive-customer') {
+        if (customer.archived_at) return response.status(200).json({ ok: true });
+        const archivedAt = new Date().toISOString();
+        await serviceFetch(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=is.null`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ archived_at: archivedAt, updated_at: archivedAt }) });
+        await serviceFetch(`/rest/v1/shared_offers?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=is.null`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ archived_at: archivedAt, updated_at: archivedAt }) });
+        await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ archived_at: archivedAt, updated_at: archivedAt }) });
+        return response.status(200).json({ ok: true });
+      }
+      if (action === 'restore-customer') {
+        if (!customer.archived_at) return response.status(200).json({ ok: true });
+        const archivedAt = encodeURIComponent(customer.archived_at);
+        const updatedAt = new Date().toISOString();
+        await serviceFetch(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=eq.${archivedAt}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ archived_at: null, updated_at: updatedAt }) });
+        await serviceFetch(`/rest/v1/shared_offers?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=eq.${archivedAt}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ archived_at: null, updated_at: updatedAt }) });
+        await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ archived_at: null, updated_at: updatedAt }) });
+        return response.status(200).json({ ok: true });
+      }
+      if (!customer.archived_at) return response.status(400).json({ error: 'Arkivér kunden, før den slettes permanent.' });
+      if (body.confirmation !== 'SLET KUNDE') return response.status(400).json({ error: 'Den permanente sletning blev ikke bekræftet korrekt.' });
+      const [customerTeams, customerOffers] = await Promise.all([
+        serviceFetch(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customer.id)}&select=*`, secret),
+        serviceFetch(`/rest/v1/shared_offers?customer_id=eq.${encodeURIComponent(customer.id)}&select=*`, secret)
+      ]);
+      for (const team of customerTeams || []) await deleteTeamCompletely(team, secret);
+      for (const offer of customerOffers || []) await deleteSharedOfferCompletely(offer, secret);
+      await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
       return response.status(200).json({ ok: true });
     }
     if (action === 'save-team') {
@@ -406,11 +487,7 @@ module.exports = async function handler(request, response) {
       return response.status(200).json({ ok: true });
     }
     if (action === 'delete-team') {
-      await deleteTeamStorage(slug, secret);
-      if (team.editor_user_id) await serviceFetch(`/auth/v1/admin/users/${team.editor_user_id}`, secret, { method: 'DELETE' });
-      if (team.viewer_user_id) await serviceFetch(`/auth/v1/admin/users/${team.viewer_user_id}`, secret, { method: 'DELETE' });
-      await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
-      await serviceFetch(`/rest/v1/access_help_requests?team_slug=eq.${encodeURIComponent(slug)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } });
+      await deleteTeamCompletely(team, secret);
       return response.status(200).json({ ok: true });
     }
     const value = clean(body.value, 300);
