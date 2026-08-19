@@ -42,9 +42,7 @@ form.addEventListener('submit', async event => {
         editorPassword: values.editorPassword,
         viewerPassword: values.viewerPassword,
         acceptedByName: values.acceptedByName,
-        acceptedTerms: values.acceptedTerms === 'on',
-        acceptedDpa: values.acceptedDpa === 'on',
-        authorized: values.authorized === 'on'
+        acceptedAgreement: values.acceptedAgreement === 'on'
       })
     });
     const data = await response.json();

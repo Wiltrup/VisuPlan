@@ -48,7 +48,8 @@ module.exports = async function handler(request, response) {
     if (viewerPassword.length < 6) return response.status(400).json({ error: 'Tavlekoden skal have mindst 6 tegn.' });
     if (editorPassword === viewerPassword) return response.status(400).json({ error: 'De to koder skal være forskellige.' });
     if (needsAcceptance) {
-      if (!request.body?.acceptedTerms || !request.body?.acceptedDpa || !request.body?.authorized) return response.status(400).json({ error: 'Betingelserne og databehandleraftalen skal godkendes af en bemyndiget person.' });
+      const acceptedAgreement = request.body?.acceptedAgreement || (request.body?.acceptedTerms && request.body?.acceptedDpa && request.body?.authorized);
+      if (!acceptedAgreement) return response.status(400).json({ error: 'Betingelserne og databehandleraftalen skal accepteres.' });
       if (!String(request.body?.acceptedByName || '').trim()) return response.status(400).json({ error: 'Skriv navnet på den person, der accepterer.' });
     }
 

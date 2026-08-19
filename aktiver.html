@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <link rel="stylesheet" href="/finder.css">
-  <link rel="stylesheet" href="/forms.css?v=40">
+  <link rel="stylesheet" href="/forms.css?v=44">
   <title>Aktivér jeres tavle – VisuPlanner</title>
 </head>
 <body>
@@ -25,17 +25,16 @@
         <p class="form-note">Koderne skal være forskellige. Linket kan kun bruges én gang.</p>
       </div>
       <section id="agreementFields" class="agreement-box" hidden>
-        <h3>Aftale og databeskyttelse</h3>
-        <p>En person, der må handle på arbejdspladsens vegne, skal godkende aftalerne. Arbejdspladsen er ansvarlig for at informere medarbejderne om eventuel brug af deres navn, foto og stemme.</p>
-        <label>Navn på den, der accepterer<input name="acceptedByName" autocomplete="name"></label>
-        <label class="consent-row"><input name="acceptedTerms" type="checkbox"><span>Jeg accepterer <a href="/betingelser" target="_blank">abonnements- og brugerbetingelserne</a> samt <a href="/privatliv" target="_blank">privatlivspolitikken</a>.</span></label>
-        <label class="consent-row"><input name="acceptedDpa" type="checkbox"><span>Jeg indgår <a href="/databehandleraftale" target="_blank">databehandleraftalen</a> på arbejdspladsens vegne.</span></label>
-        <label class="consent-row"><input name="authorized" type="checkbox"><span>Jeg bekræfter, at jeg er bemyndiget til at godkende aftalerne for kunden.</span></label>
+        <h3>Aftalegrundlag</h3>
+        <p>Ved aktivering starter jeres gratis prøveperiode. Dokumenterne kan altid findes på VisuPlanners hjemmeside.</p>
+        <label>Dit navn<input name="acceptedByName" autocomplete="name"></label>
+        <label class="consent-row"><input name="acceptedAgreement" type="checkbox"><span>Jeg accepterer på kundens vegne VisuPlanners <a href="/betingelser" target="_blank">betingelser</a> og <a href="/databehandleraftale" target="_blank">databehandleraftale</a>.</span></label>
+        <p class="agreement-links"><a href="/privatliv" target="_blank">Privatlivspolitik</a> · <a href="/underdatabehandlere" target="_blank">Underdatabehandlere</a></p>
       </section>
       <p id="activateStatus" class="finder-message" aria-live="polite"></p>
       <button type="submit">Aktivér tavlen</button>
     </form>
   </main>
-  <script src="/aktiver.js?v=40"></script>
+  <script src="/aktiver.js?v=44"></script>
 </body>
 </html>

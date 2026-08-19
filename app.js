@@ -340,7 +340,9 @@ async function resolvePhotoUrl(url) {
     '/storage/v1/object/authenticated/visuplan-images/'
   ];
   const marker = markers.find(item => url.includes(item));
-  const path = marker ? url.split(marker)[1].split('?')[0] : '';
+  const path = marker
+    ? url.split(marker)[1].split('?')[0]
+    : (/^https?:\/\//i.test(url) ? '' : String(url).replace(/^\/+/,''));
   if (!path) return url;
   const cached = signedImageCache.get(path);
   if (cached?.expiresAt > Date.now()) return cached.url;
@@ -445,12 +447,13 @@ async function loadSharedOffers(weekStart) {
     apiFetch(`/rest/v1/shared_offer_activities?offer_id=in.${idFilter}&plan_date=in.${dateFilter}&select=*&order=activity_time.asc,sort_order.asc`, {}, true)
   ]);
   const secureDays = await Promise.all((dayRows || []).map(async row => ({ ...row, meal_photo_url: await resolvePhotoUrl(row.meal_photo_url || '') })));
+  const secureActivities = await Promise.all((activityRows || []).map(async row => ({ ...row, photo_url: await resolvePhotoUrl(row.photo_url || '') })));
   state.sharedOffers = (offers || []).map(offer => ({
     ...offer,
     link: links.find(link => link.offer_id === offer.id),
     days: Object.fromEntries(dates.map(date => [date, {
       ...(secureDays.find(row => row.offer_id === offer.id && row.plan_date === date) || {}),
-      activities: (activityRows || []).filter(row => row.offer_id === offer.id && row.plan_date === date)
+      activities: secureActivities.filter(row => row.offer_id === offer.id && row.plan_date === date)
     }]))
   }));
 }
@@ -590,7 +593,7 @@ function renderSharedOffers() {
   el('sharedOffersList').innerHTML = visible.map(offer => {
     const data = offer.days?.[date] || { activities: [] };
     const items = data.activities || [];
-    return `<article class="shared-offer-panel"><div class="shared-offer-name"><h3>${escapeHtml(offer.name)}</h3>${offer.own_board_enabled ? `<a href="${escapeHtml(offerBoardPath(offer))}">Åbn tilbuddets egen tavle</a>` : ''}</div><div class="shared-offer-content"><section><h4>🍽️ Mad</h4>${data.meal_photo_url ? `<button class="shared-offer-photo image-button" data-enlarge-image="${escapeHtml(data.meal_photo_url)}" data-image-caption="${escapeHtml(data.meal_name || 'Mad i klubben')}"><img src="${escapeHtml(data.meal_photo_url)}" alt=""></button>` : ''}<strong>${escapeHtml(data.meal_name || 'Ikke udfyldt')}</strong></section><section><h4>🎯 Aktiviteter</h4>${items.length ? items.map(item => `<div class="shared-offer-activity"><time>${escapeHtml(activityTimeLabel(item.activity_time, item.activity_end_time))}</time><span>${escapeHtml(item.name)}</span></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>'}</section></div>${data.message ? `<p class="shared-offer-message">💬 ${escapeHtml(data.message)}</p>` : ''}</article>`;
+    return `<article class="shared-offer-panel"><div class="shared-offer-name"><h3>${escapeHtml(offer.name)}</h3>${offer.own_board_enabled ? `<a href="${escapeHtml(offerBoardPath(offer))}">Åbn tilbuddets egen tavle</a>` : ''}</div><div class="shared-offer-content"><section><h4>🍽️ Mad</h4>${data.meal_photo_url ? `<button class="shared-offer-photo image-button" data-enlarge-image="${escapeHtml(data.meal_photo_url)}" data-image-caption="${escapeHtml(data.meal_name || 'Mad i klubben')}"><img src="${escapeHtml(data.meal_photo_url)}" alt=""></button>` : ''}<strong>${escapeHtml(data.meal_name || 'Ikke udfyldt')}</strong></section><section><h4>🎯 Aktiviteter</h4>${items.length ? items.map(item => `<div class="shared-offer-activity ${item.photo_url ? 'has-photo' : ''}">${item.photo_url ? `<button class="shared-offer-activity-photo image-button" data-enlarge-image="${escapeHtml(item.photo_url)}" data-image-caption="${escapeHtml(item.name)}" aria-label="Vis stort billede af ${escapeHtml(item.name)}"><img src="${escapeHtml(item.photo_url)}" alt=""></button>` : ''}<time>${escapeHtml(activityTimeLabel(item.activity_time, item.activity_end_time))}</time><span>${escapeHtml(item.name)}</span></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>'}</section></div>${data.message ? `<p class="shared-offer-message">💬 ${escapeHtml(data.message)}</p>` : ''}</article>`;
   }).join('');
 }
 
