@@ -178,3 +178,59 @@ button:disabled { opacity:.6; cursor:wait; }
   .subscription-banner button { width:100%; }
   .shared-offer-content{grid-template-columns:1fr}.shared-offer-name{align-items:flex-start;flex-direction:column}.shared-offer-panel{padding:17px}.shared-offer-activity.has-photo{grid-template-columns:70px 1fr}.shared-offer-activity.has-photo .shared-offer-activity-photo{grid-row:1/3}.shared-offer-activity.has-photo time{grid-column:2}.shared-offer-activity.has-photo span{grid-column:2}
 }
+
+/* Fælles klubindhold: en tydelig, rolig sektion med klubbens navn i dagens farve. */
+.shared-offer-panel {
+  padding:16px;
+  border:1px solid #dce4ed;
+  box-shadow:0 10px 34px rgba(25,39,64,.09);
+}
+.shared-offer-name {
+  display:grid;
+  place-items:center;
+  gap:7px;
+  min-height:64px;
+  margin:0 0 16px;
+  padding:13px 18px;
+  border-radius:17px;
+  background:var(--day-color, #22c55e);
+  color:#fff;
+  text-align:center;
+  box-shadow:inset 0 -1px 0 rgba(0,0,0,.12);
+}
+.shared-offer-name h3 {
+  margin:0;
+  color:inherit;
+  font-size:clamp(1.25rem, 3vw, 1.65rem);
+  line-height:1.1;
+}
+.shared-offer-name a {
+  display:inline-flex;
+  align-items:center;
+  min-height:28px;
+  padding:5px 10px;
+  border-radius:999px;
+  background:rgba(255,255,255,.2);
+  color:#fff;
+  font-size:.74rem;
+  font-weight:850;
+  text-decoration:none;
+}
+.shared-offer-name a:hover { background:rgba(255,255,255,.3); }
+.shared-offer-name .demo-club-note {
+  color:rgba(255,255,255,.9);
+  font-size:.72rem;
+  font-weight:800;
+  text-align:center;
+}
+@media (max-width:760px) {
+  .shared-offer-name {
+    display:grid;
+    place-items:center;
+    align-items:center;
+    min-height:58px;
+    padding:12px 14px;
+    text-align:center;
+  }
+  .shared-offer-name h3 { width:100%; text-align:center; }
+}

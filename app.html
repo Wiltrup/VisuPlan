@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2563eb" />
   <link id="appManifest" rel="manifest" href="/manifest.webmanifest" />
   <script>document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(location.pathname.split('/').filter(Boolean)[0]||'trekloeveret-team-2');</script>
-  <link rel="stylesheet" href="/styles.css?v=44" />
+  <link rel="stylesheet" href="/styles.css?v=47" />
   <title>VisuPlanner</title>
 </head>
 <body>
@@ -61,7 +61,7 @@
           <div id="activitiesList" class="activities"></div>
         </article>
       </section>
-      <section id="sharedOffersSection" class="shared-offers-section" hidden><p class="shared-offers-heading">I KLUBBEN I DAG</p><div id="sharedOffersList"></div></section>
+      <section id="sharedOffersSection" class="shared-offers-section" hidden><div id="sharedOffersList"></div></section>
       </div>
       <section id="tasksView" class="tasks-view" hidden><div class="tasks-heading"><p class="eyebrow">DENNE UGE</p><h2>Ugeopgaver</h2><p id="tasksWeekLabel"></p></div><div id="taskAssignments" class="task-assignments"></div></section>
     </main>
@@ -263,6 +263,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js?v=44"></script>
+  <script src="/app.js?v=47"></script>
 </body>
 </html>

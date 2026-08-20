@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#f8fafc" />
   <meta name="description" content="VisuPlanner er en enkel og visuel ugeplan til bosteder, bofællesskaber, klubtilbud og andre pædagogiske miljøer." />
-  <link rel="stylesheet" href="/landing.css?v=44" />
-  <link rel="stylesheet" href="/landing-overrides.css?v=44" />
+  <link rel="stylesheet" href="/landing.css?v=47" />
+  <link rel="stylesheet" href="/landing-overrides.css?v=47" />
   <title>VisuPlanner – visuel ugeplan til bosteder</title>
 </head>
 <body>
@@ -25,7 +25,18 @@
         <div class="hero-actions"><a class="primary-button" href="/demo">Se VisuPlanner i brug</a><a class="secondary-button" href="/priser">Se priser</a><a class="secondary-button" href="/opret">Prøv gratis i 14 dage</a></div>
         <p class="availability">Fungerer i browseren på telefon, tablet, computer og fælles touchskærm.</p>
       </div>
-      <div class="product-preview" aria-label="Eksempel på VisuPlanner">
+      <div class="hero-preview-stack">
+      <div class="product-preview preview-card-speak" aria-label="Eksempel på VisuPlanner med Speak aktiveret">
+        <div class="preview-top"><span></span><strong>VisuPlanner <span class="preview-speak-word">Speak</span></strong><b>⚙</b></div>
+        <div class="preview-days"><i>Man</i><i>Tir</i><i class="active">Ons</i><i>Tor</i><i>Fre</i><i>Lør</i><i>Søn</i></div>
+        <div class="preview-date preview-speak-date"><small>5. august</small><strong>ONSDAG</strong><span class="preview-ear" aria-hidden="true">👂</span></div>
+        <div class="preview-grid preview-speak-grid">
+          <article><b>☀️ Morgen <span class="preview-mini-ear" aria-hidden="true">👂</span></b><span>Anna</span><span>Jonas</span></article>
+          <article><b>🌙 Aften <span class="preview-mini-ear" aria-hidden="true">👂</span></b><span>Fatima</span><span>Mikkel</span></article>
+          <article><b>🌑 Nat <span class="preview-mini-ear" aria-hidden="true">👂</span></b><span>Lene</span></article>
+        </div>
+      </div>
+      <div class="product-preview preview-card-main" aria-label="Eksempel på VisuPlanner">
         <div class="preview-top"><span></span><strong>VisuPlanner</strong><b>⚙</b></div>
         <div class="preview-days"><i>Man</i><i>Tir</i><i class="active">Ons</i><i>Tor</i><i>Fre</i><i>Lør</i><i>Søn</i></div>
         <div class="preview-date"><small>5. august</small><strong>ONSDAG</strong></div>
@@ -36,7 +47,8 @@
           <article class="food"><b>🍽️ Aftensmad</b><img class="preview-food-photo" src="/assets/demo/lasagne.webp" alt="Lasagne"><strong>Lasagne</strong></article>
           <article class="activity"><b>🎯 Aktiviteter</b><span><em>10:00</em> Indkøbstur</span><span><em>13:30</em> Banko i fællesrummet</span></article>
         </div>
-        <section class="preview-club-module"><div class="preview-club-heading"><small>FÆLLES KLUBTILBUD</small><b>Klub Solsikken</b></div><div class="preview-club-grid"><article><b>🍽️ Mad i klubben</b><img src="/assets/demo/tarteletter.webp" alt="Tarteletter med kylling og asparges"><strong>Tarteletter</strong></article><article><b>🎯 Aktiviteter i klubben</b><span><em>15:00–16:00</em> Kreativt værksted</span><span><em>17:00–18:30</em> Spil og fælles hygge</span></article></div></section>
+        <section class="preview-club-module"><div class="preview-club-heading"><b>Klub Solsikken</b></div><div class="preview-club-grid"><article><b>🍽️ Mad i klubben</b><img src="/assets/demo/tarteletter.webp" alt="Tarteletter med kylling og asparges"><strong>Tarteletter</strong></article><article><b>🎯 Aktiviteter i klubben</b><span><em>15:00–16:00</em> Kreativt værksted</span><span><em>17:00–18:30</em> Spil og fælles hygge</span></article></div></section>
+      </div>
       </div>
     </section>
 
