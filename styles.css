@@ -188,11 +188,10 @@ button:disabled { opacity:.6; cursor:wait; }
 .shared-offer-name {
   display:grid;
   place-items:center;
-  gap:7px;
-  min-height:64px;
+  min-height:0;
   margin:0 0 16px;
-  padding:13px 18px;
-  border-radius:17px;
+  padding:8px 14px;
+  border-radius:13px;
   background:var(--day-color, #22c55e);
   color:#fff;
   text-align:center;
@@ -201,7 +200,7 @@ button:disabled { opacity:.6; cursor:wait; }
 .shared-offer-name h3 {
   margin:0;
   color:inherit;
-  font-size:clamp(1.25rem, 3vw, 1.65rem);
+  font-size:clamp(1.12rem, 2.6vw, 1.4rem);
   line-height:1.1;
 }
 .shared-offer-name a {
@@ -228,8 +227,8 @@ button:disabled { opacity:.6; cursor:wait; }
     display:grid;
     place-items:center;
     align-items:center;
-    min-height:58px;
-    padding:12px 14px;
+    min-height:0;
+    padding:8px 12px;
     text-align:center;
   }
   .shared-offer-name h3 { width:100%; text-align:center; }
