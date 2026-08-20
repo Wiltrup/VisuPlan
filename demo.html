@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"><meta name="theme-color" content="#2563eb">
-  <link rel="stylesheet" href="/styles.css?v=48"><link rel="stylesheet" href="/demo.css?v=44"><title>Prøv VisuPlanner</title>
+  <link rel="stylesheet" href="/styles.css?v=49"><link rel="stylesheet" href="/demo.css?v=44"><title>Prøv VisuPlanner</title>
 </head>
 <body>
   <div class="demo-banner"><strong>DEMOVERSION</strong><span>Prøv den samme ugeplan og redigering som i den rigtige løsning – alt behandles lokalt i denne browserfane</span><a href="/priser">Se priser</a><a href="/">Til forsiden</a></div>
@@ -29,6 +29,7 @@
 
   <dialog id="demoEditorDialog"><div class="dialog-card admin-card">
     <div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Rediger ugeplan</h2></div><div class="admin-header-actions"><button id="demoOpenSettings" class="secondary settings-button" type="button">⚙ Grundindstillinger</button><button id="demoEditorClose" class="icon-button" aria-label="Luk">✕</button></div></div>
+    <div class="week-editor-bar" style="display:block"><div><span class="week-editor-caption">UGE DER REDIGERES</span><strong id="demoWeekLabel"></strong></div></div>
     <label>Vælg dag<select id="demoEditDay"></select></label>
     <p class="note">Du kan redigere flere dage og gemme alle ændringer samlet, ligesom på en rigtig tavle. Speak og ugeopgaver er valgfrie moduler i den fulde version.</p>
     <div class="form-section"><h3>Personale</h3><div class="shift-editor-grid">
@@ -36,9 +37,9 @@
       <section id="demoEveningGroup" class="shift-editor-group"><div class="section-title-row"><h4>🌙 Aften</h4><button class="secondary small" data-demo-add-shift="evening" type="button">+ Medarbejder</button></div><div id="demoEveningEditors" class="shift-editor-rows"></div></section>
       <section id="demoNightGroup" class="shift-editor-group"><div class="section-title-row"><h4>🌑 Nat</h4><button class="secondary small" data-demo-add-shift="night" type="button">+ Medarbejder</button></div><div id="demoNightEditors" class="shift-editor-rows"></div></section>
     </div></div>
-    <div id="demoBreakfastEditor" class="form-section" hidden><h3>🥐 Morgenmad</h3><input id="demoBreakfastInput"><label class="photo-field">Upload eget billede<input id="demoBreakfastPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label></div>
-    <div id="demoLunchEditor" class="form-section" hidden><h3>🥪 Frokost</h3><input id="demoLunchInput"><label class="photo-field">Upload eget billede<input id="demoLunchPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label></div>
-    <div class="form-section"><h3>Aftensmad</h3><input id="demoDinnerInput" placeholder="Fx lasagne"><button id="demoImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede <small>– tilgængelig med oprettet bruger</small></button><label class="photo-field">Upload eget madbillede<input id="demoDinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><p id="demoDinnerPhotoNote" class="file-note">Billedet behandles kun på denne enhed.</p></div>
+    <div id="demoBreakfastEditor" class="form-section" hidden><h3>🥐 Morgenmad</h3><input id="demoBreakfastInput"><label class="photo-field">Upload eget billede<input id="demoBreakfastPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="demoBreakfastPhotoNote" class="photo-selection-note is-empty"></div></div>
+    <div id="demoLunchEditor" class="form-section" hidden><h3>🥪 Frokost</h3><input id="demoLunchInput"><label class="photo-field">Upload eget billede<input id="demoLunchPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="demoLunchPhotoNote" class="photo-selection-note is-empty"></div></div>
+    <div class="form-section"><h3>Aftensmad</h3><input id="demoDinnerInput" placeholder="Fx lasagne"><button id="demoImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede <small>– tilgængelig med oprettet bruger</small></button><label class="photo-field">Upload eget madbillede<input id="demoDinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="demoDinnerPhotoNote" class="photo-selection-note is-empty"></div></div>
     <div class="form-section"><div class="section-title-row"><h3>Aktiviteter</h3><button id="demoAddActivity" class="secondary small" type="button">+ Aktivitet</button></div><div id="demoActivityEditor"></div></div>
     <button id="demoOpenStaff" class="staff-manager-launch" type="button"><span class="avatar-stack"><i>👤</i><i>👤</i><i>👤</i></span><span><strong>Rediger medarbejderliste</strong><small>Se hvordan medarbejderlisten fungerer</small></span><b>›</b></button>
     <div class="dialog-actions sticky-actions"><button id="demoReset" class="danger secondary" type="button">Nulstil demo</button><button id="demoSave" type="button">Gem ændringer</button></div>
@@ -48,6 +49,6 @@
   <dialog id="demoStaffDialog"><div class="dialog-card staff-manager-card"><div class="admin-heading"><div><p class="eyebrow">DEMOVERSION</p><h2>Medarbejderliste</h2></div><button id="demoStaffClose" class="icon-button">✕</button></div><p class="demo-feature-note">I en oprettet tavle kan teamet tilføje, redigere og fjerne medarbejdere.</p><div id="demoStaffManager" class="staff-manager"></div></div></dialog>
 
   <dialog id="demoImageDialog" class="image-dialog"><div class="image-dialog-card"><button id="demoImageClose" class="image-dialog-close" aria-label="Luk billede">✕</button><img id="demoLargeImage" alt=""><p id="demoLargeCaption"></p></div></dialog>
-  <div id="demoStatus" class="sync-status" role="status"></div><script src="/demo.js?v=48"></script>
+  <div id="demoStatus" class="sync-status" role="status"></div><script src="/demo.js?v=49"></script>
 </body>
 </html>

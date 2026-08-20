@@ -24,6 +24,9 @@ let selected = Math.min(6, Math.max(0, (new Date().getDay() + 6) % 7));
 let weekStart = '';
 let days = {};
 let activities = {};
+let editorWeekStart = '';
+let editorDays = {};
+let editorActivities = {};
 let editingActivities = [];
 let pendingPhoto = null;
 let editorMode = false;
@@ -35,6 +38,8 @@ function monday() { const now = new Date(); now.setHours(12,0,0,0); now.setDate(
 function add(date, numberOfDays) { const value = new Date(`${date}T12:00:00`); value.setDate(value.getDate() + numberOfDays); return iso(value); }
 function dateAt(index) { return add(weekStart, index); }
 function format(date) { return new Intl.DateTimeFormat('da-DK', { day:'numeric', month:'long' }).format(new Date(`${date}T12:00:00`)); }
+function isoWeekNumber(value) { const [year,month,day]=String(value).split('-').map(Number);const date=new Date(Date.UTC(year,month-1,day)),weekday=date.getUTCDay()||7;date.setUTCDate(date.getUTCDate()+4-weekday);const yearStart=new Date(Date.UTC(date.getUTCFullYear(),0,1));return Math.ceil((((date-yearStart)/86400000)+1)/7); }
+function weekLabel(start) { return `Uge ${isoWeekNumber(start)} · ${format(start)} – ${format(add(start,6))}`; }
 function headers(extra = {}) { return { apikey:SUPABASE_KEY, Authorization:`Bearer ${session?.access_token || SUPABASE_KEY}`, ...extra }; }
 function status(text) {
   const target = $('offerImageSearchDialog').open ? $('offerImageSearchStatus') : $('offerStatus');
@@ -114,25 +119,36 @@ async function restore() {
   if (!response.ok) return false;
   session = await response.json();
   editorMode = session.user?.user_metadata?.role === 'offer_editor';
+  sessionStorage.setItem(`visuplanner-offer-${slug}`, JSON.stringify(session));
   $('offerLogout').hidden = false;
   return true;
 }
 
-async function loadWeek() {
-  weekStart = weekStart || monday();
-  const dates = Array.from({ length:7 }, (_, index) => dateAt(index));
+async function fetchWeekData(start) {
+  const dates = Array.from({ length:7 }, (_, index) => add(start,index));
   const filter = `(${dates.join(',')})`;
   const [dayRows, activityRows] = await Promise.all([
     api(`/rest/v1/shared_offer_days?offer_id=eq.${offer.id}&plan_date=in.${filter}&select=*`),
     api(`/rest/v1/shared_offer_activities?offer_id=eq.${offer.id}&plan_date=in.${filter}&select=*&order=activity_time.asc,sort_order.asc`)
   ]);
-  days = {};
-  for (const row of dayRows || []) days[row.plan_date] = { ...row, meal_photo_path:row.meal_photo_url || '', meal_photo_url:await resolveMedia(row.meal_photo_url) };
-  activities = {};
-  for (const row of activityRows || []) {
-    const item = { ...row, photo_path:row.photo_url || '', photo_url:await resolveMedia(row.photo_url) };
-    (activities[row.plan_date] ??= []).push(item);
+  const [resolvedDays,resolvedActivities] = await Promise.all([
+    Promise.all((dayRows || []).map(async row => ({ ...row, meal_photo_path:row.meal_photo_url || '', meal_photo_url:await resolveMedia(row.meal_photo_url) }))),
+    Promise.all((activityRows || []).map(async row => ({ ...row, photo_path:row.photo_url || '', photo_url:await resolveMedia(row.photo_url) })))
+  ]);
+  const nextDays = {};
+  const nextActivities = {};
+  for (const row of resolvedDays) nextDays[row.plan_date] = row;
+  for (const item of resolvedActivities) {
+    (nextActivities[item.plan_date] ??= []).push(item);
   }
+  return { days:nextDays, activities:nextActivities };
+}
+
+async function loadWeek() {
+  weekStart = weekStart || monday();
+  const loaded = await fetchWeekData(weekStart);
+  days = loaded.days;
+  activities = loaded.activities;
   render();
 }
 
@@ -147,48 +163,59 @@ function render() {
   $('offerDayTabs').innerHTML = DAYS.map((item, index) => `<button class="${index === selected ? 'active' : ''}" data-day="${index}">${item[1]}<small>${new Intl.DateTimeFormat('da-DK',{day:'numeric',month:'numeric'}).format(new Date(`${dateAt(index)}T12:00:00`))}</small></button>`).join('');
   document.querySelectorAll('[data-day]').forEach(button => button.onclick = () => { selected = Number(button.dataset.day); render(); });
   $('offerMeal').textContent = data.meal_name || 'Ikke udfyldt';
-  $('offerMealPhotoButton').hidden = !data.meal_photo_url;
-  if (data.meal_photo_url) { $('offerMealPhoto').src = data.meal_photo_url; $('offerMealPhoto').alt = data.meal_name || 'Mad i klubben'; }
+  const mealPhotoButton = $('offerMealPhotoButton');
+  const mealPhoto = $('offerMealPhoto');
+  if (data.meal_photo_url) {
+    mealPhoto.src = data.meal_photo_url;
+    mealPhoto.alt = data.meal_name || 'Mad i klubben';
+    mealPhotoButton.hidden = false;
+  } else {
+    mealPhotoButton.hidden = true;
+    mealPhoto.removeAttribute('src');
+    mealPhoto.alt = '';
+  }
   $('offerActivities').innerHTML = items.length ? items.map(item => `<div class="offer-activity ${item.photo_url ? 'has-photo' : ''}">${item.photo_url ? `<button class="offer-activity-photo" data-offer-image="${esc(item.photo_url)}" data-offer-caption="${esc(item.name)}" aria-label="Vis stort billede af ${esc(item.name)}"><img src="${esc(item.photo_url)}" alt=""></button>` : ''}<time>${esc(timeLabel(item.activity_time, item.activity_end_time))}</time><strong>${esc(item.name)}</strong></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
   document.querySelectorAll('[data-offer-image]').forEach(button => button.onclick = () => openLargeImage(button.dataset.offerImage, button.dataset.offerCaption));
   $('offerMessageCard').hidden = !data.message;
   $('offerMessage').textContent = data.message || '';
 }
 
-function openEditor() {
+async function openEditor() {
   if (!editorMode) return startEditorLogin();
-  $('offerEditDate').innerHTML = Array.from({ length:28 }, (_, index) => {
-    const date = add(monday(), index);
-    return `<option value="${date}" ${date === dateAt(selected) ? 'selected' : ''}>${DAYS[index % 7][0]} ${format(date)}</option>`;
-  }).join('');
-  loadEditorDay();
   $('offerEditorDialog').showModal();
+  try { await loadEditorWeek(weekStart, selected); }
+  catch (error) { console.error(error); status('Ugen kunne ikke hentes. Prøv igen.'); }
 }
 
-async function ensureEditorDate(date) {
-  if (!days[date] && date < add(monday(), 7)) { days[date] = {}; activities[date] = activities[date] || []; }
-  if (date >= add(monday(), 7)) {
-    const [dayRows, activityRows] = await Promise.all([
-      api(`/rest/v1/shared_offer_days?offer_id=eq.${offer.id}&plan_date=eq.${date}&select=*`),
-      api(`/rest/v1/shared_offer_activities?offer_id=eq.${offer.id}&plan_date=eq.${date}&select=*&order=activity_time.asc,sort_order.asc`)
-    ]);
-    const row = dayRows?.[0] || {};
-    days[date] = { ...row, meal_photo_path:row.meal_photo_url || '', meal_photo_url:await resolveMedia(row.meal_photo_url) };
-    activities[date] = [];
-    for (const item of activityRows || []) activities[date].push({ ...item, photo_path:item.photo_url || '', photo_url:await resolveMedia(item.photo_url) });
-  }
+async function loadEditorWeek(start, preferredDay = 0) {
+  status('Henter ugen…');
+  const loaded = await fetchWeekData(start);
+  editorWeekStart = start;
+  editorDays = loaded.days;
+  editorActivities = loaded.activities;
+  $('offerEditorWeekLabel').textContent = weekLabel(editorWeekStart);
+  $('offerEditDate').innerHTML = DAYS.map((day,index) => {
+    const date = add(editorWeekStart,index);
+    return `<option value="${date}" ${index===preferredDay?'selected':''}>${day[0]} ${format(date)}</option>`;
+  }).join('');
+  await loadEditorDay();
+  status('Ugen er hentet.');
+}
+
+async function changeEditorWeek(numberOfDays) {
+  try { await loadEditorWeek(add(editorWeekStart,numberOfDays),0); }
+  catch (error) { console.error(error); status('Ugen kunne ikke hentes. Prøv igen.'); }
 }
 
 async function loadEditorDay() {
   const date = $('offerEditDate').value;
-  await ensureEditorDate(date);
-  const data = days[date] || {};
+  const data = editorDays[date] || {};
   $('offerMealInput').value = data.meal_name || '';
   $('offerMessageInput').value = data.message || '';
   $('offerMealFile').value = '';
   pendingPhoto = null;
   photoNote($('offerMealFileNote'), data.meal_photo_path ? 'existing' : 'empty', data.meal_photo_path ? 'Vælg et nyt billede for at udskifte det.' : 'Søg efter et billede eller upload jeres eget.');
-  editingActivities = (activities[date] || []).map(item => ({ time:(item.activity_time || '').slice(0,5), endTime:(item.activity_end_time || '').slice(0,5), name:item.name, photoPath:item.photo_path || item.photo_url || '', photoUrl:item.photo_url || '', photoFile:null }));
+  editingActivities = (editorActivities[date] || []).map(item => ({ time:(item.activity_time || '').slice(0,5), endTime:(item.activity_end_time || '').slice(0,5), name:item.name, photoPath:item.photo_path || item.photo_url || '', photoUrl:item.photo_url || '', photoFile:null }));
   renderActivityEditor();
 }
 
@@ -283,7 +310,7 @@ async function saveEditor() {
   try {
     // Kontrollér v43-kolonnen før eksisterende aktivitetsrækker udskiftes.
     await api('/rest/v1/shared_offer_activities?select=activity_end_time&limit=0');
-    let photoPath = days[date]?.meal_photo_path || '';
+    let photoPath = editorDays[date]?.meal_photo_path || '';
     if (pendingPhoto) photoPath = await uploadPhoto(pendingPhoto, date);
     const valid = editingActivities.filter(item => item.name.trim());
     for (let index = 0; index < valid.length; index += 1) {
@@ -292,11 +319,9 @@ async function saveEditor() {
     await api('/rest/v1/shared_offer_days?on_conflict=offer_id,plan_date', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify({ offer_id:offer.id, plan_date:date, meal_name:$('offerMealInput').value.trim() || null, meal_photo_url:photoPath || null, message:$('offerMessageInput').value.trim() || null, updated_at:new Date().toISOString() }) });
     await api(`/rest/v1/shared_offer_activities?offer_id=eq.${offer.id}&plan_date=eq.${date}`, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
     if (valid.length) await api('/rest/v1/shared_offer_activities', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(valid.map((item, index) => ({ offer_id:offer.id, plan_date:date, activity_time:item.time || null, activity_end_time:item.endTime || null, name:item.name.trim(), photo_url:item.photoPath || null, sort_order:index + 1 }))) });
+    const preferredDay = Math.max(0,$('offerEditDate').selectedIndex);
+    await loadEditorWeek(editorWeekStart,preferredDay);
     if (date >= weekStart && date <= add(weekStart, 6)) await loadWeek();
-    else {
-      days[date] = { meal_name:$('offerMealInput').value.trim(), meal_photo_path:photoPath, meal_photo_url:await resolveMedia(photoPath), message:$('offerMessageInput').value.trim() };
-      activities[date] = await Promise.all(valid.map(async item => ({ ...item, activity_time:item.time, activity_end_time:item.endTime, photo_url:await resolveMedia(item.photoPath || ''), photo_path:item.photoPath || '' })));
-    }
     status('Klubbens indhold er opdateret på alle tilknyttede tavler.');
     button.textContent = 'Gemt ✓';
   } catch (error) {
@@ -324,11 +349,13 @@ $('offerEditorLogin').onclick = startEditorLogin;
 $('offerEdit').onclick = openEditor;
 $('offerCloseEditor').onclick = () => $('offerEditorDialog').close();
 $('offerEditDate').onchange = loadEditorDay;
+$('offerPreviousEditWeek').onclick = () => changeEditorWeek(-7);
+$('offerNextEditWeek').onclick = () => changeEditorWeek(7);
 $('offerAddActivity').onclick = () => { editingActivities.push({ time:'10:00', endTime:'', name:'', photoPath:'', photoUrl:'', photoFile:null }); renderActivityEditor(); };
 $('offerMealFile').onchange = event => {
   pendingPhoto = event.target.files?.[0] || null;
   if (pendingPhoto) photoNote($('offerMealFileNote'), 'selected', pendingPhoto.name);
-  else photoNote($('offerMealFileNote'), days[$('offerEditDate').value]?.meal_photo_path ? 'existing' : 'empty', 'Søg efter et billede eller upload jeres eget.');
+  else photoNote($('offerMealFileNote'), editorDays[$('offerEditDate').value]?.meal_photo_path ? 'existing' : 'empty', 'Søg efter et billede eller upload jeres eget.');
 };
 $('offerOpenImageSearch').onclick = () => openImageSearch('meal');
 $('offerCloseImageSearch').onclick = () => $('offerImageSearchDialog').close();

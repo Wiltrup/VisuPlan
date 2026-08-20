@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2563eb" />
   <link id="appManifest" rel="manifest" href="/manifest.webmanifest" />
   <script>document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(location.pathname.split('/').filter(Boolean)[0]||'trekloeveret-team-2');</script>
-  <link rel="stylesheet" href="/styles.css?v=48" />
+  <link rel="stylesheet" href="/styles.css?v=49" />
   <title>VisuPlanner</title>
 </head>
 <body>
@@ -153,10 +153,10 @@
       </div>
 
       <div id="breakfastEditorSection" class="form-section meal-editor-section" hidden>
-        <h3>🥐 Morgenmad</h3><input id="breakfastInput" placeholder="Fx Havregrød"><button class="pexels-search-button" data-open-meal-search="breakfast" type="button">🔎 Søg efter billede</button><label class="photo-field">Billede af morgenmaden<input id="breakfastPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><p id="breakfastPhotoName" class="file-note">Intet billede valgt.</p>
+        <h3>🥐 Morgenmad</h3><input id="breakfastInput" placeholder="Fx Havregrød"><button class="pexels-search-button" data-open-meal-search="breakfast" type="button">🔎 Søg efter billede</button><label class="photo-field">Billede af morgenmaden<input id="breakfastPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="breakfastPhotoName" class="photo-selection-note is-empty" aria-live="polite"></div>
       </div>
       <div id="lunchEditorSection" class="form-section meal-editor-section" hidden>
-        <h3>🥪 Frokost</h3><input id="lunchInput" placeholder="Fx Rugbrød"><button class="pexels-search-button" data-open-meal-search="lunch" type="button">🔎 Søg efter billede</button><label class="photo-field">Billede af frokosten<input id="lunchPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><p id="lunchPhotoName" class="file-note">Intet billede valgt.</p>
+        <h3>🥪 Frokost</h3><input id="lunchInput" placeholder="Fx Rugbrød"><button class="pexels-search-button" data-open-meal-search="lunch" type="button">🔎 Søg efter billede</button><label class="photo-field">Billede af frokosten<input id="lunchPhotoInput" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="lunchPhotoName" class="photo-selection-note is-empty" aria-live="polite"></div>
       </div>
       <div id="dinnerEditorSection" class="form-section meal-editor-section">
         <h3>🍽️ Aftensmad</h3>
@@ -165,7 +165,7 @@
         <label class="photo-field">Billede af aftensmaden
           <input id="dinnerPhotoInput" type="file" accept="image/jpeg,image/png,image/webp" />
         </label>
-        <p id="dinnerPhotoName" class="file-note">Intet billede valgt.</p>
+        <div id="dinnerPhotoName" class="photo-selection-note is-empty" aria-live="polite"></div>
       </div>
 
       <div class="form-section">
@@ -263,6 +263,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js?v=48"></script>
+  <script src="/app.js?v=49"></script>
 </body>
 </html>

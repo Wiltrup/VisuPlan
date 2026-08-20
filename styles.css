@@ -125,6 +125,11 @@ input, select { width:100%; border:1px solid #d8dee8; background:#fff; padding:1
 .pexels-credit { color:#667085; font-size:.78rem; text-align:center; margin:16px 0 0; }
 .pexels-credit a { color:inherit; }
 .file-note { color:#667085; font-size:.85rem; margin:7px 2px 0; }
+.photo-selection-note { display:grid; gap:2px; margin-top:10px; padding:11px 13px; border:1px solid #c6ead9; border-radius:12px; background:#effcf5; color:#475467; font-size:.82rem; }
+.photo-selection-note strong { color:#067647; font-size:1rem; }
+.photo-selection-note.is-empty { border-color:#e5eaf1; background:#f7f9fc; }
+.photo-selection-note.is-empty strong { color:#667085; }
+.activity-photo-note { grid-column:1 / -1; margin-top:0; }
 .note { color:#667085; font-size:.92rem; line-height:1.45; }
 .sticky-actions { position:sticky; bottom:-24px; background:white; padding:14px 0 4px; border-top:1px solid #edf0f4; }
 .publish-button { background:#7c3aed !important; }

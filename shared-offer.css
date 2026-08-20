@@ -34,6 +34,7 @@ button { border:0; border-radius:12px; padding:12px 18px; background:#2563eb; co
 .activities-card { grid-column:span 2; }
 .large-text { margin:0; font-size:clamp(1.5rem,4vw,2.2rem); font-weight:900; }
 .offer-photo { display:block; width:100%; margin:-4px 0 14px; padding:0; overflow:hidden; background:transparent; cursor:zoom-in; }
+.offer-photo[hidden] { display:none !important; }
 .offer-photo img { display:block; width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:15px; }
 .offer-activity { display:grid; grid-template-columns:120px 1fr; align-items:center; gap:10px; padding:10px 13px; margin-bottom:10px; border-radius:14px; background:#f2f5f9; }
 .offer-activity.has-photo { grid-template-columns:92px 120px 1fr; }
@@ -58,6 +59,10 @@ dialog::backdrop { background:rgba(14,23,38,.58); backdrop-filter:blur(3px); }
 .dialog-heading,.section-heading,.dialog-actions { display:flex; justify-content:space-between; align-items:center; gap:12px; }
 .dialog-heading h2 { margin:3px 0; }
 .dialog-actions { justify-content:flex-end; margin-top:20px; }
+.week-editor-bar { display:grid; grid-template-columns:48px 1fr 48px; gap:10px; align-items:center; margin:14px 0 18px; padding:10px; border-radius:16px; background:#f2f5f9; text-align:center; }
+.week-editor-bar strong { display:block; margin-top:2px; font-size:1.08rem; }
+.week-editor-caption { color:#667085; font-size:.72rem; font-weight:900; letter-spacing:.08em; }
+.week-arrow { height:44px; padding:0; border-radius:11px; font-size:1.6rem; font-weight:900; }
 .note { color:#667085; font-size:.92rem; line-height:1.45; }
 .error { min-height:20px; color:#b42318; font-weight:800; }
 .form-section { margin-top:20px; padding-top:18px; border-top:1px solid #edf0f4; }

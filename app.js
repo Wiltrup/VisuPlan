@@ -107,6 +107,22 @@ function formatDate(date) {
   return new Intl.DateTimeFormat('da-DK', { day: 'numeric', month: 'long' }).format(date);
 }
 
+function isoWeekNumber(value) {
+  const source = value instanceof Date ? isoDate(value) : String(value);
+  const [year, month, day] = source.split('-').map(Number);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  const weekday = date.getUTCDay() || 7;
+  date.setUTCDate(date.getUTCDate() + 4 - weekday);
+  const yearStart = new Date(Date.UTC(date.getUTCFullYear(), 0, 1));
+  return Math.ceil((((date - yearStart) / 86400000) + 1) / 7);
+}
+
+function setEditorPhotoNote(element, state, detail = '') {
+  element.classList.toggle('is-empty', state === 'empty');
+  const heading = state === 'empty' ? 'Intet billede valgt' : state === 'existing' ? 'Billede tilknyttet ✓' : 'Billede valgt ✓';
+  element.innerHTML = `<strong>${heading}</strong>${detail ? `<span>${escapeHtml(detail)}</span>` : ''}`;
+}
+
 function currentDayData() {
   return state.week[DAYS[selectedIndex].key];
 }
@@ -641,7 +657,7 @@ function staffOptions(value) {
 function formatWeekRange(weekStart) {
   const start = dateFromIso(weekStart);
   const end = dateForIndex(6, weekStart);
-  return `${formatDate(start)} – ${formatDate(end)}`;
+  return `Uge ${isoWeekNumber(weekStart)} · ${formatDate(start)} – ${formatDate(end)}`;
 }
 
 function defaultEditingWeekStart() {
@@ -692,7 +708,11 @@ function loadAdminDay() {
     el(`${type}Input`).value = data[type] || '';
     el(`${type}PhotoInput`).value = '';
     const pendingPhoto = data._pendingMealPhotos?.[type] || null;
-    el(`${type}PhotoName`).textContent = pendingPhoto ? (pendingPhoto.name || 'Nyt billede valgt ✓') : data[`${type}PhotoUrl`] ? 'Der er allerede et billede. Vælg et nyt for at udskifte det.' : 'Intet billede valgt.';
+    setEditorPhotoNote(
+      el(`${type}PhotoName`),
+      pendingPhoto ? 'selected' : data[`${type}PhotoUrl`] ? 'existing' : 'empty',
+      pendingPhoto ? pendingPhoto.name : data[`${type}PhotoUrl`] ? 'Vælg et nyt billede for at udskifte det.' : 'Søg efter et billede eller upload jeres eget.'
+    );
     pendingMealPhotos[type] = pendingPhoto;
     pendingMealAudio[type] = data._pendingMealAudio?.[type]
       ? { ...data._pendingMealAudio[type] }
@@ -815,7 +835,7 @@ function renderPexelsResults(photos) {
       pendingMealPhotos[mealSearchTarget] = selectedFile;
       if(mealSearchTarget==='dinner') pendingDinnerPhoto=selectedFile;
       el(`${mealSearchTarget}PhotoInput`).value = '';
-      el(`${mealSearchTarget}PhotoName`).textContent = `Billede valgt fra Pexels · Foto: ${photo.photographer}`;
+      setEditorPhotoNote(el(`${mealSearchTarget}PhotoName`), 'selected', `Valgt via Pexels · Foto: ${photo.photographer}`);
       el('imageSearchDialog').close();
       setStatus('Billedet er valgt – husk Gem ændringer', 'success');
     } catch (error) {
@@ -857,7 +877,8 @@ function renderActivityEditor() {
     <label class="activity-time-input"><span>Slut</span><input type="time" value="${escapeHtml(activity.endTime || '')}" data-index="${index}" data-field="endTime"></label>
     <input value="${escapeHtml(activity.name)}" placeholder="Aktivitet" data-index="${index}" data-field="name">
     <button class="remove-row" data-remove="${index}" type="button">✕</button>
-    <label class="activity-upload-button">${activity.photoFile ? 'Nyt billede valgt ✓' : activity.photoUrl ? 'Skift aktivitetsbillede' : '+ Billede til aktiviteten'}<input type="file" accept="image/jpeg,image/png,image/webp" data-activity-photo="${index}"></label>
+    <label class="activity-upload-button">${activity.photoUrl || activity.photoFile ? 'Vælg et andet billede' : '+ Billede til aktiviteten'}<input type="file" accept="image/jpeg,image/png,image/webp" data-activity-photo="${index}"></label>
+    <div class="photo-selection-note activity-photo-note ${activity.photoUrl || activity.photoFile ? '' : 'is-empty'}"><strong>${activity.photoFile ? 'Billede valgt ✓' : activity.photoUrl ? 'Billede tilknyttet ✓' : 'Intet billede valgt'}</strong><span>${activity.photoFile ? escapeHtml(activity.photoFile.name || 'Nyt billede') : activity.photoUrl ? 'Vælg et nyt billede for at udskifte det.' : 'Upload et billede til aktiviteten, hvis I ønsker det.'}</span></div>
     ${state.speakEnabled?audioEditorControls('activity',index,activity.audioBlobUrl||activity.audioUrl):''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter endnu.</p>';
   document.querySelectorAll('[data-field]').forEach(input => input.addEventListener('input', () => {
@@ -1462,7 +1483,7 @@ el('toggleViewerCode').addEventListener('click',()=>{const input=el('newViewerCo
 el('addActivityRow').addEventListener('click', () => { editingActivities.push({ time: '10:00', endTime: '', name: '' }); renderActivityEditor(); });
 el('saveDayButton').addEventListener('click', saveWeekChanges);
 el('addStaffButton').addEventListener('click', addStaff);
-['breakfast','lunch','dinner'].forEach(type=>el(`${type}PhotoInput`).addEventListener('change',event=>{pendingMealPhotos[type]=event.target.files?.[0]||null;if(type==='dinner'){pendingDinnerPhoto=pendingMealPhotos[type];selectedPexelsPhoto=null}el(`${type}PhotoName`).textContent=pendingMealPhotos[type]?pendingMealPhotos[type].name:'Intet billede valgt.'}));
+['breakfast','lunch','dinner'].forEach(type=>el(`${type}PhotoInput`).addEventListener('change',event=>{pendingMealPhotos[type]=event.target.files?.[0]||null;if(type==='dinner'){pendingDinnerPhoto=pendingMealPhotos[type];selectedPexelsPhoto=null}const existing=editingWeek[DAYS[editingDayIndex].key]?.[`${type}PhotoUrl`];setEditorPhotoNote(el(`${type}PhotoName`),pendingMealPhotos[type]?'selected':existing?'existing':'empty',pendingMealPhotos[type]?.name|| (existing?'Vælg et nyt billede for at udskifte det.':'Søg efter et billede eller upload jeres eget.'))}));
 el('openStaffManagerButton').addEventListener('click',()=>{
   if(hasUnsavedWeekChanges())return setStatus('Gem ændringerne, før du redigerer medarbejderlisten.','error');
   renderStaffManager();el('staffManagerDialog').showModal()
