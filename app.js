@@ -537,12 +537,24 @@ function setStatus(message, type = '') {
   if (type === 'success') setTimeout(() => { target.textContent = ''; target.className = 'sync-status'; }, 1800);
 }
 
+function keepActiveDayVisible() {
+  if (!window.matchMedia('(max-width: 720px)').matches) return;
+  const tabs = el('dayTabs');
+  const activeTab = tabs.querySelector('.day-tab.active');
+  if (!activeTab || tabs.scrollWidth <= tabs.clientWidth) return;
+  requestAnimationFrame(() => {
+    const left = activeTab.offsetLeft - (tabs.clientWidth - activeTab.offsetWidth) / 2;
+    tabs.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+  });
+}
+
 function renderTabs() {
   el('dayTabs').innerHTML = DAYS.map((day, index) => `<button class="day-tab ${index === selectedIndex ? 'active' : ''}" data-index="${index}"><span>${day.short}</span>${state.showDatesPublic ? `<small>${new Intl.DateTimeFormat('da-DK', { day: 'numeric', month: 'numeric' }).format(dateForIndex(index, state.activeWeekStart))}</small>` : ''}</button>`).join('');
   document.querySelectorAll('.day-tab').forEach(button => button.addEventListener('click', () => {
     selectedIndex = Number(button.dataset.index);
     render();
   }));
+  keepActiveDayVisible();
 }
 
 function staffByName(name) {

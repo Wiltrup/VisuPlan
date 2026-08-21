@@ -152,6 +152,17 @@ async function loadWeek() {
   render();
 }
 
+function keepActiveDayVisible() {
+  if (!window.matchMedia('(max-width: 720px)').matches) return;
+  const tabs = $('offerDayTabs');
+  const activeTab = tabs.querySelector('button.active');
+  if (!activeTab || tabs.scrollWidth <= tabs.clientWidth) return;
+  requestAnimationFrame(() => {
+    const left = activeTab.offsetLeft - (tabs.clientWidth - activeTab.offsetWidth) / 2;
+    tabs.scrollTo({ left: Math.max(0, left), behavior: 'smooth' });
+  });
+}
+
 function render() {
   const date = dateAt(selected);
   const day = DAYS[selected];
@@ -162,6 +173,7 @@ function render() {
   $('offerDate').textContent = format(date);
   $('offerDayTabs').innerHTML = DAYS.map((item, index) => `<button class="${index === selected ? 'active' : ''}" data-day="${index}">${item[1]}<small>${new Intl.DateTimeFormat('da-DK',{day:'numeric',month:'numeric'}).format(new Date(`${dateAt(index)}T12:00:00`))}</small></button>`).join('');
   document.querySelectorAll('[data-day]').forEach(button => button.onclick = () => { selected = Number(button.dataset.day); render(); });
+  keepActiveDayVisible();
   $('offerMeal').textContent = data.meal_name || 'Ikke udfyldt';
   const mealPhotoButton = $('offerMealPhotoButton');
   const mealPhoto = $('offerMealPhoto');
