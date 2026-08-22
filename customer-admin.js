@@ -82,6 +82,7 @@ function render() {
   if (!createForm.elements.workplace.value) createForm.elements.workplace.value = customer.name;
   $('customerAdminBoards').innerHTML = teams.length ? teams.map(boardHtml).join('') : '<p class="empty">Ingen tavler er oprettet endnu.</p>';
   $('customerAdminColleagues').innerHTML = admins.map(admin => `<div class="admin-person"><strong>${esc(admin.name)}</strong><span>${esc(admin.email)}</span></div>`).join('');
+  $('customerAdminHelp').href = `mailto:wiltrup@wiltrup.com?subject=${encodeURIComponent(`Hjælp til VisuPlanner – ${customer.name}`)}&body=${encodeURIComponent(`Hej Techus Nord\n\nJeg har brug for hjælp til VisuPlanner.\n\nKunde: ${customer.name}\n\n`)}`;
   $('customerAdminAudit').innerHTML = logs.length ? logs.map(item => `<div class="audit-row"><div><strong>${esc(actionLabels[item.action] || item.action)}</strong><span>${item.team_slug ? ` · ${esc(item.team_slug)}` : ''}${item.target_kind ? ` · ${esc(codeLabel(item.target_kind))}` : ''}</span></div><div><span>${esc(item.admin_name || item.admin_email || '')}</span><time>${dateTime(item.created_at)}</time></div></div>`).join('') : '<p class="empty">Ingen administratorhandlinger endnu.</p>';
   $('customerAdminOffersSection').hidden = !offers.length;
   $('customerAdminOffers').innerHTML = offers.map(offer => `<article class="offer-card"><h3>${esc(offer.name)}</h3><a href="/${esc(offer.customer_slug || '')}/${esc(offer.slug)}" target="_blank" rel="noopener">Åbn tavle</a></article>`).join('');
