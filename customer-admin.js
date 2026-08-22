@@ -157,7 +157,7 @@ $('customerAdminLoginForm').onsubmit = async event => {
 $('customerAdminForgotForm').onsubmit = async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
   try {
-    await fetch('/api/customer-admin-access', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'request-reset', email:$('customerAdminForgotEmail').value.trim() }) });
+    await fetch('/api/customer-admin?flow=access', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'request-reset', email:$('customerAdminForgotEmail').value.trim() }) });
     $('customerAdminForgotStatus').textContent = 'Hvis mailen er registreret, er der sendt et nulstillingslink.';
   } finally { button.disabled = false; }
 };

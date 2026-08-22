@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const customerAdminAccess = require('../lib/customer-admin-access-handler');
 const {
   clean, randomPassword, slugify, service, customerAdminContext,
   audit, sendMail, decryptCredential, encryptCredential, saveTeamCredential
@@ -106,6 +107,7 @@ async function scopedTeam(slug, customerId, secret) {
 
 module.exports = async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
+  if (request.query?.flow === 'access') return customerAdminAccess(request, response);
   const secret = process.env.SUPABASE_SECRET_KEY;
   if (!secret) return response.status(503).json({ error:'Kundeadministrationen er ikke klar.' });
   const context = await customerAdminContext(request.headers.authorization || '', secret).catch(() => null);

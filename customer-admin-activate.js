@@ -5,7 +5,7 @@ let invitation = null;
 
 async function checkInvitation() {
   try {
-    const response = await fetch(`/api/customer-admin-access?token=${encodeURIComponent(token)}`);
+    const response = await fetch(`/api/customer-admin?flow=access&token=${encodeURIComponent(token)}`);
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
     invitation = data;
@@ -25,7 +25,7 @@ form.onsubmit = async event => {
   if (values.password !== values.repeat) { statusNode.textContent = 'Adgangskoderne er ikke ens.'; statusNode.className = 'form-message error'; return; }
   const button = event.submitter; button.disabled = true; button.textContent = 'Gemmer…';
   try {
-    const response = await fetch('/api/customer-admin-access', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token, password:values.password }) });
+    const response = await fetch('/api/customer-admin?flow=access', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ token, password:values.password }) });
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
     statusNode.className = 'form-message';
