@@ -52,7 +52,7 @@ async function createBoard(input, context, secret, host) {
 
   const name = clean(input.name, 150);
   const workplace = clean(input.workplace || customer.display_name, 200);
-  const municipality = clean(input.municipality || customer.municipality, 150);
+  const municipality = clean(customer.municipality, 150);
   const recoveryEmail = clean(input.recovery_email, 200).toLowerCase();
   if (!name || !workplace || !municipality || !/^\S+@\S+\.\S+$/.test(recoveryEmail)) throw new Error('Udfyld tavlenavn og en gyldig ansvarlig arbejdsmail.');
   const requested = clean(input.slug, 120);
@@ -181,10 +181,10 @@ module.exports = async function handler(request, response) {
     if (action === 'save-team') {
       const update = {
         name:clean(body.name, 150), workplace:clean(body.workplace, 200),
-        municipality:clean(body.municipality, 150), recovery_email:clean(body.recovery_email, 200).toLowerCase(),
+        recovery_email:clean(body.recovery_email, 200).toLowerCase(),
         updated_at:new Date().toISOString()
       };
-      if (!update.name || !update.workplace || !update.municipality || !/^\S+@\S+\.\S+$/.test(update.recovery_email)) return response.status(400).json({ error:'Udfyld gyldige tavleoplysninger.' });
+      if (!update.name || !update.workplace || !/^\S+@\S+\.\S+$/.test(update.recovery_email)) return response.status(400).json({ error:'Udfyld gyldige tavleoplysninger.' });
       await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(team.slug)}&customer_id=eq.${encodeURIComponent(context.customer.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify(update) });
       await audit(context, 'team_updated', team.slug, 'team', secret);
       return response.status(200).json({ ok:true });
