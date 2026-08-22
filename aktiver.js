@@ -12,7 +12,7 @@ async function check() {
     document.getElementById('teamName').textContent = data.teamName;
     const reset = data.purpose === 'password_reset';
     document.getElementById('activationHeading').textContent = reset ? 'Vælg en ny personalekode' : 'Vælg jeres egne koder';
-    document.getElementById('activationIntro').textContent = reset ? 'Linket kan kun bruges én gang og ændrer kun personalekoden.' : 'VisuPlanner-administratoren kan ikke se de koder, I vælger.';
+    document.getElementById('activationIntro').textContent = reset ? 'Linket kan kun bruges én gang og ændrer kun personalekoden.' : 'Koderne opbevares sikkert og kan ses af jeres udpegede kundeadministratorer.';
     document.getElementById('viewerCodeFields').hidden = reset;
     document.querySelectorAll('#viewerCodeFields input').forEach(input => { input.required = !reset; });
     document.getElementById('agreementFields').hidden = reset || !data.needsAcceptance;

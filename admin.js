@@ -114,6 +114,14 @@ function teamLinkOptions(customer, selected = []) {
   return customer.teams.map(team => `<label class="offer-team-choice"><input type="checkbox" data-offer-team value="${esc(team.slug)}" ${chosen.has(team.slug) ? 'checked' : ''}><span>${esc(team.name)}</span></label>`).join('') || '<p class="slug-note">Kunden har ingen aktive tavler.</p>';
 }
 
+function customerAdministratorSection(customer) {
+  const admins = customer.customer_admins || [];
+  const pending = (customer.customer_admin_invitations || []).filter(invite => invite.purpose === 'activation');
+  const adminRows = admins.length ? admins.map(admin => `<article class="customer-admin-row ${admin.active ? '' : 'is-inactive'}" data-customer-admin="${esc(admin.id)}"><div><strong>${esc(admin.name)}</strong><span>${esc(admin.email)}</span><small>${admin.active ? 'Aktiv kundeadministrator' : 'Deaktiveret'}</small></div>${admin.active ? `<div class="board-actions"><button data-customer-admin-action="reset-customer-admin" type="button">Send nulstillingslink</button><button data-customer-admin-action="deactivate-customer-admin" class="danger" type="button">Deaktivér</button></div>` : '<div class="board-actions"><button data-customer-admin-action="reactivate-customer-admin" type="button">Genaktivér og send nyt link</button></div>'}</article>`).join('') : '<p class="slug-note">Ingen kundeadministratorer er aktiveret endnu.</p>';
+  const pendingRows = pending.map(invite => `<p class="pending-admin-invite"><strong>Invitation sendt:</strong> ${esc(invite.name)} · ${esc(invite.email)} · udløber ${dateTime(invite.expires_at)}</p>`).join('');
+  return `<section class="boards-block customer-admin-block"><h4>Kundeadministratorer</h4><p class="slug-note">Personlige administratorer kan kun administrere denne kundes egne tavler og fælleskoder.</p><div class="customer-admin-list">${adminRows}${pendingRows}</div><details><summary>Invitér kundeadministrator</summary><div class="inline-create customer-admin-create"><label>Navn<input data-new-admin="name" autocomplete="name"></label><label>Arbejdsmail<input data-new-admin="email" type="email" autocomplete="email"></label><button data-customer-action="invite-customer-admin" type="button">Send personlig invitation</button></div></details></section>`;
+}
+
 function sharedOfferCard(offer, customer) {
   const selected = (offer.team_links || []).map(link => link.team_slug);
   const customerSlug = offer.customer_slug || customer.url_slug || slugify(customer.display_name);
@@ -143,6 +151,7 @@ function customerCard(customer) {
   return `<article class="customer-card" data-customer="${esc(customer.id)}">
     <div class="customer-head"><div><h3>${esc(customer.display_name)}</h3><p>${esc(customer.legal_name || customer.municipality || '')}</p></div><span class="status-badge ${esc(customer.subscription_status)}">${esc(statusLabels[customer.subscription_status] || customer.subscription_status)}</span></div>
     <div class="customer-facts"><span>${esc(planLabels[customer.plan_code] || customer.plan_code)}</span><span>${customer.teams.length} af ${customer.board_limit} tavler</span><span>${esc(trialText)}</span>${customer.subscription_status === 'trial' && customer.subscription_interest_at ? '<span class="interest-flag">Aktivering anmodet</span>' : ''}</div>
+    ${customerAdministratorSection(customer)}
     <details><summary>Kunde- og fakturaoplysninger</summary>
       <div class="field-grid">
         <label>Visningsnavn<input data-field="display_name" value="${esc(customer.display_name)}"></label>
@@ -281,6 +290,8 @@ function customerPayload(card, action) {
     payload.payment_method = fieldValue(card, 'invoice_payment_method');
   } else if (action === 'create-board') {
     card.querySelectorAll('[data-new-board]').forEach(input => payload[input.dataset.newBoard] = input.value.trim());
+  } else if (action === 'invite-customer-admin') {
+    card.querySelectorAll('[data-new-admin]').forEach(input => payload[input.dataset.newAdmin] = input.value.trim());
   } else if (action === 'create-shared-offer') {
     const create = card.querySelector('.shared-offer-create');
     create.querySelectorAll('[data-new-offer]').forEach(input => payload[input.dataset.newOffer] = input.type === 'checkbox' ? input.checked : input.value.trim());
@@ -306,9 +317,23 @@ function bindActions() {
     button.disabled = true;
     try {
       const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify(customerPayload(card, action)) });
-      await copyFallback(result, 'Tavlen er oprettet.');
-      const messages = { 'create-board':'Tavlen er oprettet, og invitationen er sendt.', 'create-shared-offer':'Det fælles tilbud er oprettet.', 'archive-customer':'Kunden og alle tilknyttede tavler er arkiveret.', 'restore-customer':'Kunden er gendannet.', 'delete-customer':'Kunden og alle tilknyttede data er slettet permanent.' };
+      await copyFallback(result, action === 'invite-customer-admin' ? 'Administratorinvitationen er oprettet.' : 'Tavlen er oprettet.');
+      const messages = { 'create-board':'Tavlen er oprettet, og invitationen er sendt.', 'create-shared-offer':'Det fælles tilbud er oprettet.', 'invite-customer-admin':'Kundeadministratorens invitation er sendt.', 'archive-customer':'Kunden og alle tilknyttede tavler er arkiveret.', 'restore-customer':'Kunden er gendannet.', 'delete-customer':'Kunden og alle tilknyttede data er slettet permanent.' };
       status(messages[action] || 'Kundens aftale er opdateret.', 'success');
+      await openDashboard();
+    } catch (error) { status(error.message, 'error'); button.disabled = false; }
+  });
+
+  document.querySelectorAll('[data-customer-admin-action]').forEach(button => button.onclick = async () => {
+    const customerCard = button.closest('[data-customer]');
+    const adminRow = button.closest('[data-customer-admin]');
+    const action = button.dataset.customerAdminAction;
+    if (action === 'deactivate-customer-admin' && !confirm('Deaktivér denne kundeadministrator? Vedkommende mister straks adgang til kundeadministrationen.')) return;
+    button.disabled = true;
+    try {
+      const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify({ action, customerId:customerCard.dataset.customer, admin_id:adminRow.dataset.customerAdmin }) });
+      await copyFallback(result, 'Linket er oprettet.');
+      status(action === 'deactivate-customer-admin' ? 'Kundeadministratoren er deaktiveret.' : action === 'reactivate-customer-admin' ? 'Kundeadministratoren er genaktiveret, og et nyt link er sendt.' : 'Nulstillingslinket er sendt.', 'success');
       await openDashboard();
     } catch (error) { status(error.message, 'error'); button.disabled = false; }
   });

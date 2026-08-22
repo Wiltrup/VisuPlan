@@ -31,6 +31,7 @@ let editingActivities = [];
 let pendingPhoto = null;
 let editorMode = false;
 let imageSearchTarget = { kind:'meal', index:null };
+let offerRefreshTimer = null;
 const signedMediaCache = new Map();
 
 function iso(date) { return date.toISOString().slice(0, 10); }
@@ -109,7 +110,17 @@ async function login(action, password) {
   $('offerLoginDialog').close();
   $('offerLogout').hidden = false;
   await loadWeek();
+  startAutoRefresh();
   if (editorMode) openEditor();
+}
+
+function startAutoRefresh() {
+  clearInterval(offerRefreshTimer);
+  offerRefreshTimer = setInterval(() => {
+    if (!document.hidden && !$('offerEditorDialog').open) {
+      loadWeek().catch(error => console.error('Automatisk opdatering fejlede.', error));
+    }
+  }, 10 * 60 * 1000);
 }
 
 async function restore() {
@@ -254,10 +265,23 @@ function renderActivityEditor() {
   });
 }
 
+async function compressPhoto(file) {
+  if (!file?.type?.startsWith('image/')) throw new Error('Vælg en billedfil.');
+  const bitmap = await createImageBitmap(file);
+  const maxSize = 1000;
+  const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+  canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+  canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close?.();
+  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Billedet kunne ikke behandles.')), 'image/jpeg', 0.76));
+}
+
 async function uploadPhoto(file, date, folder = 'meals', suffix = '') {
-  const extension = (file.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '');
-  const path = `offers/${offer.id}/${folder}/${date}${suffix ? `-${suffix}` : ''}-${Date.now()}.${extension || 'jpg'}`;
-  await api(`/storage/v1/object/visuplan-images/${path}`, { method:'POST', headers:{ 'Content-Type':file.type || 'image/jpeg', 'x-upsert':'false' }, body:file });
+  const path = `offers/${offer.id}/${folder}/${date}${suffix ? `-${suffix}` : ''}-${Date.now()}.jpg`;
+  const compressed = await compressPhoto(file);
+  await api(`/storage/v1/object/visuplan-images/${path}`, { method:'POST', headers:{ 'Content-Type':'image/jpeg', 'x-upsert':'false' }, body:compressed });
   return path;
 }
 
@@ -378,12 +402,21 @@ $('offerNext').onclick = () => { selected = (selected + 1) % 7; render(); };
 $('offerMealPhotoButton').onclick = () => openLargeImage($('offerMealPhoto').src, $('offerMealPhoto').alt);
 $('offerCloseImage').onclick = () => $('offerImageDialog').close();
 $('offerLogout').onclick = () => { sessionStorage.removeItem(`visuplanner-offer-${slug}`); location.reload(); };
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && session && !$('offerEditorDialog').open) loadWeek().catch(() => {});
+});
+window.addEventListener('pageshow', () => {
+  if (session && !$('offerEditorDialog').open) loadWeek().catch(() => {});
+});
 
 (async () => {
   try {
     weekStart = monday();
     await loadOffer();
-    if (await restore()) await loadWeek();
+    if (await restore()) {
+      await loadWeek();
+      startAutoRefresh();
+    }
     else $('offerLoginDialog').showModal();
   } catch (error) {
     document.body.innerHTML = `<main class="dialog-card"><h1>Tilbuddet kunne ikke åbnes</h1><p>${esc(error.message)}</p><a href="/">Til forsiden</a></main>`;

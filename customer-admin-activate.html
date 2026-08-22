@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <link rel="stylesheet" href="/customer-admin.css?v=51">
+  <title>Opret administratorlogin – VisuPlanner</title>
+</head>
+<body>
+  <header class="site-header"><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a></header>
+  <main class="customer-admin-shell activation-shell">
+    <section class="login-panel">
+      <p class="eyebrow">PERSONLIG ADGANG</p>
+      <h1 id="adminActivationHeading">Kontrollerer invitationen…</h1>
+      <p id="adminActivationIntro">Vent et øjeblik.</p>
+      <form id="adminActivationForm" hidden>
+        <label>Navn<input id="adminActivationName" disabled></label>
+        <label>Arbejdsmail<input id="adminActivationEmail" type="email" disabled></label>
+        <label>Personlig adgangskode <small>Mindst 10 tegn</small><input name="password" type="password" minlength="10" autocomplete="new-password" required></label>
+        <label>Gentag adgangskode<input name="repeat" type="password" minlength="10" autocomplete="new-password" required></label>
+        <p class="help-note">Din personlige adgangskode kan ikke ses af Techus Nord eller andre administratorer.</p>
+        <p id="adminActivationStatus" class="form-message" aria-live="polite"></p>
+        <button type="submit">Gem og fortsæt</button>
+      </form>
+    </section>
+  </main>
+  <script src="/customer-admin-activate.js?v=51"></script>
+</body>
+</html>

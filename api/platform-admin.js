@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { createCustomerAdminInvitation, saveTeamCredential } = require('../lib/customer-admin-security');
 
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
@@ -267,7 +268,7 @@ module.exports = async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const [customers, archivedCustomers, teams, archivedTeams, onboarding, accessHelp, acceptances, sharedOffers, archivedSharedOffers, sharedOfferLinks] = await Promise.all([
+      const [customers, archivedCustomers, teams, archivedTeams, onboarding, accessHelp, acceptances, sharedOffers, archivedSharedOffers, sharedOfferLinks, customerAdmins, customerAdminInvitations] = await Promise.all([
         serviceFetch('/rest/v1/customers?archived_at=is.null&select=*&order=display_name.asc', secret),
         serviceFetch('/rest/v1/customers?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
         serviceFetch('/rest/v1/teams_registry?archived_at=is.null&select=*&order=name.asc', secret),
@@ -277,12 +278,16 @@ module.exports = async function handler(request, response) {
         serviceFetch('/rest/v1/customer_acceptances?select=customer_id,terms_version,accepted_by_name,accepted_at&order=accepted_at.desc', secret),
         serviceFetch('/rest/v1/shared_offers?archived_at=is.null&select=*&order=name.asc', secret),
         serviceFetch('/rest/v1/shared_offers?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
-        serviceFetch('/rest/v1/shared_offer_team_links?select=*&order=created_at.asc', secret)
+        serviceFetch('/rest/v1/shared_offer_team_links?select=*&order=created_at.asc', secret),
+        serviceFetch('/rest/v1/customer_admins?select=*&order=name.asc', secret).catch(() => []),
+        serviceFetch('/rest/v1/customer_admin_invitations?used_at=is.null&select=id,customer_id,name,email,purpose,expires_at,created_at&order=created_at.desc', secret).catch(() => [])
       ]);
       const grouped = (customers || []).map(customer => ({
         ...customer,
         teams: (teams || []).filter(team => team.customer_id === customer.id),
         shared_offers: (sharedOffers || []).filter(offer => offer.customer_id === customer.id).map(offer => ({ ...offer, team_links: (sharedOfferLinks || []).filter(link => link.offer_id === offer.id) })),
+        customer_admins: (customerAdmins || []).filter(admin => admin.customer_id === customer.id),
+        customer_admin_invitations: (customerAdminInvitations || []).filter(invite => invite.customer_id === customer.id && new Date(invite.expires_at) > new Date()),
         latest_acceptance: (acceptances || []).find(item => item.customer_id === customer.id) || null
       }));
       const archivedGrouped = (archivedCustomers || []).map(customer => ({
@@ -304,6 +309,32 @@ module.exports = async function handler(request, response) {
 
     const body = request.body || {};
     const { action, requestId, customerId, slug } = body;
+
+    if (action === 'invite-customer-admin') {
+      const customers = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&archived_at=is.null&select=*`, secret);
+      const customer = customers?.[0];
+      if (!customer) return response.status(404).json({ error:'Kunden blev ikke fundet.' });
+      const email = clean(body.email, 200).toLowerCase();
+      const existing = await serviceFetch(`/rest/v1/customer_admins?customer_id=eq.${encodeURIComponent(customer.id)}&email=eq.${encodeURIComponent(email)}&select=id,active`, secret);
+      if (existing?.length) return response.status(409).json({ error:existing[0].active ? 'Denne kundeadministrator er allerede aktiv.' : 'Denne administrator er deaktiveret. Brug “Genaktivér” på den eksisterende profil.' });
+      return response.status(200).json({ ok:true, ...(await createCustomerAdminInvitation({ customer, name:body.name, email, secret, host:request.headers.host })) });
+    }
+    if (['reset-customer-admin','deactivate-customer-admin','reactivate-customer-admin'].includes(action)) {
+      const adminId = clean(body.admin_id, 80);
+      const admins = await serviceFetch(`/rest/v1/customer_admins?id=eq.${encodeURIComponent(adminId)}&customer_id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
+      const admin = admins?.[0];
+      if (!admin) return response.status(404).json({ error:'Kundeadministratoren blev ikke fundet.' });
+      if (action === 'deactivate-customer-admin') {
+        await serviceFetch(`/rest/v1/customer_admins?id=eq.${encodeURIComponent(admin.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ active:false, updated_at:new Date().toISOString() }) });
+        return response.status(200).json({ ok:true });
+      }
+      const customers = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&archived_at=is.null&select=*`, secret);
+      const customer = customers?.[0];
+      if (!customer) return response.status(404).json({ error:'Kunden blev ikke fundet.' });
+      if (action === 'reactivate-customer-admin') await serviceFetch(`/rest/v1/customer_admins?id=eq.${encodeURIComponent(admin.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ active:true, updated_at:new Date().toISOString() }) });
+      else if (!admin.active) return response.status(400).json({ error:'Administratoradgangen er ikke aktiv.' });
+      return response.status(200).json({ ok:true, ...(await createCustomerAdminInvitation({ customer, name:admin.name, email:admin.email, userId:admin.user_id, purpose:'password_reset', secret, host:request.headers.host })) });
+    }
 
     if (action === 'check-slug') {
       const candidate = slugify(body.value || body.slug);
@@ -491,10 +522,13 @@ module.exports = async function handler(request, response) {
       return response.status(200).json({ ok: true });
     }
     const value = clean(body.value, 300);
+    const credentialKind = action === 'reset-viewer' ? 'viewer' : 'editor';
     const userId = action === 'reset-editor' ? team.editor_user_id : action === 'reset-viewer' ? team.viewer_user_id : null;
     if (!userId) return response.status(400).json({ error: 'Ukendt handling eller manglende loginbruger.' });
-    if (value.length < 6) return response.status(400).json({ error: 'Koden skal have mindst seks tegn.' });
+    const minimum = credentialKind === 'viewer' ? 6 : 8;
+    if (value.length < minimum) return response.status(400).json({ error: `Koden skal have mindst ${minimum} tegn.` });
     await serviceFetch(`/auth/v1/admin/users/${userId}`, secret, { method: 'PUT', body: JSON.stringify({ password: value }) });
+    await saveTeamCredential(team.slug, credentialKind, value, secret).catch(error => console.error('Koden kunne ikke gemmes krypteret.', error.message));
     return response.status(200).json({ ok: true });
   } catch (error) {
     console.error(error);

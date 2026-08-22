@@ -1,5 +1,22 @@
 # VisuPlanner
 
+## v51 – kundeadministration, mindre billeder og rolig synkronisering
+
+Version 51 tilføjer et personligt kundeadministrator-login på `/kundeadmin`. Techus Nord inviterer den ansvarlige via en unik 72-timers engangsadresse, som er bundet til præcis én kunde. Kundeadministratoren logger derefter ind med arbejdsmail og en personlig adgangskode og kan kun se og administrere den pågældende kundes tavler.
+
+Kundeadministratoren kan oprette tavler op til kundens aftalte tavlegrænse, sende aktiverings- og nulstillingslinks, rette tavleoplysninger samt vælge og senere vise kundens fælles tavle- og personalekoder. Visning og ændring af koder registreres i en hændelseslog. Personlige administratoradgangskoder opbevares fortsat kun som Supabase-login og kan ikke vises af Techus Nord.
+
+Billeder på team- og klubtavler skaleres nu automatisk til højst 1.000 pixels på den længste led og gemmes som komprimeret JPEG. Team- og klubtavler henter nye ændringer automatisk hvert 10. minut, når siden er synlig. Når enheden eller browserfanen åbnes igen, opdateres tavlen straks; en almindelig manuel genindlæsning virker fortsat med det samme.
+
+### Opdatering fra v50
+
+1. Kør `supabase-v51-customer-administration.sql` én gang i Supabase SQL Editor. Migrationen er additiv og sletter ikke eksisterende kunder, tavler, koder eller ugeplaner.
+2. Tilføj en ny, stærk og permanent Vercel-miljøvariabel med navnet `CREDENTIALS_ENCRYPTION_KEY`. Generér værdien lokalt med `openssl rand -hex 32`, og indsæt den direkte i Vercel uden at sende eller gemme den i GitHub.
+3. Udgiv derefter v51-filerne via GitHub/Vercel eller redeploy efter miljøvariablen er gemt.
+4. Eksisterende fælleskoder kan ikke udlæses bagudrettet fra Supabase. Kundeadministratoren skal derfor vælge en ny kode én gang på ældre tavler; derefter kan koden vises sikkert i kundeadministrationen.
+
+`CREDENTIALS_ENCRYPTION_KEY` må ikke ændres eller slettes efter ibrugtagning, da allerede gemte fælleskoder ellers ikke kan dekrypteres. Ved en planlagt nøglerotation skal koderne genkrypteres først.
+
 ## v43 – hele kunder, sluttider og ens klubtavler
 
 Version 43 gør det muligt at arkivere og gendanne en hel kunde fra administrationen. En arkiveret kunde kan derefter slettes permanent med en ekstra tekstbekræftelse; det fjerner kundens tavler, klubtilbud, planer, filer og tekniske loginbrugere.

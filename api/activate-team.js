@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { saveTeamCredential } = require('../lib/customer-admin-security');
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const TERMS_VERSION = '2026-08-16-v1.2';
 const hash = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
@@ -40,6 +41,7 @@ module.exports = async function handler(request, response) {
 
     if (invite.purpose === 'password_reset') {
       await service(`/auth/v1/admin/users/${team.editor_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: editorPassword }) });
+      await saveTeamCredential(team.slug, 'editor', editorPassword, secret).catch(error => console.error('Personalekoden kunne ikke gemmes krypteret.', error.message));
       await service(`/rest/v1/team_invitations?id=eq.${invite.id}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ used_at: new Date().toISOString() }) });
       return response.status(200).json({ ok: true, slug: team.slug, reset: true });
     }
@@ -55,6 +57,10 @@ module.exports = async function handler(request, response) {
 
     await service(`/auth/v1/admin/users/${team.editor_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: editorPassword }) });
     await service(`/auth/v1/admin/users/${team.viewer_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: viewerPassword }) });
+    await Promise.all([
+      saveTeamCredential(team.slug, 'editor', editorPassword, secret),
+      saveTeamCredential(team.slug, 'viewer', viewerPassword, secret)
+    ]).catch(error => console.error('Tavlekoderne kunne ikke gemmes krypteret.', error.message));
     const now = new Date();
     const nowIso = now.toISOString();
     await service(`/rest/v1/team_invitations?id=eq.${invite.id}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ used_at: nowIso }) });

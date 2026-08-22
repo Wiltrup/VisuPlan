@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="da">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <meta name="referrer" content="no-referrer">
+  <link rel="stylesheet" href="/customer-admin.css?v=51">
+  <title>Kundeadministration – VisuPlanner</title>
+</head>
+<body>
+  <header class="site-header"><a href="/"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"></a><a href="/">Til forsiden</a></header>
+  <main class="customer-admin-shell">
+    <section id="customerAdminLogin" class="login-panel">
+      <p class="eyebrow">KUNDEADMINISTRATION</p>
+      <h1>Administrér jeres tavler</h1>
+      <p>Log ind med din personlige arbejdsmail og adgangskode.</p>
+      <form id="customerAdminLoginForm">
+        <label>Arbejdsmail<input id="customerAdminEmail" type="email" autocomplete="username" required></label>
+        <label>Adgangskode<input id="customerAdminPassword" type="password" autocomplete="current-password" required></label>
+        <p id="customerAdminLoginError" class="form-message error" aria-live="polite"></p>
+        <button type="submit">Log ind</button>
+      </form>
+      <details class="forgot-panel"><summary>Glemt adgangskode?</summary><form id="customerAdminForgotForm"><label>Din registrerede arbejdsmail<input id="customerAdminForgotEmail" type="email" autocomplete="email" required></label><button type="submit">Send nulstillingslink</button><p id="customerAdminForgotStatus" class="form-message" aria-live="polite"></p></form></details>
+    </section>
+
+    <section id="customerAdminDashboard" hidden>
+      <div class="dashboard-head"><div><p class="eyebrow">KUNDEADMINISTRATION</p><h1 id="customerAdminCustomerName">Jeres VisuPlanner</h1><p id="customerAdminIdentity"></p></div><button id="customerAdminLogout" class="secondary" type="button">Log ud</button></div>
+      <section class="capacity-panel"><div><strong id="customerAdminCapacity">0 af 0 tavler</strong><span id="customerAdminRemaining">Indlæser…</span></div><div class="capacity-track"><span id="customerAdminCapacityBar"></span></div></section>
+
+      <details id="createBoardPanel" class="create-board-panel">
+        <summary>Opret ny tavle</summary>
+        <form id="customerCreateBoardForm" class="field-grid">
+          <label>Teamnavn<input name="name" placeholder="Fx Team Syd" required></label>
+          <label>Ansvarlig arbejdsmail<input name="recovery_email" type="email" required></label>
+          <label>Arbejdsplads<input name="workplace" required></label>
+          <label>Kommune<input name="municipality" required></label>
+          <label class="wide">Ønsket URL <small>Kan stå tom – så vælger systemet en sikker, unik adresse.</small><input name="slug" placeholder="Fx granbohus-team-syd"></label>
+          <div class="wide form-actions"><button type="submit">Opret tavle og send aktiveringslink</button></div>
+        </form>
+      </details>
+
+      <section class="dashboard-section"><div class="section-heading"><div><p class="eyebrow">TAVLER</p><h2>Jeres teamtavler</h2></div><button id="customerAdminReload" class="secondary" type="button">Opdatér oversigt</button></div><div id="customerAdminBoards" class="board-grid"></div></section>
+      <section id="customerAdminOffersSection" class="dashboard-section" hidden><p class="eyebrow">FÆLLES TILBUD</p><h2>Klub- og fællestavler</h2><div id="customerAdminOffers" class="offer-grid"></div></section>
+      <section class="dashboard-section secondary-section"><p class="eyebrow">ADGANG</p><h2>Kundeadministratorer</h2><div id="customerAdminColleagues"></div><p class="help-note">Techus Nord udpeger og deaktiverer kundeadministratorer. Kontakt os, hvis en kollega skal tilføjes eller fjernes.</p></section>
+      <details class="dashboard-section activity-section"><summary>Seneste administratorhandlinger</summary><div id="customerAdminAudit"></div></details>
+    </section>
+  </main>
+  <div id="customerAdminStatus" role="status" aria-live="polite"></div>
+  <script src="/customer-admin.js?v=51"></script>
+</body>
+</html>

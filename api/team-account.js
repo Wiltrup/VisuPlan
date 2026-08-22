@@ -1,5 +1,6 @@
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
+const { saveTeamCredential } = require('../lib/customer-admin-security');
 
 async function parse(response) {
   const text = await response.text();
@@ -56,6 +57,7 @@ module.exports = async function handler(request, response) {
     if (action === 'reset-viewer') {
       if (String(value || '').length < 6) return response.status(400).json({ error: 'Tavlekoden skal have mindst seks tegn.' });
       await service(`/auth/v1/admin/users/${team.viewer_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: String(value) }) });
+      await saveTeamCredential(team.slug, 'viewer', String(value), secret).catch(error => console.error('Tavlekoden kunne ikke gemmes krypteret.', error.message));
       return response.status(200).json({ ok: true });
     }
     if (action === 'request-subscription') {

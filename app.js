@@ -280,6 +280,8 @@ function saveSession(session, rememberViewer = false) {
 }
 
 function clearSession() {
+  clearInterval(refreshTimer);
+  refreshTimer = null;
   state.session = null;
   sessionStorage.removeItem(SESSION_KEY);
   renderLoginState();
@@ -312,6 +314,13 @@ async function signInViewer(password) {
   saveSession(data,true);
 }
 
+function startAutoRefresh() {
+  clearInterval(refreshTimer);
+  refreshTimer = setInterval(() => {
+    if (!document.hidden) loadData({ quiet: true });
+  }, 10 * 60 * 1000);
+}
+
 async function signIn(password) {
   const response=await fetch('/api/team-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({slug:TEAM_SLUG,action:'login',password})});
   const data=await response.json().catch(()=>({}));
@@ -329,7 +338,7 @@ async function signOut() {
     el('adminDialog').close();
     try {
       const viewerSession = await refreshSavedSession(VIEWER_SESSION_KEY);
-      if (viewerSession) { saveSession(viewerSession, true); await loadData({ quiet: true }); return; }
+      if (viewerSession) { saveSession(viewerSession, true); await loadData({ quiet: true }); startAutoRefresh(); return; }
     } catch { sessionStorage.removeItem(VIEWER_SESSION_KEY); }
     el('viewerLoginDialog').showModal();
   }
@@ -1032,13 +1041,14 @@ async function deactivateStaff(staffId, name) {
 async function compressImage(file) {
   if (!file.type.startsWith('image/')) throw new Error('Vælg en billedfil.');
   const bitmap = await createImageBitmap(file);
-  const maxSize = 1200;
+  const maxSize = 1000;
   const scale = Math.min(1, maxSize / Math.max(bitmap.width, bitmap.height));
   const canvas = document.createElement('canvas');
   canvas.width = Math.round(bitmap.width * scale);
   canvas.height = Math.round(bitmap.height * scale);
   canvas.getContext('2d').drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Billedet kunne ikke behandles.')), 'image/jpeg', 0.82));
+  bitmap.close?.();
+  return new Promise((resolve, reject) => canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('Billedet kunne ikke behandles.')), 'image/jpeg', 0.76));
 }
 
 async function uploadImage(file, path) {
@@ -1442,6 +1452,7 @@ el('viewerLoginForm').addEventListener('submit', async event => {
     await signInViewer(el('viewerPinInput').value);
     el('viewerLoginDialog').close();
     await loadData();
+    startAutoRefresh();
   } catch (error) { el('viewerLoginError').textContent = error.message; }
   finally { button.disabled = false; button.textContent = 'Åbn tavlen'; }
 });
@@ -1454,6 +1465,7 @@ el('loginForm').addEventListener('submit', async event => {
     await signIn(el('pinInput').value);
     el('loginDialog').close();
     await loadData({ quiet: true });
+    startAutoRefresh();
     openAdmin();
   } catch (error) {
     el('loginError').textContent = error.message;
@@ -1569,7 +1581,7 @@ async function init() {
   const loaded = await loadData();
   if (!loaded) setTimeout(() => loadData({ quiet: true }), 700);
   setTimeout(() => loadData({ quiet: true }), 1500);
-  refreshTimer = setInterval(() => loadData({ quiet: true }), 30000);
+  startAutoRefresh();
 }
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('/service-worker.js');
