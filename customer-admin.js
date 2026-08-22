@@ -175,11 +175,11 @@ function resetInactivity() {
 $('customerAdminLogout').onclick = logout;
 $('customerAdminReload').onclick = () => loadDashboard().then(() => notify('Oversigten er opdateret.')).catch(error => notify(error.message,'error'));
 $('customerCreateBoardForm').onsubmit = async event => {
-  event.preventDefault(); const button = event.submitter; button.disabled = true; const values = Object.fromEntries(new FormData(event.currentTarget));
+  event.preventDefault(); const form = event.currentTarget; const button = event.submitter; button.disabled = true; const values = Object.fromEntries(new FormData(form));
   try {
     const result = await post({ action:'create-board', ...values });
     if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
-    event.currentTarget.elements.name.value = ''; event.currentTarget.elements.recovery_email.value = ''; event.currentTarget.elements.slug.value = '';
+    form.elements.name.value = ''; form.elements.recovery_email.value = ''; form.elements.slug.value = '';
     notify(result.mailSent ? 'Tavlen er oprettet, og aktiveringslinket er sendt.' : 'Tavlen er oprettet. Aktiveringslinket er kopieret.');
     await loadDashboard();
   } catch (error) { notify(error.message,'error'); button.disabled = false; }

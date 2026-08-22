@@ -46,10 +46,8 @@ async function createTeamInvitation(team, customer, secret, host, purpose = 'act
 async function createBoard(input, context, secret, host) {
   const customer = context.customer;
   const existing = await service(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=is.null&select=slug`, secret);
-  const trialLimit = customer.subscription_status === 'trial' ? 1 : Number(customer.board_limit || 1);
-  if ((existing || []).length >= trialLimit) throw new Error(customer.subscription_status === 'trial'
-    ? 'Prøveperioden omfatter én tavle. Techus Nord skal aktivere pakken, før flere tavler kan oprettes.'
-    : `Pakken tillader højst ${customer.board_limit} tavler.`);
+  const boardLimit = Number(customer.board_limit || 1);
+  if ((existing || []).length >= boardLimit) throw new Error(`Pakken tillader højst ${boardLimit} tavler.`);
   if (['read_only','cancelled','overdue'].includes(customer.subscription_status)) throw new Error('Kundens aftale tillader ikke oprettelse af nye tavler lige nu.');
 
   const name = clean(input.name, 150);
@@ -126,7 +124,7 @@ module.exports = async function handler(request, response) {
         ? await service(`/rest/v1/team_credentials?team_slug=in.(${teamSlugs.join(',')})&select=team_slug,editor_code_ciphertext,viewer_code_ciphertext,editor_changed_at,viewer_changed_at`, secret)
         : [];
       const credentialMap = new Map((credentials || []).map(item => [item.team_slug, item]));
-      const boardLimit = context.customer.subscription_status === 'trial' ? 1 : Number(context.customer.board_limit || 1);
+      const boardLimit = Number(context.customer.board_limit || 1);
       await service(`/rest/v1/customer_admins?id=eq.${encodeURIComponent(context.admin.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ last_login_at:new Date().toISOString() }) }).catch(() => {});
       return response.status(200).json({
         customer:{ id:context.customer.id, name:context.customer.display_name, municipality:context.customer.municipality, plan_code:context.customer.plan_code, subscription_status:context.customer.subscription_status, board_limit:boardLimit },

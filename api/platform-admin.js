@@ -319,6 +319,13 @@ module.exports = async function handler(request, response) {
       if (existing?.length) return response.status(409).json({ error:existing[0].active ? 'Denne kundeadministrator er allerede aktiv.' : 'Denne administrator er deaktiveret. Brug “Genaktivér” på den eksisterende profil.' });
       return response.status(200).json({ ok:true, ...(await createCustomerAdminInvitation({ customer, name:body.name, email, secret, host:request.headers.host })) });
     }
+    if (action === 'delete-customer-admin-invitation') {
+      const invitationId = clean(body.invitation_id, 80);
+      const invitations = await serviceFetch(`/rest/v1/customer_admin_invitations?id=eq.${encodeURIComponent(invitationId)}&customer_id=eq.${encodeURIComponent(customerId)}&purpose=eq.activation&used_at=is.null&select=id`, secret);
+      if (!invitations?.length) return response.status(404).json({ error:'Den afventende invitation blev ikke fundet.' });
+      await serviceFetch(`/rest/v1/customer_admin_invitations?id=eq.${encodeURIComponent(invitationId)}&customer_id=eq.${encodeURIComponent(customerId)}`, secret, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+      return response.status(200).json({ ok:true });
+    }
     if (['reset-customer-admin','deactivate-customer-admin','reactivate-customer-admin'].includes(action)) {
       const adminId = clean(body.admin_id, 80);
       const admins = await serviceFetch(`/rest/v1/customer_admins?id=eq.${encodeURIComponent(adminId)}&customer_id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
@@ -402,7 +409,7 @@ module.exports = async function handler(request, response) {
             display_name: clean(body.customer_name || item.workplace, 200), legal_name: clean(body.legal_name || item.workplace, 200),
             municipality: clean(body.municipality || item.municipality, 150), contact_name: item.contact_name,
             contact_email: item.contact_email.toLowerCase(), billing_email: item.contact_email.toLowerCase(), phone: item.phone,
-            plan_code: desiredPlan, board_limit: 1, intro_price_dkk: plan.intro, renewal_price_dkk: plan.renewal,
+            plan_code: desiredPlan, board_limit: plan.limit, intro_price_dkk: plan.intro, renewal_price_dkk: plan.renewal,
             subscription_status: 'trial', internal_notes: item.notes
           })
         });
@@ -412,12 +419,12 @@ module.exports = async function handler(request, response) {
         await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, {
           method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ url_slug: customerSlug })
         }).catch(() => {});
-        const created = await createBoard({
-          name: body.team_name || item.team_name, municipality: body.municipality || item.municipality,
-          workplace: body.workplace || item.workplace, recovery_email: item.contact_email, slug: body.desired_slug
-        }, customer, secret, request.headers.host);
+        const invitation = await createCustomerAdminInvitation({
+          customer, name:item.contact_name, email:item.contact_email,
+          secret, host:request.headers.host
+        });
         await serviceFetch(`/rest/v1/onboarding_requests?id=eq.${encodeURIComponent(requestId)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'invited' }) });
-        return response.status(200).json({ ok: true, customer, ...created });
+        return response.status(200).json({ ok: true, customer, ...invitation });
       } catch (error) {
         if (customer?.id) await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
         throw error;
@@ -428,7 +435,6 @@ module.exports = async function handler(request, response) {
       const customer = customers?.[0];
       if (!customer) return response.status(404).json({ error: 'Kunden blev ikke fundet.' });
       const teams = await serviceFetch(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=is.null&select=slug`, secret);
-      if (customer.subscription_status === 'trial' && teams.length >= 1) throw new Error('Prøveperioden omfatter én tavle. Aktivér en pakke før flere tavler oprettes.');
       if (teams.length >= customer.board_limit) throw new Error(`Pakken tillader højst ${customer.board_limit} tavler.`);
       return response.status(200).json({ ok: true, ...(await createBoard(body, customer, secret, request.headers.host)) });
     }
@@ -487,8 +493,7 @@ module.exports = async function handler(request, response) {
         const planCode = PLANS[body.plan_code] ? body.plan_code : 'intro3';
         const plan = PLANS[planCode];
         const limit = planCode === 'custom' ? Math.max(1, Number(body.board_limit) || customer.board_limit || 1) : plan.limit;
-        const renews = isoAfter(now);
-        update = { ...update, plan_code: planCode, board_limit: limit, intro_price_dkk: body.intro_price_dkk ?? plan.intro, renewal_price_dkk: body.renewal_price_dkk ?? plan.renewal, subscription_status: 'contracted', subscription_started_at: customer.subscription_started_at || now.toISOString(), subscription_renews_at: customer.subscription_renews_at || renews, invoice_period_end: customer.subscription_renews_at || renews };
+        update = { ...update, plan_code: planCode, board_limit: limit, intro_price_dkk: body.intro_price_dkk ?? plan.intro, renewal_price_dkk: body.renewal_price_dkk ?? plan.renewal };
       } else if (action === 'extend-trial') {
         const base = customer.trial_ends_at && new Date(customer.trial_ends_at) > now ? new Date(customer.trial_ends_at) : now;
         update = { ...update, subscription_status: 'trial', trial_ends_at: new Date(base.getTime() + Math.max(1, Number(body.days) || 7) * DAY).toISOString() };
@@ -496,8 +501,10 @@ module.exports = async function handler(request, response) {
         const currentRenewal = customer.subscription_renews_at ? new Date(customer.subscription_renews_at) : new Date(isoAfter(now));
         update = { ...update, subscription_status: 'invoice_sent', invoice_number: clean(body.invoice_number, 100), invoice_sent_at: now.toISOString(), invoice_due_at: body.invoice_due_at || null, payment_method: body.payment_method || null, invoice_period_end: body.invoice_kind === 'renewal' ? isoAfter(currentRenewal) : currentRenewal.toISOString() };
       } else if (action === 'mark-paid') {
-        update = { ...update, subscription_status: 'active', paid_at: now.toISOString() };
-        if (customer.invoice_period_end) update.subscription_renews_at = customer.invoice_period_end;
+        const startedAt = customer.subscription_started_at || now.toISOString();
+        let renewsAt = customer.invoice_period_end || customer.subscription_renews_at;
+        if (!renewsAt || new Date(renewsAt) <= now) renewsAt = isoAfter(now);
+        update = { ...update, subscription_status: 'active', paid_at: now.toISOString(), subscription_started_at: startedAt, subscription_renews_at: renewsAt, invoice_period_end: renewsAt };
       } else update = { ...update, subscription_status: 'read_only' };
       await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(update) });
       return response.status(200).json({ ok: true });

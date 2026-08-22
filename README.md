@@ -75,7 +75,7 @@ Derudover tilføjer versionen MobilePay som betalingsform i administrationen og 
 
 Version 38 samler flere selvstændige tavler under én betalende kunde og tilføjer:
 
-- 14 dages gratis prøve med én tavle. Efter udløb kan tavlen fortsat ses, mens redigering låses.
+- 14 dages gratis prøve med det antal tavler, der følger med den valgte pakke. Efter udløb kan tavlerne fortsat ses, mens redigering låses.
 - Pakker med op til 3, 8 eller 12 tavler samt skræddersyet tavlegrænse.
 - Kunde-, EAN-, faktura-, betalings- og fornyelsesoverblik i administrationen.
 - Separate aktiveringslinks, koder og URL'er til hver tavle under samme betaler.

@@ -118,7 +118,7 @@ function customerAdministratorSection(customer) {
   const admins = customer.customer_admins || [];
   const pending = (customer.customer_admin_invitations || []).filter(invite => invite.purpose === 'activation');
   const adminRows = admins.length ? admins.map(admin => `<article class="customer-admin-row ${admin.active ? '' : 'is-inactive'}" data-customer-admin="${esc(admin.id)}"><div><strong>${esc(admin.name)}</strong><span>${esc(admin.email)}</span><small>${admin.active ? 'Aktiv kundeadministrator' : 'Deaktiveret'}</small></div>${admin.active ? `<div class="board-actions"><button data-customer-admin-action="reset-customer-admin" type="button">Send nulstillingslink</button><button data-customer-admin-action="deactivate-customer-admin" class="danger" type="button">Deaktivér</button></div>` : '<div class="board-actions"><button data-customer-admin-action="reactivate-customer-admin" type="button">Genaktivér og send nyt link</button></div>'}</article>`).join('') : '<p class="slug-note">Ingen kundeadministratorer er aktiveret endnu.</p>';
-  const pendingRows = pending.map(invite => `<p class="pending-admin-invite"><strong>Invitation sendt:</strong> ${esc(invite.name)} · ${esc(invite.email)} · udløber ${dateTime(invite.expires_at)}</p>`).join('');
+  const pendingRows = pending.map(invite => `<article class="pending-admin-invite" data-customer-admin-invite="${esc(invite.id)}"><div><strong>Invitation afventer</strong><span>${esc(invite.name)} · ${esc(invite.email)}</span><small>Udløber ${dateTime(invite.expires_at)}</small></div><button data-customer-admin-invite-action="delete-customer-admin-invitation" class="danger" type="button">Slet invitation</button></article>`).join('');
   return `<section class="boards-block customer-admin-block"><h4>Kundeadministratorer</h4><p class="slug-note">Personlige administratorer kan kun administrere denne kundes egne tavler og fælleskoder.</p><div class="customer-admin-list">${adminRows}${pendingRows}</div><details><summary>Invitér kundeadministrator</summary><div class="inline-create customer-admin-create"><label>Navn<input data-new-admin="name" autocomplete="name"></label><label>Arbejdsmail<input data-new-admin="email" type="email" autocomplete="email"></label><button data-customer-action="invite-customer-admin" type="button">Send personlig invitation</button></div></details></section>`;
 }
 
@@ -180,11 +180,12 @@ function customerCard(customer) {
         <label>Fakturatype<select data-field="invoice_kind"><option value="first">Første år</option><option value="renewal">Årsfornyelse</option></select></label>
         <label>Betalingsform<select data-field="invoice_payment_method"><option value="ean">EAN</option><option value="card">Kort</option><option value="mobilepay">MobilePay</option><option value="bank">Bank</option><option value="other">Andet</option></select></label>
       </div>
+      <p class="slug-note">Den valgte pakke er allerede tilgængelig i prøveperioden. Brug kun pakkeændringen, når kunden senere skifter løsning.</p>
       <div class="action-row">
-        <button data-customer-action="activate-subscription">Aktivér valgt pakke</button>
+        <button data-customer-action="activate-subscription" class="secondary">Aktivér valgt pakkeændring</button>
         <button data-customer-action="extend-trial" class="secondary">Forlæng prøve 7 dage</button>
         <button data-customer-action="mark-invoice-sent" class="secondary">Markér faktura sendt</button>
-        <button data-customer-action="mark-paid">Markér betaling modtaget</button>
+        <button data-customer-action="mark-paid">Betaling modtaget</button>
         <button data-customer-action="set-read-only" class="warning">Lås redigering</button>
       </div>
     </details>
@@ -230,19 +231,16 @@ function archivedCustomerCard(customer) {
 
 function requestCard(item) {
   return `<article class="request-card" data-request="${esc(item.id)}">
-    <strong>${esc(item.team_name)}</strong> <span class="plan-label">${esc(planLabels[item.requested_plan] || 'Op til 3 tavler')}</span>
+    <strong>${esc(item.workplace)}</strong> <span class="plan-label">${esc(planLabels[item.requested_plan] || 'Op til 3 tavler')}</span>
     <p>${esc(item.contact_name)} · <a href="mailto:${esc(item.contact_email)}">${esc(item.contact_email)}</a></p>
     <p>${esc(item.municipality)} · ${esc(item.workplace)} · ${Number(item.resident_count)} beboere</p>
     ${item.phone ? `<p>Tlf. ${esc(item.phone)}</p>` : ''}${item.notes ? `<p class="request-notes">${esc(item.notes)}</p>` : ''}
     <div class="request-form">
       <label>Kundenavn<input data-field="customer_name" value="${esc(item.workplace)}"></label>
       <label>Juridisk navn<input data-field="legal_name" value="${esc(item.workplace)}"></label>
-      <label>Arbejdsplads<input data-field="workplace" value="${esc(item.workplace)}"></label>
-      <label>Tavlenavn<input data-field="team_name" value="${esc(item.team_name)}"></label>
       <label>Kommune<input data-field="municipality" value="${esc(item.municipality)}"></label>
-      <label>Ønsket URL<input data-field="desired_slug" placeholder="arbejdsplads-team"></label>
       <label>Forventet pakke<select data-field="plan_code">${planOptions(item.requested_plan || 'intro3')}</select></label>
-      <div class="request-actions"><button data-request-action="create">Opret prøvekunde og send invitation</button><button data-request-action="delete" class="secondary danger-text">Slet forespørgsel</button></div>
+      <div class="request-actions"><button data-request-action="create">Opret prøvekunde og invitér administrator</button><button data-request-action="delete" class="secondary danger-text">Slet forespørgsel</button></div>
     </div>
     <small>Modtaget ${dateTime(item.created_at)}</small>
   </article>`;
@@ -306,8 +304,9 @@ function bindActions() {
   document.querySelectorAll('[data-customer-action]').forEach(button => button.onclick = async () => {
     const card = button.closest('[data-customer]');
     const action = button.dataset.customerAction;
+    if (action === 'activate-subscription' && !confirm('Aktivér den valgte pakkeændring? Kundens tavlegrænse og priser opdateres med det samme.')) return;
     if (action === 'set-read-only' && !confirm('Lås kundens redigering? Tavlerne kan stadig ses.')) return;
-    if (action === 'mark-paid' && !confirm('Bekræft, at betalingen er modtaget.')) return;
+    if (action === 'mark-paid' && !confirm('Bekræft, at betalingen er modtaget. Kunden får fuld adgang, og årsperioden aktiveres.')) return;
     if (action === 'archive-customer' && !confirm('Arkivér hele kunden? Alle kundens tavler og klubtilbud lukkes, men indholdet bevares.')) return;
     if (action === 'restore-customer' && !confirm('Gendan kunden og de tavler og klubtilbud, der blev lukket sammen med kunden?')) return;
     if (action === 'delete-customer') {
@@ -334,6 +333,22 @@ function bindActions() {
       const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify({ action, customerId:customerCard.dataset.customer, admin_id:adminRow.dataset.customerAdmin }) });
       await copyFallback(result, 'Linket er oprettet.');
       status(action === 'deactivate-customer-admin' ? 'Kundeadministratoren er deaktiveret.' : action === 'reactivate-customer-admin' ? 'Kundeadministratoren er genaktiveret, og et nyt link er sendt.' : 'Nulstillingslinket er sendt.', 'success');
+      await openDashboard();
+    } catch (error) { status(error.message, 'error'); button.disabled = false; }
+  });
+
+  document.querySelectorAll('[data-customer-admin-invite-action]').forEach(button => button.onclick = async () => {
+    const customerCard = button.closest('[data-customer]');
+    const inviteRow = button.closest('[data-customer-admin-invite]');
+    if (!confirm('Slet den afventende invitation? Linket stopper straks med at virke.')) return;
+    button.disabled = true;
+    try {
+      await api('/api/platform-admin', { method:'POST', body:JSON.stringify({
+        action:button.dataset.customerAdminInviteAction,
+        customerId:customerCard.dataset.customer,
+        invitation_id:inviteRow.dataset.customerAdminInvite
+      }) });
+      status('Den afventende administratorinvitation er slettet.', 'success');
       await openDashboard();
     } catch (error) { status(error.message, 'error'); button.disabled = false; }
   });
@@ -392,8 +407,8 @@ function bindActions() {
     button.disabled = true;
     try {
       const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify(payload) });
-      await copyFallback(result, 'Prøvekunden og tavlen er oprettet.');
-      status(action === 'create' ? 'Prøvekunden er oprettet, og invitationen er sendt.' : 'Forespørgslen er slettet.', 'success');
+      await copyFallback(result, 'Prøvekunden og administratorinvitationen er oprettet.');
+      status(action === 'create' ? 'Prøvekunden er oprettet, og administratorinvitationen er sendt.' : 'Forespørgslen er slettet.', 'success');
       await openDashboard();
     } catch (error) { status(error.message, 'error'); button.disabled = false; }
   });
