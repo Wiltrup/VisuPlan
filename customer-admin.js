@@ -107,6 +107,7 @@ function render() {
   $('customerAdminAudit').innerHTML = logs.length ? logs.map(item => `<div class="audit-row"><div><strong>${esc(actionLabels[item.action] || item.action)}</strong><span>${item.team_slug ? ` · ${esc(item.team_slug)}` : ''}${item.target_kind ? ` · ${esc(auditTargetLabel(item.target_kind))}` : ''}</span></div><div><span>${esc(item.admin_name || item.admin_email || '')}</span><time>${dateTime(item.created_at)}</time></div></div>`).join('') : '<p class="empty">Ingen administratorhandlinger endnu.</p>';
   $('customerAdminOffersSection').hidden = !customer.club_module_enabled;
   $('customerAdminOffers').innerHTML = offers.length ? offers.map(clubHtml).join('') : '<p class="empty">Ingen klubtavler er oprettet endnu.</p>';
+  $('customerCreateClubPanel').hidden = !customer.club_module_enabled || offers.length >= 1;
   if (customer.club_module_enabled) {
     const clubForm = $('customerCreateClubForm');
     if (!clubForm.elements.workplace.value) clubForm.elements.workplace.value = customer.name;

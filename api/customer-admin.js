@@ -182,6 +182,8 @@ async function createBoard(input, context, secret, host) {
 async function createClub(input, context, secret) {
   const customer = context.customer;
   if (!customer.club_module_enabled) throw new Error('Klubmodulet er ikke aktiveret på kundens aftale.');
+  const existingClubs = await service(`/rest/v1/shared_offers?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=is.null&select=id&limit=1`, secret);
+  if (existingClubs?.length) throw new Error('Klubmodulet omfatter én klubtavle. Slet den eksisterende klubtavle, før I opretter en ny.');
   const name = clean(input.name, 150);
   const recoveryEmail = clean(input.recovery_email || customer.contact_email, 200).toLowerCase();
   if (!name || !/^\S+@\S+\.\S+$/.test(recoveryEmail)) throw new Error('Klubbens navn og en gyldig ansvarlig arbejdsmail skal udfyldes.');
