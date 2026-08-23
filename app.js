@@ -1,6 +1,11 @@
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
-const TEAM_SLUG = location.pathname.split('/').filter(Boolean)[0] || 'trekloeveret-team-2';
+const CURRENT_BOARD_PATH = location.pathname.replace(/\/+$/, '') || '/';
+let ROUTE_RESOLUTION = null;
+try { ROUTE_RESOLUTION = JSON.parse(sessionStorage.getItem('visuplanner-board-route') || 'null'); } catch {}
+if (ROUTE_RESOLUTION?.path !== CURRENT_BOARD_PATH || ROUTE_RESOLUTION?.kind !== 'team') ROUTE_RESOLUTION = null;
+const TEAM_SLUG = ROUTE_RESOLUTION?.target_slug || location.pathname.split('/').filter(Boolean)[0] || 'trekloeveret-team-2';
+const PUBLIC_BOARD_PATH = ROUTE_RESOLUTION ? CURRENT_BOARD_PATH : `/${TEAM_SLUG}`;
 const PLATFORM_ADMIN_EMAIL = 'wiltrup@wiltrup.com';
 const SESSION_KEY = 'visuplanner-session';
 const VIEWER_SESSION_KEY = 'visuplanner-viewer-session';
@@ -476,7 +481,8 @@ async function loadSharedOffers(weekStart) {
   ]);
   const secureDays = await Promise.all((dayRows || []).map(async row => ({ ...row, meal_photo_url: await resolvePhotoUrl(row.meal_photo_url || '') })));
   const secureActivities = await Promise.all((activityRows || []).map(async row => ({ ...row, photo_url: await resolvePhotoUrl(row.photo_url || '') })));
-  state.sharedOffers = (offers || []).map(offer => ({
+  const activeOffers = (offers || []).filter(offer => offer.onboarding_status !== 'invited');
+  state.sharedOffers = activeOffers.map(offer => ({
     ...offer,
     link: links.find(link => link.offer_id === offer.id),
     days: Object.fromEntries(dates.map(date => [date, {
@@ -484,7 +490,7 @@ async function loadSharedOffers(weekStart) {
       activities: secureActivities.filter(row => row.offer_id === offer.id && row.plan_date === date)
     }]))
   }));
-  await loadRegistrationEvents(offers || [], links);
+  await loadRegistrationEvents(activeOffers, links);
 }
 
 async function loadRegistrationEvents(offers, links) {
@@ -1654,7 +1660,7 @@ el('viewerHelpForm').addEventListener('submit',async event=>{event.preventDefaul
 el('forgotStaffPassword').addEventListener('click',()=>{el('loginDialog').close();el('staffRecoveryDialog').showModal()});
 el('closeStaffRecovery').addEventListener('click',()=>el('staffRecoveryDialog').close());
 el('staffRecoveryForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;el('staffRecoveryStatus').textContent='Sender…';try{await sendStaffRecovery(el('staffRecoveryEmail').value.trim());el('staffRecoveryStatus').textContent='Hvis mailen er registreret på teamets personalelogin, er nulstillingslinket sendt.'}catch(error){el('staffRecoveryStatus').textContent=error.message}finally{button.disabled=false}});
-el('newPasswordForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{await apiFetch('/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:el('recoveryNewPassword').value})},true);el('newPasswordStatus').textContent='Koden er ændret. Du kan nu logge ind som personale.';setTimeout(()=>location.href=`/${TEAM_SLUG}`,1500)}catch{el('newPasswordStatus').textContent='Koden kunne ikke ændres. Bed om et nyt link.'}finally{button.disabled=false}});
+el('newPasswordForm').addEventListener('submit',async event=>{event.preventDefault();const button=event.submitter;button.disabled=true;try{await apiFetch('/auth/v1/user',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify({password:el('recoveryNewPassword').value})},true);el('newPasswordStatus').textContent='Koden er ændret. Du kan nu logge ind som personale.';setTimeout(()=>location.href=PUBLIC_BOARD_PATH,1500)}catch{el('newPasswordStatus').textContent='Koden kunne ikke ændres. Bed om et nyt link.'}finally{button.disabled=false}});
 document.querySelectorAll('[data-open-meal-search]').forEach(searchButton=>searchButton.addEventListener('click', () => {
   mealSearchTarget=searchButton.dataset.openMealSearch;
   el('imageSearchTitle').textContent=`Find billede til ${{breakfast:'morgenmad',lunch:'frokost',dinner:'aftensmad'}[mealSearchTarget]}`;

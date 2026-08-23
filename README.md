@@ -1,5 +1,18 @@
 # VisuPlanner
 
+## v53 – kundeopdelte adresser og klubtilkøb
+
+Team- og klubtavler bruger nu samme korte adresseform under kundens navn, fx `/cfbb/team-2` og `/cfbb/solsikken`. Den sidste del er kun unik inden for den enkelte kunde, så andre kunder kan bruge de samme teamnavne. Eksisterende links bevares.
+
+Techus Nord kan markere “Klubmodul tilkøbt” på kunden. Derefter kan kundeadministratoren oprette klubtavler, vælge hvilke teamtavler klubben skal vises på og sende et 72-timers aktiveringslink til klubbens ansvarlige medarbejder. Medarbejderen vælger selv klubbens koder. Tilmelding vælges direkte på den enkelte klubaktivitet og har ikke længere en særskilt administrationskontakt.
+
+### Opdatering fra v52
+
+1. Kør `supabase-v53-customer-board-routes.sql` én gang i Supabase SQL Editor.
+2. Udgiv derefter v53-filerne via GitHub/Vercel.
+3. Aktivér “Klubmodul tilkøbt” på de kunder, der har købt modulet.
+4. Der skal ikke oprettes nye miljøvariabler eller flere Vercel-funktioner.
+
 ## v52 – valgfrit tilmeldingsmodul til klubaktiviteter
 
 Version 52 gør det muligt for Techus Nord at aktivere et tilmeldingsmodul på et enkelt fælles klubtilbud. Modulet er slået fra som standard og påvirker derfor ikke andre kunder eller klubber.

@@ -4,6 +4,7 @@ const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 module.exports = async function handler(request, response) {
   if (request.method !== 'GET') return response.status(405).json({ error:'Kun GET er tilladt.' });
   const slug = String(request.query.slug || '');
+  const requestedPath = String(request.query.path || '');
   if (!/^[a-z0-9-]{3,120}$/.test(slug)) return response.status(404).json({ error:'Tavlen blev ikke fundet.' });
   try {
     const key = process.env.SUPABASE_SECRET_KEY || SUPABASE_KEY;
@@ -15,11 +16,12 @@ module.exports = async function handler(request, response) {
     if (!team) return response.status(404).json({ error:'Tavlen blev ikke fundet.' });
     response.setHeader('Content-Type', 'application/manifest+json');
     response.setHeader('Cache-Control', 'public, max-age=300');
+    const boardPath = /^\/[a-z0-9-]+(?:\/[a-z0-9-]+)?$/.test(requestedPath) ? requestedPath : `/${slug}`;
     return response.status(200).send(JSON.stringify({
-      id:`/${slug}`,
+      id:boardPath,
       name:`VisuPlanner – ${team.name}`,
       short_name:team.name.slice(0, 30),
-      start_url:`/${slug}`,
+      start_url:boardPath,
       scope:'/',
       display:'standalone',
       background_color:'#eef2f7',

@@ -85,9 +85,10 @@ function attentionHtml(customer) {
 }
 
 function teamCard(team, archived = false) {
-  if (archived) return `<article class="board-card" data-team="${esc(team.slug)}"><div class="board-title"><div><h5>${esc(team.name)}</h5><code>/${esc(team.slug)}</code></div><span class="status-badge read_only">Arkiveret</span></div><p>${esc(team.workplace)} · ${esc(team.municipality)}</p><div class="board-actions"><button data-team-action="delete-team" class="danger">Slet permanent</button></div></article>`;
+  const path = team.public_path || `/${team.slug}`;
+  if (archived) return `<article class="board-card" data-team="${esc(team.slug)}"><div class="board-title"><div><h5>${esc(team.name)}</h5><code>${esc(path)}</code></div><span class="status-badge read_only">Arkiveret</span></div><p>${esc(team.workplace)} · ${esc(team.municipality)}</p><div class="board-actions"><button data-team-action="delete-team" class="danger">Slet permanent</button></div></article>`;
   return `<article class="board-card" data-team="${esc(team.slug)}">
-    <div class="board-title"><div><h5>${esc(team.name)}</h5><code>visuplanner.dk/${esc(team.slug)}</code></div><span class="status-badge ${team.onboarding_status === 'active' ? '' : 'trial'}">${team.onboarding_status === 'active' ? 'Aktiv tavle' : 'Afventer aktivering'}</span></div>
+    <div class="board-title"><div><h5>${esc(team.name)}</h5><code>visuplanner.dk${esc(path)}</code></div><span class="status-badge ${team.onboarding_status === 'active' ? '' : 'trial'}">${team.onboarding_status === 'active' ? 'Aktiv tavle' : 'Afventer aktivering'}</span></div>
     <div class="field-grid">
       <label>Tavlenavn<input data-field="name" value="${esc(team.name)}"></label>
       <label>Arbejdsplads<input data-field="workplace" value="${esc(team.workplace)}"></label>
@@ -96,7 +97,7 @@ function teamCard(team, archived = false) {
     </div>
     <p class="slug-note">Visningsnavne kan rettes frit. Tavleadressen ændres ikke automatisk.</p>
     <div class="board-actions">
-      <a data-board-link href="/${esc(team.slug)}">Åbn tavle</a>
+      <a data-board-link href="${esc(path)}">Åbn tavle</a>
       <button data-team-action="save-team">Gem navne og kontakt</button>
       ${team.onboarding_status !== 'active' ? '<button data-team-action="resend-invite">Send invitation igen</button>' : ''}
       <button data-team-action="send-reset-editor">Send nulstillingslink</button>
@@ -124,20 +125,18 @@ function customerAdministratorSection(customer) {
 
 function sharedOfferCard(offer, customer) {
   const selected = (offer.team_links || []).map(link => link.team_slug);
-  const customerSlug = offer.customer_slug || customer.url_slug || slugify(customer.display_name);
-  const offerPath = `/${customerSlug}/${offer.slug}`;
+  const offerPath = offer.public_path || `/${offer.customer_slug || customer.url_slug || slugify(customer.display_name)}/${offer.slug}`;
   return `<article class="board-card shared-offer-card" data-offer="${esc(offer.id)}">
-    <div class="board-title"><div><h5>${esc(offer.name)}</h5><code>visuplanner.dk${esc(offerPath)}</code></div><span class="status-badge">Fælles tilbud</span></div>
+    <div class="board-title"><div><h5>${esc(offer.name)}</h5><code>visuplanner.dk${esc(offerPath)}</code></div><span class="status-badge ${offer.onboarding_status === 'invited' ? 'trial' : ''}">${offer.onboarding_status === 'invited' ? 'Afventer aktivering' : 'Fælles tilbud'}</span></div>
     <div class="field-grid">
       <label>Navn<input data-offer-field="name" value="${esc(offer.name)}"></label>
       <label>Arbejdsplads<input data-offer-field="workplace" value="${esc(offer.workplace)}"></label>
       <label>Kommune<input data-offer-field="municipality" value="${esc(offer.municipality)}"></label>
       <label>Ansvarlig arbejdsmail<input data-offer-field="recovery_email" type="email" value="${esc(offer.recovery_email)}"></label>
       <label class="toggle-setting"><input data-offer-field="own_board_enabled" type="checkbox" ${offer.own_board_enabled ? 'checked' : ''}><span><strong>Egen tavle</strong><small>Kan åbnes på tablet og af eksterne beboere.</small></span></label>
-      <label class="toggle-setting"><input data-offer-field="registration_module_enabled" type="checkbox" ${offer.registration_module_enabled ? 'checked' : ''}><span><strong>Tilmeldingsmodul</strong><small>Viser kommende tilmeldingsaktiviteter på de tilknyttede teamtavler.</small></span></label>
     </div>
     <div class="offer-team-grid"><strong>Tilgængeligt for disse tavler</strong>${teamLinkOptions(customer, selected)}</div>
-    <div class="board-actions"><a href="${esc(offerPath)}" target="_blank" rel="noopener">Åbn tilbudstavle</a><button data-offer-action="save-shared-offer">Gem tilbud og tilknytninger</button></div>
+    <div class="board-actions">${offer.onboarding_status === 'invited' ? '' : `<a href="${esc(offerPath)}" target="_blank" rel="noopener">Åbn tilbudstavle</a>`}<button data-offer-action="save-shared-offer">Gem tilbud og tilknytninger</button></div>
     <details><summary>Nødhjælp: skift tilbuddets koder</summary><div class="field-grid two"><label>Ny redigeringskode<input data-offer-field="editor_password" type="password" minlength="8"></label><label>Ny visningskode<input data-offer-field="viewer_password" type="password" minlength="6"></label></div><div class="board-actions"><button data-offer-action="reset-editor-code">Sæt redigeringskode</button><button data-offer-action="reset-viewer-code">Sæt visningskode</button></div></details>
   </article>`;
 }
@@ -166,6 +165,7 @@ function customerCard(customer) {
         <label>EAN<input data-field="ean" value="${esc(customer.ean)}"></label>
         <label>Fakturareference<input data-field="invoice_reference" value="${esc(customer.invoice_reference)}"></label>
         <label>Betalingsform<select data-field="payment_method"><option value="">Ikke valgt</option><option value="ean" ${customer.payment_method === 'ean' ? 'selected' : ''}>EAN</option><option value="card" ${customer.payment_method === 'card' ? 'selected' : ''}>Kort</option><option value="mobilepay" ${customer.payment_method === 'mobilepay' ? 'selected' : ''}>MobilePay</option><option value="bank" ${customer.payment_method === 'bank' ? 'selected' : ''}>Bank</option><option value="other" ${customer.payment_method === 'other' ? 'selected' : ''}>Andet</option></select></label>
+        <label class="toggle-setting"><input data-field="club_module_enabled" type="checkbox" ${customer.club_module_enabled ? 'checked' : ''}><span><strong>Klubmodul tilkøbt</strong><small>Giver kundeadministratoren adgang til at oprette og tilknytte klubtavler.</small></span></label>
         <label>Interne noter<textarea data-field="internal_notes" rows="3">${esc(customer.internal_notes)}</textarea></label>
       </div>
       <div class="action-row"><button data-customer-action="save-customer">Gem kundeoplysninger</button></div>
@@ -213,7 +213,6 @@ function customerCard(customer) {
         <label>Redigeringskode<input data-new-offer="editor_password" type="password" minlength="8"></label>
         <label>Visningskode<input data-new-offer="viewer_password" type="password" minlength="6"></label>
         <label class="toggle-setting"><input data-new-offer="own_board_enabled" type="checkbox" checked><span><strong>Opret egen klubtavle</strong><small>Kan bruges på klubbens tablet og af eksterne beboere.</small></span></label>
-        <label class="toggle-setting"><input data-new-offer="registration_module_enabled" type="checkbox"><span><strong>Tilmeldingsmodul</strong><small>Valgfrit modul. Det kan også aktiveres senere på det enkelte klubtilbud.</small></span></label>
         <div class="offer-team-grid"><strong>Gør tilbuddet tilgængeligt for</strong>${teamLinkOptions(customer)}</div>
         <button data-customer-action="create-shared-offer">Opret fælles tilbud</button>
       </div></details>
@@ -277,6 +276,7 @@ function customerPayload(card, action) {
   const payload = { action, customerId:card.dataset.customer };
   if (action === 'save-customer') {
     ['display_name','legal_name','municipality','contact_name','contact_email','billing_email','phone','cvr','ean','invoice_reference','internal_notes','payment_method'].forEach(name => payload[name] = fieldValue(card, name));
+    payload.club_module_enabled = card.querySelector('[data-field="club_module_enabled"]')?.checked === true;
   } else if (action === 'activate-subscription') {
     payload.plan_code = fieldValue(card, 'plan_code');
     payload.board_limit = Number(fieldValue(card, 'board_limit'));
@@ -321,7 +321,7 @@ function bindActions() {
       await copyFallback(result, action === 'invite-customer-admin' ? 'Administratorinvitationen er oprettet.' : 'Tavlen er oprettet.');
       const messages = { 'create-board':'Tavlen er oprettet, og invitationen er sendt.', 'create-shared-offer':'Det fælles tilbud er oprettet.', 'invite-customer-admin':'Kundeadministratorens invitation er sendt.', 'archive-customer':'Kunden og alle tilknyttede tavler er arkiveret.', 'restore-customer':'Kunden er gendannet.', 'delete-customer':'Kunden og alle tilknyttede data er slettet permanent.' };
       const addressNote = action === 'create-board' && result.slugAdjusted
-        ? ` Adressen blev ændret til visuplanner.dk/${result.team.slug}, fordi ønsket var optaget eller reserveret.`
+        ? ` Adressen blev ændret til visuplanner.dk${result.publicPath}, fordi ønsket var optaget eller reserveret.`
         : '';
       status((messages[action] || 'Kundens aftale er opdateret.') + addressNote, 'success');
       await openDashboard();
@@ -426,12 +426,13 @@ function bindActions() {
         const note = input.closest('.inline-create')?.querySelector('[data-slug-status]');
         if (!input.value.trim()) { if (note) note.textContent = 'URL’en dannes automatisk, hvis feltet er tomt.'; return; }
         try {
-          const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify({ action:'check-slug', value:input.value }) });
+          const customerId = input.closest('[data-customer]')?.dataset.customer;
+          const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify({ action:'check-slug', customerId, value:input.value }) });
           input.value = result.slug;
           if (note) {
             note.textContent = result.available
-              ? `visuplanner.dk/${result.slug} er ledig.`
-              : `Den ønskede adresse er optaget eller reserveret. Vi foreslår visuplanner.dk/${result.slug}.`;
+              ? `URL-slutningen “${result.slug}” er ledig hos kunden.`
+              : `Den ønskede slutning er optaget hos kunden. Vi foreslår “${result.slug}”.`;
             note.className = 'slug-note good';
           }
         } catch (error) { if (note) note.textContent = error.message; }

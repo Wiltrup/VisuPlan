@@ -40,12 +40,12 @@
       </details>
 
       <section class="dashboard-section"><div class="section-heading"><div><p class="eyebrow">TAVLER</p><h2>Jeres teamtavler</h2></div><button id="customerAdminReload" class="secondary" type="button">Opdatér oversigt</button></div><div id="customerAdminBoards" class="board-grid"></div></section>
-      <section id="customerAdminOffersSection" class="dashboard-section" hidden><p class="eyebrow">FÆLLES TILBUD</p><h2>Klub- og fællestavler</h2><div id="customerAdminOffers" class="offer-grid"></div></section>
+      <section id="customerAdminOffersSection" class="dashboard-section" hidden><p class="eyebrow">KLUBMODUL</p><h2>Jeres klubtavler</h2><div id="customerAdminOffers" class="offer-grid"></div><details id="customerCreateClubPanel"><summary>Opret ny klubtavle</summary><form id="customerCreateClubForm" class="field-grid"><label>Klubbens navn<input name="name" placeholder="Fx Klub Solsikken" required></label><label>Ansvarlig arbejdsmail<input name="recovery_email" type="email" required></label><label>Arbejdsplads<input name="workplace" required></label><label class="wide">Ønsket slutning på URL <small id="customerClubSlugStatus">Skriv kun den sidste del, fx solsikken – ikke hele adressen.</small><input name="slug" placeholder="Fx solsikken"></label><fieldset class="wide"><legend>Vis klubben på disse teamtavler</legend><div id="customerClubTeams"></div></fieldset><p class="wide">Den ansvarlige medarbejder modtager et engangslink og vælger selv klubbens redigerings- og tavlekode.</p><div class="wide form-actions"><button type="submit">Opret klubtavle og send aktiveringslink</button></div></form></details></section>
       <section class="dashboard-section secondary-section"><p class="eyebrow">ADGANG</p><h2>Kundeadministratorer</h2><div id="customerAdminColleagues"></div><a id="customerAdminHelp" class="help-button" href="mailto:wiltrup@wiltrup.com">Hjælp: Kontakt Techus Nord / VisuPlanner</a></section>
       <details class="dashboard-section activity-section"><summary>Seneste administratorhandlinger</summary><div id="customerAdminAudit"></div></details>
     </section>
   </main>
   <div id="customerAdminStatus" role="status" aria-live="polite"></div>
-  <script src="/customer-admin.js?v=60"></script>
+  <script src="/customer-admin.js?v=61"></script>
 </body>
 </html>

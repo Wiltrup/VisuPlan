@@ -15,8 +15,9 @@
     { "source": "/databehandleraftale", "destination": "/databehandleraftale.html" },
     { "source": "/underdatabehandlere", "destination": "/underdatabehandlere.html" },
     { "source": "/administration", "destination": "/admin" },
+    { "source": "/board", "destination": "/board.html" },
     { "source": "/tilbud/:offerSlug", "destination": "/shared-offer" },
-    { "source": "/:customerSlug/:offerSlug", "destination": "/shared-offer" },
+    { "source": "/:customerSlug/:boardSlug", "destination": "/board" },
     { "source": "/:teamSlug", "destination": "/app" }
   ],
   "crons": [

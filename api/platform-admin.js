@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { createCustomerAdminInvitation, saveTeamCredential } = require('../lib/customer-admin-security');
 const { isReservedBoardSlug, withNumericSuffix } = require('../lib/board-slugs');
+const { safeRoutes, publicPath, uniquePublicSlug, createRoute, routeMaps } = require('../lib/board-routes');
 
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
@@ -106,6 +107,14 @@ async function uniqueSlug(base, secret) {
   return candidate;
 }
 
+async function uniqueCustomerSlug(base, secret) {
+  const stem = slugify(base);
+  let candidate = stem;
+  let suffix = 2;
+  while ((await serviceFetch(`/rest/v1/customers?url_slug=eq.${encodeURIComponent(candidate)}&select=id&limit=1`, secret))?.length) candidate = withNumericSuffix(stem, suffix++);
+  return candidate;
+}
+
 async function offerSlugAvailable(slug, secret, currentSlug = '') {
   if (!/^[a-z0-9-]{3,120}$/.test(slug)) return false;
   if (slug === currentSlug) return true;
@@ -129,8 +138,9 @@ async function createSharedOffer(input, customer, secret) {
   if (!name || !/^\S+@\S+\.\S+$/.test(recoveryEmail)) throw new Error('Tilbuddets navn og kontaktmail skal udfyldes.');
   if (editorPassword.length < 8 || viewerPassword.length < 6) throw new Error('Redigeringskoden skal have mindst 8 tegn, og visningskoden mindst 6 tegn.');
   const requested = clean(input.slug, 120);
-  const slug = requested ? slugify(requested) : await uniqueOfferSlug(`${customer.display_name}-${name}`, secret);
-  if (!(await offerSlugAvailable(slug, secret))) throw new Error('Den ønskede tilbudsadresse er allerede i brug.');
+  const requestedSlug = requested ? slugify(requested) : '';
+  const boardSlug = await uniquePublicSlug(serviceFetch, secret, customer, requestedSlug || name, slugify);
+  const slug = await uniqueOfferSlug(`${customer.url_slug || customer.display_name}-${boardSlug}`, secret);
   let editor = null;
   let viewer = null;
   let offer = null;
@@ -149,7 +159,7 @@ async function createSharedOffer(input, customer, secret) {
         municipality: clean(input.municipality || customer.municipality, 150) || null,
         recovery_email: recoveryEmail, editor_user_id: editor.id, viewer_user_id: viewer.id,
         own_board_enabled: input.own_board_enabled !== false,
-        registration_module_enabled: input.registration_module_enabled === true
+        registration_module_enabled: true
       })
     });
     offer = rows?.[0];
@@ -160,12 +170,13 @@ async function createSharedOffer(input, customer, secret) {
         method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ customer_slug: customerSlug })
       }).catch(() => {});
     }
+    const route = await createRoute(serviceFetch, secret, { customer_id:customer.id, customer_slug:customerSlug, board_slug:boardSlug, board_kind:'offer', offer_id:offer.id });
     const teamSlugs = Array.isArray(input.team_slugs) ? input.team_slugs.filter(value => /^[a-z0-9-]{3,120}$/.test(value)) : [];
     if (offer && teamSlugs.length) await serviceFetch('/rest/v1/shared_offer_team_links', secret, {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(teamSlugs.map(team_slug => ({ offer_id: offer.id, team_slug, visible_on_team: true })))
     });
-    return offer;
+    return { ...offer, public_path:publicPath(route) || `/${customerSlug}/${offer.slug}`, board_slug:boardSlug, slugAdjusted:Boolean(requestedSlug && boardSlug !== requestedSlug) };
   } catch (error) {
     if (offer?.id) await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
     if (viewer?.id) await serviceFetch(`/auth/v1/admin/users/${viewer.id}`, secret, { method: 'DELETE' }).catch(() => {});
@@ -221,8 +232,9 @@ async function createBoard(input, customer, secret, host) {
 
   const requested = clean(input.slug, 120);
   const requestedSlug = requested ? slugify(requested) : '';
-  const slug = await uniqueSlug(requestedSlug || `${workplace}-${name}`, secret);
-  const slugAdjusted = Boolean(requestedSlug && slug !== requestedSlug);
+  const boardSlug = await uniquePublicSlug(serviceFetch, secret, customer, requestedSlug || name, slugify);
+  const slug = await uniqueSlug(`${customer.url_slug || customer.display_name}-${boardSlug}`, secret);
+  const slugAdjusted = Boolean(requestedSlug && boardSlug !== requestedSlug);
 
   const technicalId = crypto.randomBytes(8).toString('hex');
   const editorEmail = `${slug}-${technicalId}-editor@visuplanner.invalid`;
@@ -247,8 +259,9 @@ async function createBoard(input, customer, secret, host) {
     });
     teamCreated = true;
     const team = rows?.[0] || { slug, name, recovery_email: recoveryEmail, customer_id: customer.id };
+    const route = await createRoute(serviceFetch, secret, { customer_id:customer.id, customer_slug:customer.url_slug || slugify(customer.display_name), board_slug:boardSlug, board_kind:'team', team_slug:team.slug });
     const invitation = await createInvitation(team, customer, secret, host);
-    return { team, requestedSlug, slugAdjusted, ...invitation };
+    return { team, requestedSlug, boardSlug, slugAdjusted, publicPath:publicPath(route) || `/${team.slug}`, ...invitation };
   } catch (error) {
     if (teamCreated) await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
     if (viewer?.id) await serviceFetch(`/auth/v1/admin/users/${viewer.id}`, secret, { method: 'DELETE' }).catch(() => {});
@@ -273,7 +286,7 @@ module.exports = async function handler(request, response) {
 
   try {
     if (request.method === 'GET') {
-      const [customers, archivedCustomers, teams, archivedTeams, onboarding, accessHelp, acceptances, sharedOffers, archivedSharedOffers, sharedOfferLinks, customerAdmins, customerAdminInvitations] = await Promise.all([
+      const [customers, archivedCustomers, teams, archivedTeams, onboarding, accessHelp, acceptances, sharedOffers, archivedSharedOffers, sharedOfferLinks, customerAdmins, customerAdminInvitations, routes] = await Promise.all([
         serviceFetch('/rest/v1/customers?archived_at=is.null&select=*&order=display_name.asc', secret),
         serviceFetch('/rest/v1/customers?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
         serviceFetch('/rest/v1/teams_registry?archived_at=is.null&select=*&order=name.asc', secret),
@@ -285,28 +298,34 @@ module.exports = async function handler(request, response) {
         serviceFetch('/rest/v1/shared_offers?archived_at=not.is.null&select=*&order=archived_at.desc', secret),
         serviceFetch('/rest/v1/shared_offer_team_links?select=*&order=created_at.asc', secret),
         serviceFetch('/rest/v1/customer_admins?select=*&order=name.asc', secret).catch(() => []),
-        serviceFetch('/rest/v1/customer_admin_invitations?used_at=is.null&select=id,customer_id,name,email,purpose,expires_at,created_at&order=created_at.desc', secret).catch(() => [])
+        serviceFetch('/rest/v1/customer_admin_invitations?used_at=is.null&select=id,customer_id,name,email,purpose,expires_at,created_at&order=created_at.desc', secret).catch(() => []),
+        safeRoutes(serviceFetch, secret, 'select=*')
       ]);
+      const maps = routeMaps(routes);
+      const teamWithPaths = (teams || []).map(team => ({ ...team, public_path:publicPath(maps.byTeam.get(team.slug)) || `/${team.slug}` }));
+      const archivedTeamWithPaths = (archivedTeams || []).map(team => ({ ...team, public_path:publicPath(maps.byTeam.get(team.slug)) || `/${team.slug}` }));
+      const offerWithPaths = (sharedOffers || []).map(offer => ({ ...offer, public_path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || 'tilbud'}/${offer.slug}` }));
+      const archivedOfferWithPaths = (archivedSharedOffers || []).map(offer => ({ ...offer, public_path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || 'tilbud'}/${offer.slug}` }));
       const grouped = (customers || []).map(customer => ({
         ...customer,
-        teams: (teams || []).filter(team => team.customer_id === customer.id),
-        shared_offers: (sharedOffers || []).filter(offer => offer.customer_id === customer.id).map(offer => ({ ...offer, team_links: (sharedOfferLinks || []).filter(link => link.offer_id === offer.id) })),
+        teams: teamWithPaths.filter(team => team.customer_id === customer.id),
+        shared_offers: offerWithPaths.filter(offer => offer.customer_id === customer.id).map(offer => ({ ...offer, team_links: (sharedOfferLinks || []).filter(link => link.offer_id === offer.id) })),
         customer_admins: (customerAdmins || []).filter(admin => admin.customer_id === customer.id),
         customer_admin_invitations: (customerAdminInvitations || []).filter(invite => invite.customer_id === customer.id && new Date(invite.expires_at) > new Date()),
         latest_acceptance: (acceptances || []).find(item => item.customer_id === customer.id) || null
       }));
       const archivedGrouped = (archivedCustomers || []).map(customer => ({
         ...customer,
-        teams: [...(teams || []), ...(archivedTeams || [])].filter(team => team.customer_id === customer.id),
-        shared_offers: [...(sharedOffers || []), ...(archivedSharedOffers || [])].filter(offer => offer.customer_id === customer.id),
+        teams: [...teamWithPaths, ...archivedTeamWithPaths].filter(team => team.customer_id === customer.id),
+        shared_offers: [...offerWithPaths, ...archivedOfferWithPaths].filter(offer => offer.customer_id === customer.id),
         latest_acceptance: (acceptances || []).find(item => item.customer_id === customer.id) || null
       }));
       const archivedCustomerIds = new Set((archivedCustomers || []).map(customer => customer.id));
       return response.status(200).json({
         customers: grouped,
         archivedCustomers: archivedGrouped,
-        ungroupedTeams: (teams || []).filter(team => !team.customer_id),
-        archivedTeams: (archivedTeams || []).filter(team => !archivedCustomerIds.has(team.customer_id)),
+        ungroupedTeams: teamWithPaths.filter(team => !team.customer_id),
+        archivedTeams: archivedTeamWithPaths.filter(team => !archivedCustomerIds.has(team.customer_id)),
         onboarding: onboarding || [], accessHelp: accessHelp || [], termsVersion: TERMS_VERSION
       });
     }
@@ -349,9 +368,12 @@ module.exports = async function handler(request, response) {
     }
 
     if (action === 'check-slug') {
+      const customers = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
+      const customer = customers?.[0];
+      if (!customer) return response.status(404).json({ error:'Kunden blev ikke fundet.' });
       const requestedSlug = slugify(body.value || body.slug);
-      const available = await slugAvailable(requestedSlug, secret);
-      const slug = available ? requestedSlug : await uniqueSlug(requestedSlug, secret);
+      const slug = await uniquePublicSlug(serviceFetch, secret, customer, requestedSlug, slugify);
+      const available = slug === requestedSlug;
       return response.status(200).json({ slug, available, adjusted:!available, requestedSlug });
     }
     if (action === 'create-shared-offer') {
@@ -362,7 +384,7 @@ module.exports = async function handler(request, response) {
       const allowed = new Set((customerTeams || []).map(team => team.slug));
       body.team_slugs = (Array.isArray(body.team_slugs) ? body.team_slugs : []).filter(teamSlug => allowed.has(teamSlug));
       const offer = await createSharedOffer(body, customer, secret);
-      return response.status(200).json({ ok: true, offer, boardUrl: `/${offer.customer_slug || slugify(customer.display_name)}/${offer.slug}` });
+      return response.status(200).json({ ok: true, offer, boardUrl:offer.public_path });
     }
     if (action === 'save-shared-offer') {
       const offerId = clean(body.offer_id, 60);
@@ -373,7 +395,7 @@ module.exports = async function handler(request, response) {
         name: clean(body.name, 150), workplace: clean(body.workplace, 200) || null,
         municipality: clean(body.municipality, 150) || null, recovery_email: clean(body.recovery_email, 200).toLowerCase(),
         own_board_enabled: body.own_board_enabled !== false,
-        registration_module_enabled: body.registration_module_enabled === true,
+        registration_module_enabled: true,
         updated_at: new Date().toISOString()
       };
       if (!update.name || !/^\S+@\S+\.\S+$/.test(update.recovery_email)) return response.status(400).json({ error: 'Udfyld navn og en gyldig kontaktmail.' });
@@ -423,7 +445,7 @@ module.exports = async function handler(request, response) {
           })
         });
         customer = customerRows?.[0];
-        const customerSlug = slugify(customer.display_name);
+        const customerSlug = await uniqueCustomerSlug(customer.display_name, secret);
         customer.url_slug = customerSlug;
         await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, {
           method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ url_slug: customerSlug })
@@ -448,8 +470,9 @@ module.exports = async function handler(request, response) {
       return response.status(200).json({ ok: true, ...(await createBoard(body, customer, secret, request.headers.host)) });
     }
     if (action === 'save-customer') {
-      const allowed = ['display_name','legal_name','municipality','contact_name','contact_email','billing_email','phone','cvr','ean','invoice_reference','internal_notes','payment_method'];
+      const allowed = ['display_name','legal_name','municipality','contact_name','contact_email','billing_email','phone','cvr','ean','invoice_reference','internal_notes','payment_method','club_module_enabled'];
       const update = Object.fromEntries(allowed.filter(key => Object.prototype.hasOwnProperty.call(body, key)).map(key => [key, clean(body[key], key === 'internal_notes' ? 2000 : 300) || null]));
+      if (Object.prototype.hasOwnProperty.call(body, 'club_module_enabled')) update.club_module_enabled = body.club_module_enabled === true;
       update.updated_at = new Date().toISOString();
       await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(update) });
       return response.status(200).json({ ok: true });

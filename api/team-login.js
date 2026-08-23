@@ -1,4 +1,5 @@
 const crypto = require('crypto');
+const { safeRoutes, publicPath, routeMaps } = require('../lib/board-routes');
 
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
@@ -69,14 +70,49 @@ module.exports = async function handler(request, response) {
   try {
     const input = request.method === 'GET' ? request.query : (request.body || {});
     const { slug, action, password, email } = input;
+    const resolveCustomer = String(input.resolve_customer || '');
+    const resolveSlug = String(input.resolve_slug || '');
+    if (request.method === 'GET' && resolveCustomer && resolveSlug) {
+      if (!/^[a-z0-9-]{2,80}$/.test(resolveCustomer) || !/^[a-z0-9-]{2,80}$/.test(resolveSlug)) return response.status(404).json({ error:'Tavlen blev ikke fundet.' });
+      const routes = await safeRoutes(service, secret, `customer_slug=eq.${encodeURIComponent(resolveCustomer)}&board_slug=eq.${encodeURIComponent(resolveSlug)}&select=*&limit=1`);
+      let route = routes?.[0] || null;
+      if (!route) {
+        const customers = await service(`/rest/v1/customers?url_slug=eq.${encodeURIComponent(resolveCustomer)}&archived_at=is.null&select=id,url_slug&limit=1`, secret);
+        const customer = customers?.[0];
+        if (customer) {
+          const [teams, offers] = await Promise.all([
+            service(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=is.null&select=slug,onboarding_status`, secret),
+            service(`/rest/v1/shared_offers?customer_id=eq.${encodeURIComponent(customer.id)}&archived_at=is.null&own_board_enabled=eq.true&select=id,slug,onboarding_status`, secret)
+          ]);
+          const local = value => value?.startsWith(`${resolveCustomer}-`) ? value.slice(resolveCustomer.length + 1) : value;
+          const team = (teams || []).find(item => (item.slug === resolveSlug || local(item.slug) === resolveSlug) && item.onboarding_status === 'active');
+          const offer = (offers || []).find(item => (item.slug === resolveSlug || local(item.slug) === resolveSlug) && item.onboarding_status !== 'invited');
+          if (team) route = { board_kind:'team', team_slug:team.slug };
+          else if (offer) route = { board_kind:'offer', offer_id:offer.id, offer_slug:offer.slug };
+        }
+      }
+      if (route?.board_kind === 'team' && route.team_slug) {
+        const teams = await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(route.team_slug)}&onboarding_status=eq.active&archived_at=is.null&select=slug&limit=1`, secret);
+        if (teams?.length) return response.status(200).json({ kind:'team', target_slug:route.team_slug });
+      }
+      if (route?.board_kind === 'offer') {
+        const offers = route.offer_id
+          ? await service(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(route.offer_id)}&own_board_enabled=eq.true&archived_at=is.null&select=slug,onboarding_status&limit=1`, secret)
+          : [{ slug:route.offer_slug }];
+        if (offers?.[0]?.slug && offers[0].onboarding_status !== 'invited') return response.status(200).json({ kind:'club', target_slug:offers[0].slug });
+      }
+      return response.status(404).json({ error:'Tavlen blev ikke fundet eller er endnu ikke aktiveret.' });
+    }
     if (request.method === 'GET' && !slug) {
-      const [teams, offers] = await Promise.all([
-        service('/rest/v1/teams_registry?onboarding_status=eq.active&archived_at=is.null&select=slug,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc', secret),
-        service('/rest/v1/shared_offers?own_board_enabled=eq.true&archived_at=is.null&select=slug,customer_slug,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc', secret)
+      const [teams, offers, routes] = await Promise.all([
+        service('/rest/v1/teams_registry?onboarding_status=eq.active&archived_at=is.null&select=slug,customer_id,name,municipality,workplace&order=municipality.asc,workplace.asc,name.asc', secret),
+        service('/rest/v1/shared_offers?own_board_enabled=eq.true&archived_at=is.null&select=id,slug,customer_id,customer_slug,name,municipality,workplace,onboarding_status&order=municipality.asc,workplace.asc,name.asc', secret),
+        safeRoutes(service, secret, 'select=*')
       ]);
+      const maps = routeMaps(routes);
       const directory = [
-        ...(teams || []).map(team => ({ ...team, kind:'team', path:`/${team.slug}` })),
-        ...(offers || []).map(offer => ({ ...offer, kind:'club', path:`/${offer.customer_slug || 'tilbud'}/${offer.slug}` }))
+        ...(teams || []).map(team => ({ ...team, kind:'team', path:publicPath(maps.byTeam.get(team.slug)) || `/${team.slug}` })),
+        ...(offers || []).filter(offer => offer.onboarding_status !== 'invited').map(offer => ({ ...offer, kind:'club', path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || 'tilbud'}/${offer.slug}` }))
       ].sort((a, b) => `${a.municipality}\0${a.workplace}\0${a.kind}\0${a.name}`.localeCompare(`${b.municipality}\0${b.workplace}\0${b.kind}\0${b.name}`, 'da'));
       return response.status(200).json(directory);
     }

@@ -9,7 +9,7 @@ module.exports=async function handler(request,response){
     const key=process.env.SUPABASE_SECRET_KEY||SUPABASE_KEY;
     const result=await fetch(`${SUPABASE_URL}/rest/v1/shared_offers?slug=eq.${encodeURIComponent(slug)}&archived_at=is.null&own_board_enabled=eq.true&select=*`,{headers:{apikey:key,Authorization:`Bearer ${key}`}});
     const offer=(await result.json())?.[0];
-    if(!offer)return response.status(404).json({error:'Tilbuddet blev ikke fundet.'});
+    if(!offer||offer.onboarding_status==='invited')return response.status(404).json({error:'Tilbuddet blev ikke fundet.'});
     response.setHeader('Content-Type','application/manifest+json');response.setHeader('Cache-Control','public, max-age=300');
     const fallbackPath=`/${offer.customer_slug||'tilbud'}/${slug}`;
     const boardPath=/^\/[a-z0-9-]+\/[a-z0-9-]+$/.test(requestedPath)?requestedPath:fallbackPath;

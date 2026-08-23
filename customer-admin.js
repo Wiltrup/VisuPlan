@@ -57,7 +57,8 @@ const auditTargetLabel = value => String(value || '').startsWith('deleted_team:'
 const actionLabels = {
   board_created:'Tavle oprettet', code_revealed:'Kode vist', code_changed:'Kode ændret',
   team_updated:'Tavleoplysninger ændret', activation_sent:'Aktiveringslink sendt', password_reset_sent:'Nulstillingslink sendt',
-  board_deleted:'Tavle slettet'
+  board_deleted:'Tavle slettet', club_created:'Klubtavle oprettet', club_activation_sent:'Aktiveringslink til klub sendt',
+  club_password_reset_sent:'Nulstillingslink til klub sendt', club_code_changed:'Klubbens kode ændret'
 };
 
 function credentialHtml(team, kind) {
@@ -69,7 +70,13 @@ function credentialHtml(team, kind) {
 
 function boardHtml(team) {
   const active = team.onboarding_status === 'active';
-  return `<article class="customer-board" data-team="${esc(team.slug)}"><div class="board-head"><div><h3>${esc(team.name)}</h3><code>visuplanner.dk/${esc(team.slug)}</code></div><span class="badge ${active ? '' : 'pending'}">${active ? 'Aktiv' : 'Afventer aktivering'}</span></div><div class="board-meta"><span>${esc(team.workplace)} · ${esc(team.municipality)}</span><span>Ansvarlig: ${esc(team.recovery_email)}</span></div><div class="credential-list">${credentialHtml(team,'viewer')}${credentialHtml(team,'editor')}</div><div class="board-actions"><a href="/${esc(team.slug)}" target="_blank" rel="noopener">Åbn tavle</a>${active ? '<button data-action="send-editor-reset" type="button">Send nulstillingslink</button>' : '<button data-action="send-invite" type="button">Send aktiveringslink igen</button>'}<button data-action="delete-board" class="danger" type="button">Slet tavle</button></div><details class="team-edit"><summary>Ret tavlenavn og kontakt</summary><form data-save-team class="field-grid"><label>Tavlenavn<input name="name" value="${esc(team.name)}" required></label><label>Ansvarlig mail<input name="recovery_email" type="email" value="${esc(team.recovery_email)}" required></label><label>Arbejdsplads<input name="workplace" value="${esc(team.workplace)}" required></label><div class="form-actions"><button type="submit">Gem oplysninger</button></div></form></details></article>`;
+  const path = team.public_path || `/${team.slug}`;
+  return `<article class="customer-board" data-team="${esc(team.slug)}"><div class="board-head"><div><h3>${esc(team.name)}</h3><code>visuplanner.dk${esc(path)}</code></div><span class="badge ${active ? '' : 'pending'}">${active ? 'Aktiv' : 'Afventer aktivering'}</span></div><div class="board-meta"><span>${esc(team.workplace)} · ${esc(team.municipality)}</span><span>Ansvarlig: ${esc(team.recovery_email)}</span></div><div class="credential-list">${credentialHtml(team,'viewer')}${credentialHtml(team,'editor')}</div><div class="board-actions"><a href="${esc(path)}" target="_blank" rel="noopener">Åbn tavle</a>${active ? '<button data-action="send-editor-reset" type="button">Send nulstillingslink</button>' : '<button data-action="send-invite" type="button">Send aktiveringslink igen</button>'}<button data-action="delete-board" class="danger" type="button">Slet tavle</button></div><details class="team-edit"><summary>Ret tavlenavn og kontakt</summary><form data-save-team class="field-grid"><label>Tavlenavn<input name="name" value="${esc(team.name)}" required></label><label>Ansvarlig mail<input name="recovery_email" type="email" value="${esc(team.recovery_email)}" required></label><label>Arbejdsplads<input name="workplace" value="${esc(team.workplace)}" required></label><div class="form-actions"><button type="submit">Gem oplysninger</button></div></form></details></article>`;
+}
+
+function clubHtml(offer) {
+  const active = offer.onboarding_status === 'active';
+  return `<article class="offer-card" data-offer="${esc(offer.id)}"><div class="board-head"><div><h3>${esc(offer.name)}</h3><code>visuplanner.dk${esc(offer.public_path)}</code></div><span class="badge ${active ? '' : 'pending'}">${active ? 'Aktiv' : 'Afventer aktivering'}</span></div><p>${esc(offer.workplace || '')} · ${esc(offer.recovery_email || '')}</p><div class="board-actions">${active ? `<a href="${esc(offer.public_path)}" target="_blank" rel="noopener">Åbn klubtavle</a><button data-club-action="send-club-reset" type="button">Send nulstillingslink</button>` : '<button data-club-action="send-club-invite" type="button">Send aktiveringslink igen</button>'}</div><details><summary>Nødhjælp: vælg nye koder</summary><form data-reset-club-code="editor"><input name="value" type="password" minlength="8" placeholder="Ny redigeringskode – mindst 8 tegn" required><button type="submit">Vælg ny</button></form><form data-reset-club-code="viewer"><input name="value" type="password" minlength="6" placeholder="Ny tavlekode – mindst 6 tegn" required><button type="submit">Vælg ny</button></form></details></article>`;
 }
 
 function render() {
@@ -86,8 +93,13 @@ function render() {
   $('customerAdminColleagues').innerHTML = admins.map(admin => `<div class="admin-person"><strong>${esc(admin.name)}</strong><span>${esc(admin.email)}</span></div>`).join('');
   $('customerAdminHelp').href = `mailto:wiltrup@wiltrup.com?subject=${encodeURIComponent(`Hjælp til VisuPlanner – ${customer.name}`)}&body=${encodeURIComponent(`Hej Techus Nord\n\nJeg har brug for hjælp til VisuPlanner.\n\nKunde: ${customer.name}\n\n`)}`;
   $('customerAdminAudit').innerHTML = logs.length ? logs.map(item => `<div class="audit-row"><div><strong>${esc(actionLabels[item.action] || item.action)}</strong><span>${item.team_slug ? ` · ${esc(item.team_slug)}` : ''}${item.target_kind ? ` · ${esc(auditTargetLabel(item.target_kind))}` : ''}</span></div><div><span>${esc(item.admin_name || item.admin_email || '')}</span><time>${dateTime(item.created_at)}</time></div></div>`).join('') : '<p class="empty">Ingen administratorhandlinger endnu.</p>';
-  $('customerAdminOffersSection').hidden = !offers.length;
-  $('customerAdminOffers').innerHTML = offers.map(offer => `<article class="offer-card"><h3>${esc(offer.name)}</h3><a href="/${esc(offer.customer_slug || '')}/${esc(offer.slug)}" target="_blank" rel="noopener">Åbn tavle</a></article>`).join('');
+  $('customerAdminOffersSection').hidden = !customer.club_module_enabled;
+  $('customerAdminOffers').innerHTML = offers.length ? offers.map(clubHtml).join('') : '<p class="empty">Ingen klubtavler er oprettet endnu.</p>';
+  if (customer.club_module_enabled) {
+    const clubForm = $('customerCreateClubForm');
+    if (!clubForm.elements.workplace.value) clubForm.elements.workplace.value = customer.name;
+    $('customerClubTeams').innerHTML = teams.map(team => `<label><input type="checkbox" name="team_slugs" value="${esc(team.slug)}" checked> ${esc(team.name)}</label>`).join('') || '<p class="empty">Opret mindst én teamtavle for at vise klubindhold dér.</p>';
+  }
   bindDashboardActions();
 }
 
@@ -155,6 +167,25 @@ function bindDashboardActions() {
       await loadDashboard();
     } catch (error) { notify(error.message,'error'); button.disabled = false; }
   });
+  document.querySelectorAll('[data-club-action]').forEach(button => button.onclick = async () => {
+    const card = button.closest('[data-offer]');
+    button.disabled = true;
+    try {
+      const result = await post({ action:button.dataset.clubAction, offer_id:card.dataset.offer });
+      if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
+      notify(result.mailSent ? 'Linket er sendt.' : 'Mail kunne ikke sendes. Linket er kopieret.');
+    } catch (error) { notify(error.message, 'error'); button.disabled = false; }
+  });
+  document.querySelectorAll('[data-reset-club-code]').forEach(form => form.onsubmit = async event => {
+    event.preventDefault();
+    const card = form.closest('[data-offer]');
+    const kind = form.dataset.resetClubCode;
+    const value = new FormData(form).get('value');
+    if (!confirm(`Vælg en ny ${kind === 'viewer' ? 'tavlekode' : 'redigeringskode'} til klubben?`)) return;
+    const button = event.submitter; button.disabled = true;
+    try { await post({ action:'reset-club-code', offer_id:card.dataset.offer, kind, value }); notify('Klubbens kode er ændret.'); form.reset(); }
+    catch (error) { notify(error.message, 'error'); button.disabled = false; }
+  });
 }
 
 $('customerAdminLoginForm').onsubmit = async event => {
@@ -194,7 +225,7 @@ $('customerCreateBoardForm').onsubmit = async event => {
     const result = await post({ action:'create-board', ...values });
     if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
     form.elements.name.value = ''; form.elements.recovery_email.value = ''; form.elements.slug.value = '';
-    const addressNote = result.slugAdjusted ? ` Adressen blev ændret til visuplanner.dk/${result.team.slug}, fordi ønsket var optaget eller reserveret.` : '';
+    const addressNote = result.slugAdjusted ? ` Adressen blev ændret til visuplanner.dk${result.publicPath}, fordi ønsket var optaget eller reserveret.` : '';
     notify((result.mailSent ? 'Tavlen er oprettet, og aktiveringslinket er sendt.' : 'Tavlen er oprettet. Aktiveringslinket er kopieret.') + addressNote);
     $('customerBoardSlugStatus').textContent = 'Skriv fx team 1 eller /team-1. Systemet indsætter selv bindestreger og vælger en unik adresse.';
     await loadDashboard();
@@ -216,8 +247,44 @@ $('customerCreateBoardForm').onsubmit = async event => {
         const result = await post({ action:'check-slug', value:input.value });
         input.value = `/${result.slug}`;
         note.textContent = result.available
-          ? `visuplanner.dk/${result.slug} er ledig.`
-          : `Den ønskede adresse er optaget eller reserveret. Vi foreslår visuplanner.dk/${result.slug}.`;
+          ? `visuplanner.dk/${dashboard.customer.url_slug}/${result.slug} er ledig.`
+          : `Den ønskede adresse er optaget. Vi foreslår visuplanner.dk/${dashboard.customer.url_slug}/${result.slug}.`;
+      } catch (error) { note.textContent = error.message; }
+    }, 450);
+  });
+}
+
+$('customerCreateClubForm').onsubmit = async event => {
+  event.preventDefault();
+  const form = event.currentTarget;
+  const button = event.submitter;
+  button.disabled = true;
+  const data = new FormData(form);
+  const payload = Object.fromEntries(data);
+  payload.action = 'create-shared-offer';
+  payload.team_slugs = data.getAll('team_slugs');
+  try {
+    const result = await post(payload);
+    const changed = result.slugAdjusted ? ` Adressen blev justeret til visuplanner.dk${result.publicPath}.` : '';
+    if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
+    notify(`${result.mailSent ? 'Klubtavlen er oprettet, og aktiveringslinket er sendt.' : 'Klubtavlen er oprettet. Aktiveringslinket er kopieret.'}${changed}`);
+    form.reset();
+    await loadDashboard();
+  } catch (error) { notify(error.message, 'error'); button.disabled = false; }
+};
+
+{
+  const input = $('customerCreateClubForm').elements.slug;
+  const note = $('customerClubSlugStatus');
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (!input.value.trim()) return note.textContent = 'Feltet er tomt – systemet bruger klubbens navn.';
+      try {
+        const result = await post({ action:'check-slug', value:input.value });
+        input.value = result.slug;
+        note.textContent = result.available ? `visuplanner.dk/${dashboard.customer.url_slug}/${result.slug} er ledig.` : `Vi foreslår visuplanner.dk/${dashboard.customer.url_slug}/${result.slug}.`;
       } catch (error) { note.textContent = error.message; }
     }, 450);
   });

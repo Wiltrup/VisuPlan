@@ -24,7 +24,7 @@ module.exports = async function handler(request, response) {
     if (!/^[a-z0-9-]{3,120}$/.test(slug)) return response.status(404).json({ error: 'Tilbuddet blev ikke fundet.' });
     const offers = await service(`/rest/v1/shared_offers?slug=eq.${encodeURIComponent(slug)}&archived_at=is.null&select=*`, secret);
     const offer = offers?.[0];
-    if (!offer) return response.status(404).json({ error: 'Tilbuddet blev ikke fundet.' });
+    if (!offer || offer.onboarding_status === 'invited') return response.status(404).json({ error: 'Tilbuddet blev ikke fundet eller er endnu ikke aktiveret.' });
     if (request.method === 'GET') {
       let linkedTeams = [];
       if (offer.registration_module_enabled) {

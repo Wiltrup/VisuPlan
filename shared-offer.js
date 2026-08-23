@@ -1,6 +1,10 @@
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
-const slug = location.pathname.split('/').filter(Boolean).at(-1) || '';
+const CURRENT_OFFER_PATH = location.pathname.replace(/\/+$/, '') || '/';
+let ROUTE_RESOLUTION = null;
+try { ROUTE_RESOLUTION = JSON.parse(sessionStorage.getItem('visuplanner-board-route') || 'null'); } catch {}
+if (ROUTE_RESOLUTION?.path !== CURRENT_OFFER_PATH || ROUTE_RESOLUTION?.kind !== 'club') ROUTE_RESOLUTION = null;
+const slug = ROUTE_RESOLUTION?.target_slug || location.pathname.split('/').filter(Boolean).at(-1) || '';
 const DAYS = [
   ['Mandag','Man','#eab308'],
   ['Tirsdag','Tir','#ef4444'],

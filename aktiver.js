@@ -11,8 +11,9 @@ async function check() {
     invitation = data;
     document.getElementById('teamName').textContent = data.teamName;
     const reset = data.purpose === 'password_reset';
-    document.getElementById('activationHeading').textContent = reset ? 'Vælg en ny personalekode' : 'Vælg jeres egne koder';
-    document.getElementById('activationIntro').textContent = reset ? 'Linket kan kun bruges én gang og ændrer kun personalekoden.' : 'Koderne opbevares sikkert og kan ses af jeres udpegede kundeadministratorer.';
+    const club = data.kind === 'club';
+    document.getElementById('activationHeading').textContent = reset ? `Vælg en ny ${club ? 'redigeringskode' : 'personalekode'}` : 'Vælg jeres egne koder';
+    document.getElementById('activationIntro').textContent = reset ? `Linket kan kun bruges én gang og ændrer kun ${club ? 'redigeringskoden' : 'personalekoden'}.` : 'Vælg en kode til redigering og en fælles kode til visning af tavlen.';
     document.getElementById('viewerCodeFields').hidden = reset;
     document.querySelectorAll('#viewerCodeFields input').forEach(input => { input.required = !reset; });
     form.querySelector('button').textContent = reset ? 'Gem ny personalekode' : 'Aktivér tavlen';
@@ -45,7 +46,7 @@ form.addEventListener('submit', async event => {
     if (!response.ok) throw new Error(data.error);
     statusEl.className = 'finder-message success-message';
     statusEl.textContent = data.reset ? 'Personalekoden er ændret. Du sendes videre…' : 'Tavlen er aktiveret. Jeres 14 dages prøveperiode starter nu.';
-    setTimeout(() => { location.href = `/${data.slug}`; }, 1400);
+    setTimeout(() => { location.href = data.path || `/${data.slug}`; }, 1400);
   } catch (error) {
     statusEl.className = 'finder-message error-message';
     statusEl.textContent = error.message;
