@@ -259,6 +259,9 @@ module.exports = async function handler(request, response) {
       const offerCredentials = offerIds.length
         ? await service(`/rest/v1/shared_offer_credentials?offer_id=in.(${offerIds.map(encodeURIComponent).join(',')})&select=offer_id,editor_code_ciphertext,viewer_code_ciphertext,editor_changed_at,viewer_changed_at`, secret).catch(() => [])
         : [];
+      const offerLinks = offerIds.length
+        ? await service(`/rest/v1/shared_offer_team_links?offer_id=in.(${offerIds.map(encodeURIComponent).join(',')})&select=offer_id,team_slug,visible_on_team`, secret).catch(() => [])
+        : [];
       const offerCredentialMap = new Map((offerCredentials || []).map(item => [item.offer_id, item]));
       const boardLimit = Number(context.customer.board_limit || 1);
       await service(`/rest/v1/customer_admins?id=eq.${encodeURIComponent(context.admin.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ last_login_at:new Date().toISOString() }) }).catch(() => {});
@@ -273,7 +276,7 @@ module.exports = async function handler(request, response) {
         canCreateBoards:!['read_only','cancelled','overdue'].includes(context.customer.subscription_status) && (teams || []).length < boardLimit,
         admins:admins || [], logs:logs || [], offers:(offers || []).map(offer => {
           const stored = offerCredentialMap.get(offer.id) || {};
-          return { ...offer, public_path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || context.customer.url_slug}/${offer.slug}`, has_editor_code:Boolean(stored.editor_code_ciphertext), has_viewer_code:Boolean(stored.viewer_code_ciphertext), editor_changed_at:stored.editor_changed_at || null, viewer_changed_at:stored.viewer_changed_at || null };
+          return { ...offer, public_path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || context.customer.url_slug}/${offer.slug}`, team_links:offerLinks.filter(link => link.offer_id === offer.id), has_editor_code:Boolean(stored.editor_code_ciphertext), has_viewer_code:Boolean(stored.viewer_code_ciphertext), editor_changed_at:stored.editor_changed_at || null, viewer_changed_at:stored.viewer_changed_at || null };
         })
       });
     }
@@ -314,6 +317,15 @@ module.exports = async function handler(request, response) {
         };
         if (!update.name || !update.workplace || !/^\S+@\S+\.\S+$/.test(update.recovery_email)) return response.status(400).json({ error:'Udfyld gyldige kluboplysninger.' });
         await service(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}&customer_id=eq.${encodeURIComponent(context.customer.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify(update) });
+        const customerTeams = await service(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(context.customer.id)}&archived_at=is.null&select=slug`, secret);
+        const allowed = new Set((customerTeams || []).map(team => team.slug));
+        const selected = new Set((Array.isArray(body.team_slugs) ? body.team_slugs : []).filter(teamSlug => allowed.has(teamSlug)));
+        const existingLinks = await service(`/rest/v1/shared_offer_team_links?offer_id=eq.${encodeURIComponent(offer.id)}&select=team_slug`, secret);
+        const existing = new Set((existingLinks || []).map(link => link.team_slug));
+        const removed = [...existing].filter(teamSlug => !selected.has(teamSlug));
+        const added = [...selected].filter(teamSlug => !existing.has(teamSlug));
+        if (removed.length) await service(`/rest/v1/shared_offer_team_links?offer_id=eq.${encodeURIComponent(offer.id)}&team_slug=in.(${removed.map(encodeURIComponent).join(',')})`, secret, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+        if (added.length) await service('/rest/v1/shared_offer_team_links', secret, { method:'POST', headers:{ Prefer:'return=minimal' }, body:JSON.stringify(added.map(team_slug => ({ offer_id:offer.id, team_slug, visible_on_team:true }))) });
         await audit(context, 'club_updated', null, `club:${offer.slug}`, secret);
         return response.status(200).json({ ok:true });
       }

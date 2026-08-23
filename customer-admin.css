@@ -32,6 +32,11 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at top left,#e5
 .field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:18px}
 .field-grid .wide{grid-column:1/-1}
 .field-grid small{font-weight:500;color:var(--muted)}
+.field-grid fieldset{margin:0;border:1px solid var(--line);border-radius:13px;padding:13px 14px;background:#f8fafc}
+.field-grid fieldset legend{padding:0 6px;color:#344054;font-size:.82rem;font-weight:900}
+.field-grid fieldset label{display:flex;align-items:center;gap:9px;padding:7px 0;font-size:.88rem}
+.field-grid fieldset input[type="checkbox"]{width:auto;flex:0 0 auto}
+.club-team-choices,#customerClubTeams{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 14px}
 .dashboard-section h2{margin:5px 0 17px}
 .board-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .customer-board{border:1px solid var(--line);border-radius:17px;padding:16px;background:#fbfcfe}
@@ -75,4 +80,5 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at top left,#e5
 .dashboard-head button,.section-heading button{margin-top:12px}
 .login-panel{margin-top:24px;padding:22px}
 .customer-board{padding:13px}
+.club-team-choices,#customerClubTeams{grid-template-columns:1fr}
 }
