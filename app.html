@@ -6,7 +6,7 @@
   <meta name="theme-color" content="#2563eb" />
   <link id="appManifest" rel="manifest" href="/manifest.webmanifest" />
   <script>try{const p=location.pathname.replace(/\/+$/,'')||'/';const r=JSON.parse(sessionStorage.getItem('visuplanner-board-route')||'null');const s=r?.path===p&&r.kind==='team'?r.target_slug:(location.pathname.split('/').filter(Boolean)[0]||'trekloeveret-team-2');document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(s)+'&path='+encodeURIComponent(p)}catch{}</script>
-  <link rel="stylesheet" href="/styles.css?v=58" />
+  <link rel="stylesheet" href="/styles.css?v=59" />
   <title>VisuPlanner</title>
 </head>
 <body>
@@ -19,7 +19,7 @@
       <div class="topbar-actions"><button id="viewerLogoutButton" class="board-logout-button" type="button">Log ud</button><button id="adminButton" class="icon-button" aria-label="Åbn redigering">⚙️</button></div>
     </header>
 
-    <nav id="moduleTabs" class="module-tabs" hidden><button id="boardTab" class="active" type="button">Ugetavle</button><button id="tasksTab" type="button">Ugeopgaver</button></nav>
+    <nav id="moduleTabs" class="module-tabs" aria-label="Vælg visning" hidden></nav>
     <nav id="dayTabs" class="day-tabs" aria-label="Vælg dag"></nav>
 
     <main>
@@ -62,11 +62,11 @@
         </article>
       </section>
       <section id="sharedOffersSection" class="shared-offers-section" hidden><div id="sharedOffersList"></div></section>
+      </div>
       <section id="registrationEventsSection" class="registration-events-section" hidden>
-        <div class="registration-events-heading"><div><p class="eyebrow">TILMELDING</p><h2>Kommende arrangementer</h2><p>Aktiviteter fra klubben, som kræver tilmelding.</p></div><span>VALGFRIT MODUL</span></div>
+        <div class="registration-events-heading"><div><p id="registrationClubName" class="eyebrow">KLUB</p><h2>Kommende arrangementer og tilmeldinger</h2><p>Her kan I se arrangementer, tilmelde jer og finde jeres deltagerliste.</p></div></div>
         <div id="registrationEventsList" class="registration-events-list"></div>
       </section>
-      </div>
       <section id="tasksView" class="tasks-view" hidden><div class="tasks-heading"><p class="eyebrow">DENNE UGE</p><h2>Ugeopgaver</h2><p id="tasksWeekLabel"></p></div><div id="taskAssignments" class="task-assignments"></div></section>
     </main>
 
@@ -243,7 +243,7 @@
     <form id="registrationForm" class="dialog-card registration-dialog-card">
       <div class="admin-heading"><div><p class="eyebrow">TILMELDING</p><h2>Tilmeld til arrangement</h2></div><button id="closeRegistrationDialog" class="icon-button" type="button" aria-label="Luk">✕</button></div>
       <div class="registration-event-summary"><strong id="registrationEventTitle"></strong><span id="registrationEventDetails"></span></div>
-      <label>Skriv beboernavn eller personale<input id="registrationParticipantName" maxlength="80" autocomplete="off" placeholder="Fx Louise eller Personale 1" required></label>
+      <label>Skriv beboernavn eller personale<input id="registrationParticipantName" maxlength="80" autocomplete="off" placeholder="Fx Mikkel eller Personale 1" required></label>
       <p class="note">Navnet vises kun på jeres teams deltagerliste og i klubbens samlede overblik.</p>
       <p id="registrationFormStatus" class="registration-form-status" role="status" aria-live="polite"></p>
       <button id="registrationSubmit" type="submit">Tilmeld</button>
@@ -278,6 +278,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js?v=61"></script>
+  <script src="/app.js?v=62"></script>
 </body>
 </html>

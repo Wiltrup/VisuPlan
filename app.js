@@ -624,7 +624,6 @@ function render() {
   el('dateLabel').textContent = formatDate(dateForIndex(selectedIndex, state.activeWeekStart));
   el('speakBrand').hidden=!state.speakEnabled;el('speakDayButton').hidden=!state.speakEnabled;
   document.querySelectorAll('.shift-speak').forEach(button=>button.hidden=!state.speakEnabled);
-  el('moduleTabs').hidden=!state.tasksEnabled;
   ['morning','evening','night'].forEach(type => {
     const active = activeShiftTypes().includes(type);
     el(`${type}Panel`).hidden = !active;
@@ -652,6 +651,7 @@ function render() {
     <div class="activity-time">${escapeHtml(activityTimeLabel(activity.time, activity.endTime))}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">👂</button>`:''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
   renderSharedOffers();
+  renderModuleTabs();
   renderRegistrationEvents();
   renderTabs();
   renderTaskAssignments();
@@ -690,9 +690,16 @@ function registrationIsOpen(item) {
 
 function renderRegistrationEvents() {
   const section = el('registrationEventsSection');
-  const events = (state.registrationEvents || []).filter(item => state.sharedOffers.find(offer => offer.id === item.offer_id)?.link?.visible_on_team);
-  section.hidden = !events.length;
-  if (!events.length) { el('registrationEventsList').innerHTML = ''; return; }
+  const clubId = activeModule.startsWith('club:') ? activeModule.slice(5) : '';
+  const club = visibleClubOffers().find(offer => offer.id === clubId);
+  section.hidden = !club;
+  if (!club) { el('registrationEventsList').innerHTML = ''; return; }
+  el('registrationClubName').textContent = club.name;
+  const events = (state.registrationEvents || []).filter(item => item.offer_id === club.id);
+  if (!events.length) {
+    el('registrationEventsList').innerHTML = '<div class="registration-empty"><h3>Ingen kommende arrangementer</h3><p>Klubben har ikke oprettet arrangementer med tilmelding endnu.</p></div>';
+    return;
+  }
   el('registrationEventsList').innerHTML = events.map(item => {
     const date = registrationDateParts(item.plan_date);
     const registrations = item.registrations || [];
@@ -768,7 +775,18 @@ function weeksSince(start,end){
   return Math.max(0,Math.floor((dateFromIso(end)-dateFromIso(start))/(7*86400000)));
 }
 function renderTaskAssignments(){if(!state.tasksEnabled)return;el('tasksWeekLabel').textContent=formatWeekRange(state.activeWeekStart);const offset=weeksSince(state.taskRotationStart,state.activeWeekStart);el('taskAssignments').innerHTML=state.residents.length&&state.teamTasks.length?state.residents.map((resident,index)=>{const task=state.teamTasks[(index+offset)%state.teamTasks.length];return `<article class="task-assignment"><span class="task-person">${escapeHtml(resident.name)}</span><span class="task-arrow">→</span><strong>${escapeHtml(task?.name||'Ingen opgave')}</strong></article>`}).join(''):'<p class="empty">Ugeopgaverne er ikke udfyldt endnu.</p>'}
-function showModule(module){activeModule=module;el('boardView').hidden=module!=='board';el('dayTabs').hidden=module!=='board';el('tasksView').hidden=module!=='tasks';el('boardTab').classList.toggle('active',module==='board');el('tasksTab').classList.toggle('active',module==='tasks')}
+function visibleClubOffers(){return state.sharedOffers.filter(offer=>offer.link?.visible_on_team&&offer.registration_module_enabled===true)}
+function applyModuleVisibility(){const clubActive=activeModule.startsWith('club:');el('boardView').hidden=activeModule!=='board';el('dayTabs').hidden=activeModule!=='board';el('tasksView').hidden=activeModule!=='tasks';el('registrationEventsSection').hidden=!clubActive}
+function renderModuleTabs(){
+  const clubs=visibleClubOffers();
+  const validModules=new Set(['board',...(state.tasksEnabled?['tasks']:[]),...clubs.map(offer=>`club:${offer.id}`)]);
+  if(!validModules.has(activeModule))activeModule='board';
+  const modules=[{id:'board',label:'Tavle'},...clubs.map(offer=>({id:`club:${offer.id}`,label:offer.name})),...(state.tasksEnabled?[{id:'tasks',label:'Ugeopgaver'}]:[])];
+  el('moduleTabs').innerHTML=modules.map(item=>`<button class="${activeModule===item.id?'active':''}" data-module="${escapeHtml(item.id)}" type="button">${escapeHtml(item.label)}</button>`).join('');
+  el('moduleTabs').hidden=modules.length<=1;
+  applyModuleVisibility();
+}
+function showModule(module){activeModule=module;renderModuleTabs();renderRegistrationEvents();bindImageEnlargement()}
 function playAudio(url){if(!url)return;const audio=new Audio(url);audio.play().catch(()=>setStatus('Lyden kunne ikke afspilles.','error'))}
 function shiftAudioKey(type){if(type==='morning'&&state.shiftMode===1)return'allday';if(type==='morning'&&state.shiftMode===2)return'overnight';return type}
 function bindSpeakButtons(){el('speakDayButton').onclick=()=>playAudio(FIXED_AUDIO[DAYS[selectedIndex].key]);document.querySelectorAll('[data-speak-shift]').forEach(button=>button.onclick=()=>playAudio(FIXED_AUDIO[shiftAudioKey(button.dataset.speakShift)]));document.querySelectorAll('[data-fixed-audio]').forEach(button=>button.onclick=event=>{event.stopPropagation();playAudio(FIXED_AUDIO[button.dataset.fixedAudio])});document.querySelectorAll('[data-audio-url]').forEach(button=>button.onclick=event=>{event.stopPropagation();playAudio(button.dataset.audioUrl)})}
@@ -1428,7 +1446,7 @@ function openSettings() {
 function renderSharedOfferSettings() {
   const section = el('sharedOfferSettings');
   section.hidden = !state.sharedOffers.length;
-  el('sharedOfferSettingsList').innerHTML = state.sharedOffers.map(offer => `<label class="toggle-setting"><input type="checkbox" data-shared-offer-toggle="${escapeHtml(offer.id)}" ${offer.link?.visible_on_team ? 'checked' : ''}><span><strong>Vis ${escapeHtml(offer.name)}</strong><small>Mad, aktiviteter og eventuelle tilmeldinger vises nederst på den almindelige tavle.</small></span></label>`).join('');
+  el('sharedOfferSettingsList').innerHTML = state.sharedOffers.map(offer => `<label class="toggle-setting"><input type="checkbox" data-shared-offer-toggle="${escapeHtml(offer.id)}" ${offer.link?.visible_on_team ? 'checked' : ''}><span><strong>Vis ${escapeHtml(offer.name)}</strong><small>Dagens mad og aktiviteter vises på tavlen. Kommende arrangementer findes under klubbens egen fane.</small></span></label>`).join('');
 }
 
 async function requestSubscription(button) {
@@ -1645,8 +1663,7 @@ el('openStaffManagerButton').addEventListener('click',()=>{
   renderStaffManager();el('staffManagerDialog').showModal()
 });
 el('closeStaffManagerButton').addEventListener('click',()=>el('staffManagerDialog').close());
-el('boardTab').addEventListener('click',()=>showModule('board'));
-el('tasksTab').addEventListener('click',()=>showModule('tasks'));
+el('moduleTabs').addEventListener('click',event=>{const button=event.target.closest('[data-module]');if(button)showModule(button.dataset.module)});
 el('openTasksManagerButton').addEventListener('click',openTasksManager);
 el('closeTasksManagerButton').addEventListener('click',()=>el('tasksManagerDialog').close());
 el('addResidentButton').addEventListener('click',()=>addTaskDraft('resident'));
