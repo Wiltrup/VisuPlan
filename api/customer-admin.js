@@ -202,14 +202,15 @@ async function createClub(input, context, secret) {
     const allowed = new Set((teams || []).map(team => team.slug));
     const selected = (Array.isArray(input.team_slugs) ? input.team_slugs : []).filter(teamSlug => allowed.has(teamSlug));
     if (selected.length) await service('/rest/v1/shared_offer_team_links', secret, { method:'POST', headers:{ Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify(selected.map(team_slug => ({ offer_id:offer.id, team_slug, visible_on_team:true }))) });
+    await audit(context, 'club_created', null, `club:${slug}`, secret);
     const invitation = await createClubInvitation(offer, customer, secret, input.host);
-    await audit(context, 'club_created', slug, 'club', secret);
     return { offer, requestedSlug, boardSlug, slugAdjusted, publicPath:publicPath(route) || `/${offer.customer_slug}/${offer.slug}`, ...invitation };
   } catch (error) {
+    console.error('Klubtavlen kunne ikke oprettes.', error);
     if (offer?.id) await service(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, { method:'DELETE', headers:{ Prefer:'return=minimal' } }).catch(() => {});
     if (viewer?.id) await service(`/auth/v1/admin/users/${viewer.id}`, secret, { method:'DELETE' }).catch(() => {});
     if (editor?.id) await service(`/auth/v1/admin/users/${editor.id}`, secret, { method:'DELETE' }).catch(() => {});
-    throw error;
+    throw new Error('Klubtavlen kunne ikke oprettes. Der er ikke sendt et gyldigt aktiveringslink. Prøv igen eller kontakt Techus Nord.');
   }
 }
 
@@ -287,7 +288,7 @@ module.exports = async function handler(request, response) {
       if (action === 'send-club-invite' || action === 'send-club-reset') {
         const purpose = action === 'send-club-reset' ? 'password_reset' : 'activation';
         const invitation = await createClubInvitation(offer, context.customer, secret, request.headers.host, purpose);
-        await audit(context, purpose === 'activation' ? 'club_activation_sent' : 'club_password_reset_sent', offer.slug, 'club', secret);
+        await audit(context, purpose === 'activation' ? 'club_activation_sent' : 'club_password_reset_sent', null, `club:${offer.slug}`, secret);
         return response.status(200).json({ ok:true, ...invitation });
       }
       const kind = body.kind === 'viewer' ? 'viewer' : 'editor';
@@ -295,7 +296,7 @@ module.exports = async function handler(request, response) {
       const minimum = kind === 'viewer' ? 6 : 8;
       if (value.length < minimum) return response.status(400).json({ error:`Koden skal have mindst ${minimum} tegn.` });
       await service(`/auth/v1/admin/users/${offer[`${kind}_user_id`]}`, secret, { method:'PUT', body:JSON.stringify({ password:value }) });
-      await audit(context, 'club_code_changed', offer.slug, kind, secret);
+      await audit(context, 'club_code_changed', null, `club:${offer.slug}:${kind}`, secret);
       return response.status(200).json({ ok:true });
     }
 

@@ -53,7 +53,16 @@ function notify(message, type = '') {
 
 const dateTime = value => value ? new Intl.DateTimeFormat('da-DK', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)) : 'Ikke registreret';
 const codeLabel = kind => kind === 'viewer' ? 'Tavlekode' : 'Personalekode';
-const auditTargetLabel = value => String(value || '').startsWith('deleted_team:') ? String(value).slice(13) : (value === 'team' ? 'Tavle' : codeLabel(value));
+const auditTargetLabel = value => {
+  const target = String(value || '');
+  if (target.startsWith('deleted_team:')) return target.slice(13);
+  if (target.startsWith('club:')) {
+    const [, slug, detail] = target.split(':');
+    const suffix = detail === 'viewer' ? ' · Tavlekode' : detail === 'editor' ? ' · Redigeringskode' : '';
+    return `Klubtavle ${slug}${suffix}`;
+  }
+  return target === 'team' ? 'Tavle' : codeLabel(target);
+};
 const actionLabels = {
   board_created:'Tavle oprettet', code_revealed:'Kode vist', code_changed:'Kode ændret',
   team_updated:'Tavleoplysninger ændret', activation_sent:'Aktiveringslink sendt', password_reset_sent:'Nulstillingslink sendt',
