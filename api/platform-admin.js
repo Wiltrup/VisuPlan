@@ -224,8 +224,9 @@ async function createBoard(input, customer, secret, host) {
   const slug = await uniqueSlug(requestedSlug || `${workplace}-${name}`, secret);
   const slugAdjusted = Boolean(requestedSlug && slug !== requestedSlug);
 
-  const editorEmail = `${slug}-editor@visuplanner.invalid`;
-  const viewerEmail = `${slug}-viewer@visuplanner.invalid`;
+  const technicalId = crypto.randomBytes(8).toString('hex');
+  const editorEmail = `${slug}-${technicalId}-editor@visuplanner.invalid`;
+  const viewerEmail = `${slug}-${technicalId}-viewer@visuplanner.invalid`;
   let editor = null;
   let viewer = null;
   let teamCreated = false;

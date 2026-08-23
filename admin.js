@@ -199,7 +199,7 @@ function customerCard(customer) {
           <label>Kontaktmail<input data-new-board="recovery_email" type="email" value="${esc(customer.contact_email)}"></label>
           <label>Ønsket slutning på URL<input data-new-board="slug" placeholder="/team-1"></label>
           <button data-customer-action="create-board">Opret og send aktiveringslink</button>
-          <p class="slug-note" data-slug-status>Skriv kun den sidste del, fx /team-1 – ikke hele visuplanner.dk-adressen. Feltet kan også stå tomt.</p>
+          <p class="slug-note" data-slug-status>Skriv fx team 1 eller /team-1. Systemet indsætter selv bindestreger og vælger en unik adresse. Skriv ikke hele visuplanner.dk-adressen.</p>
         </div>
       </details>
     </section>

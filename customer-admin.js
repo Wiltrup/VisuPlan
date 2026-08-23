@@ -53,9 +53,11 @@ function notify(message, type = '') {
 
 const dateTime = value => value ? new Intl.DateTimeFormat('da-DK', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)) : 'Ikke registreret';
 const codeLabel = kind => kind === 'viewer' ? 'Tavlekode' : 'Personalekode';
+const auditTargetLabel = value => String(value || '').startsWith('deleted_team:') ? String(value).slice(13) : (value === 'team' ? 'Tavle' : codeLabel(value));
 const actionLabels = {
   board_created:'Tavle oprettet', code_revealed:'Kode vist', code_changed:'Kode ændret',
-  team_updated:'Tavleoplysninger ændret', activation_sent:'Aktiveringslink sendt', password_reset_sent:'Nulstillingslink sendt'
+  team_updated:'Tavleoplysninger ændret', activation_sent:'Aktiveringslink sendt', password_reset_sent:'Nulstillingslink sendt',
+  board_deleted:'Tavle slettet'
 };
 
 function credentialHtml(team, kind) {
@@ -67,7 +69,7 @@ function credentialHtml(team, kind) {
 
 function boardHtml(team) {
   const active = team.onboarding_status === 'active';
-  return `<article class="customer-board" data-team="${esc(team.slug)}"><div class="board-head"><div><h3>${esc(team.name)}</h3><code>visuplanner.dk/${esc(team.slug)}</code></div><span class="badge ${active ? '' : 'pending'}">${active ? 'Aktiv' : 'Afventer aktivering'}</span></div><div class="board-meta"><span>${esc(team.workplace)} · ${esc(team.municipality)}</span><span>Ansvarlig: ${esc(team.recovery_email)}</span></div><div class="credential-list">${credentialHtml(team,'viewer')}${credentialHtml(team,'editor')}</div><div class="board-actions"><a href="/${esc(team.slug)}" target="_blank" rel="noopener">Åbn tavle</a>${active ? '<button data-action="send-editor-reset" type="button">Send nulstillingslink</button>' : '<button data-action="send-invite" type="button">Send aktiveringslink igen</button>'}</div><details class="team-edit"><summary>Ret tavlenavn og kontakt</summary><form data-save-team class="field-grid"><label>Tavlenavn<input name="name" value="${esc(team.name)}" required></label><label>Ansvarlig mail<input name="recovery_email" type="email" value="${esc(team.recovery_email)}" required></label><label>Arbejdsplads<input name="workplace" value="${esc(team.workplace)}" required></label><div class="form-actions"><button type="submit">Gem oplysninger</button></div></form></details></article>`;
+  return `<article class="customer-board" data-team="${esc(team.slug)}"><div class="board-head"><div><h3>${esc(team.name)}</h3><code>visuplanner.dk/${esc(team.slug)}</code></div><span class="badge ${active ? '' : 'pending'}">${active ? 'Aktiv' : 'Afventer aktivering'}</span></div><div class="board-meta"><span>${esc(team.workplace)} · ${esc(team.municipality)}</span><span>Ansvarlig: ${esc(team.recovery_email)}</span></div><div class="credential-list">${credentialHtml(team,'viewer')}${credentialHtml(team,'editor')}</div><div class="board-actions"><a href="/${esc(team.slug)}" target="_blank" rel="noopener">Åbn tavle</a>${active ? '<button data-action="send-editor-reset" type="button">Send nulstillingslink</button>' : '<button data-action="send-invite" type="button">Send aktiveringslink igen</button>'}<button data-action="delete-board" class="danger" type="button">Slet tavle</button></div><details class="team-edit"><summary>Ret tavlenavn og kontakt</summary><form data-save-team class="field-grid"><label>Tavlenavn<input name="name" value="${esc(team.name)}" required></label><label>Ansvarlig mail<input name="recovery_email" type="email" value="${esc(team.recovery_email)}" required></label><label>Arbejdsplads<input name="workplace" value="${esc(team.workplace)}" required></label><div class="form-actions"><button type="submit">Gem oplysninger</button></div></form></details></article>`;
 }
 
 function render() {
@@ -83,7 +85,7 @@ function render() {
   $('customerAdminBoards').innerHTML = teams.length ? teams.map(boardHtml).join('') : '<p class="empty">Ingen tavler er oprettet endnu.</p>';
   $('customerAdminColleagues').innerHTML = admins.map(admin => `<div class="admin-person"><strong>${esc(admin.name)}</strong><span>${esc(admin.email)}</span></div>`).join('');
   $('customerAdminHelp').href = `mailto:wiltrup@wiltrup.com?subject=${encodeURIComponent(`Hjælp til VisuPlanner – ${customer.name}`)}&body=${encodeURIComponent(`Hej Techus Nord\n\nJeg har brug for hjælp til VisuPlanner.\n\nKunde: ${customer.name}\n\n`)}`;
-  $('customerAdminAudit').innerHTML = logs.length ? logs.map(item => `<div class="audit-row"><div><strong>${esc(actionLabels[item.action] || item.action)}</strong><span>${item.team_slug ? ` · ${esc(item.team_slug)}` : ''}${item.target_kind ? ` · ${esc(codeLabel(item.target_kind))}` : ''}</span></div><div><span>${esc(item.admin_name || item.admin_email || '')}</span><time>${dateTime(item.created_at)}</time></div></div>`).join('') : '<p class="empty">Ingen administratorhandlinger endnu.</p>';
+  $('customerAdminAudit').innerHTML = logs.length ? logs.map(item => `<div class="audit-row"><div><strong>${esc(actionLabels[item.action] || item.action)}</strong><span>${item.team_slug ? ` · ${esc(item.team_slug)}` : ''}${item.target_kind ? ` · ${esc(auditTargetLabel(item.target_kind))}` : ''}</span></div><div><span>${esc(item.admin_name || item.admin_email || '')}</span><time>${dateTime(item.created_at)}</time></div></div>`).join('') : '<p class="empty">Ingen administratorhandlinger endnu.</p>';
   $('customerAdminOffersSection').hidden = !offers.length;
   $('customerAdminOffers').innerHTML = offers.map(offer => `<article class="offer-card"><h3>${esc(offer.name)}</h3><a href="/${esc(offer.customer_slug || '')}/${esc(offer.slug)}" target="_blank" rel="noopener">Åbn tavle</a></article>`).join('');
   bindDashboardActions();
@@ -141,6 +143,18 @@ function bindDashboardActions() {
     try { const result = await post({ action:button.dataset.action, team_slug:board.dataset.team }); if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {}); notify(result.mailSent ? 'Linket er sendt.' : 'Mail kunne ikke sendes. Linket er kopieret.'); await loadDashboard(); }
     catch (error) { notify(error.message,'error'); button.disabled = false; }
   });
+  document.querySelectorAll('[data-action="delete-board"]').forEach(button => button.onclick = async () => {
+    const board = button.closest('[data-team]');
+    const name = board.querySelector('h3').textContent;
+    if (!confirm(`Slet ${name} permanent? Alle ugeplaner, billeder, lyd, koder og login til denne tavle bliver slettet. Handlingen kan ikke fortrydes.`)) return;
+    if (prompt('Skriv SLET TAVLE for at bekræfte:') !== 'SLET TAVLE') return;
+    button.disabled = true;
+    try {
+      await post({ action:'delete-board', team_slug:board.dataset.team, confirmation:'SLET TAVLE' });
+      notify(`${name} er slettet. Pladsen er frigivet i pakken.`);
+      await loadDashboard();
+    } catch (error) { notify(error.message,'error'); button.disabled = false; }
+  });
 }
 
 $('customerAdminLoginForm').onsubmit = async event => {
@@ -182,7 +196,7 @@ $('customerCreateBoardForm').onsubmit = async event => {
     form.elements.name.value = ''; form.elements.recovery_email.value = ''; form.elements.slug.value = '';
     const addressNote = result.slugAdjusted ? ` Adressen blev ændret til visuplanner.dk/${result.team.slug}, fordi ønsket var optaget eller reserveret.` : '';
     notify((result.mailSent ? 'Tavlen er oprettet, og aktiveringslinket er sendt.' : 'Tavlen er oprettet. Aktiveringslinket er kopieret.') + addressNote);
-    $('customerBoardSlugStatus').textContent = 'Skriv kun den sidste del, fx /team-1 – ikke hele visuplanner.dk-adressen. Feltet kan stå tomt, så vælger systemet en sikker, unik adresse.';
+    $('customerBoardSlugStatus').textContent = 'Skriv fx team 1 eller /team-1. Systemet indsætter selv bindestreger og vælger en unik adresse.';
     await loadDashboard();
   } catch (error) { notify(error.message,'error'); button.disabled = false; }
 };

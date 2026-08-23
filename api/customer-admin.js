@@ -21,6 +21,35 @@ async function uniqueSlug(base, secret) {
   return candidate;
 }
 
+async function listStorageFiles(prefix, secret) {
+  const items = await service('/storage/v1/object/list/visuplan-images', secret, {
+    method:'POST', body:JSON.stringify({ prefix, limit:1000, offset:0, sortBy:{ column:'name', order:'asc' } })
+  }) || [];
+  const files = [];
+  for (const item of items) {
+    const path = prefix ? `${prefix}/${item.name}` : item.name;
+    if (item.id) files.push(path);
+    else files.push(...await listStorageFiles(path, secret));
+  }
+  return files;
+}
+
+async function deleteStoragePrefix(prefix, secret) {
+  const files = await listStorageFiles(prefix, secret);
+  for (let index = 0; index < files.length; index += 100) {
+    await service('/storage/v1/object/visuplan-images', secret, {
+      method:'DELETE', body:JSON.stringify({ prefixes:files.slice(index, index + 100) })
+    });
+  }
+}
+
+async function deleteAuthUser(userId, secret) {
+  if (!userId) return;
+  await service(`/auth/v1/admin/users/${userId}`, secret, { method:'DELETE' }).catch(error => {
+    console.warn('Tavlens tekniske login kunne ikke slettes eller var allerede slettet.', userId, error.message);
+  });
+}
+
 const hash = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 
 async function createTeamInvitation(team, customer, secret, host, purpose = 'activation') {
@@ -65,13 +94,14 @@ async function createBoard(input, context, secret, host) {
   let editor = null;
   let viewer = null;
   let teamCreated = false;
+  const technicalId = crypto.randomBytes(8).toString('hex');
   try {
     editor = await service('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({
-      email:`${slug}-editor@visuplanner.invalid`, password:randomPassword(), email_confirm:true,
+      email:`${slug}-${technicalId}-editor@visuplanner.invalid`, password:randomPassword(), email_confirm:true,
       user_metadata:{ role:'editor', team_slug:slug }
     }) });
     viewer = await service('/auth/v1/admin/users', secret, { method:'POST', body:JSON.stringify({
-      email:`${slug}-viewer@visuplanner.invalid`, password:randomPassword(), email_confirm:true,
+      email:`${slug}-${technicalId}-viewer@visuplanner.invalid`, password:randomPassword(), email_confirm:true,
       user_metadata:{ role:'viewer', team_slug:slug }
     }) });
     const rows = await service('/rest/v1/teams_registry?select=*', secret, {
@@ -161,6 +191,16 @@ module.exports = async function handler(request, response) {
 
     const team = await scopedTeam(clean(body.team_slug, 120), context.customer.id, secret);
     if (!team) return response.status(404).json({ error:'Tavlen blev ikke fundet hos denne kunde.' });
+
+    if (action === 'delete-board') {
+      if (String(body.confirmation || '') !== 'SLET TAVLE') return response.status(400).json({ error:'Sletningen blev ikke bekræftet korrekt.' });
+      await audit(context, 'board_deleted', team.slug, `deleted_team:${team.slug}`, secret);
+      await deleteStoragePrefix(team.slug, secret);
+      await service(`/rest/v1/access_help_requests?team_slug=eq.${encodeURIComponent(team.slug)}`, secret, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+      await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(team.slug)}&customer_id=eq.${encodeURIComponent(context.customer.id)}`, secret, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+      await Promise.all([deleteAuthUser(team.editor_user_id, secret), deleteAuthUser(team.viewer_user_id, secret)]);
+      return response.status(200).json({ ok:true });
+    }
 
     if (action === 'reveal-code') {
       const kind = body.kind === 'viewer' ? 'viewer' : 'editor';

@@ -1,6 +1,5 @@
 const crypto = require('crypto');
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
-const TERMS_VERSION = '2026-08-16-v1.2';
 const hash = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
 async function data(response) { const text = await response.text(); return text ? JSON.parse(text) : null; }
 async function service(path, secret, options = {}) {
@@ -23,16 +22,12 @@ module.exports = async function handler(request, response) {
     if (!team) return response.status(404).json({ error: 'Tavlen blev ikke fundet.' });
     const customerId = invite.customer_id || team.customer_id;
     const customer = customerId ? (await service(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret))?.[0] : null;
-    const acceptances = customerId ? await service(`/rest/v1/customer_acceptances?customer_id=eq.${encodeURIComponent(customerId)}&terms_version=eq.${encodeURIComponent(TERMS_VERSION)}&select=id&limit=1`, secret) : [];
-    const needsAcceptance = invite.purpose !== 'password_reset' && !acceptances?.length;
 
     if (request.method === 'GET') return response.status(200).json({
       teamName: team.name || invite.team_slug,
       customerName: customer?.display_name || team.workplace,
       contactEmail: invite.contact_email,
-      purpose: invite.purpose || 'activation',
-      needsAcceptance,
-      termsVersion: TERMS_VERSION
+      purpose: invite.purpose || 'activation'
     });
 
     const editorPassword = String(request.body?.editorPassword || '');
@@ -47,10 +42,6 @@ module.exports = async function handler(request, response) {
     const viewerPassword = String(request.body?.viewerPassword || '');
     if (viewerPassword.length < 6) return response.status(400).json({ error: 'Tavlekoden skal have mindst 6 tegn.' });
     if (editorPassword === viewerPassword) return response.status(400).json({ error: 'De to koder skal være forskellige.' });
-    if (needsAcceptance) {
-      if (!request.body?.acceptedTerms || !request.body?.acceptedDpa || !request.body?.authorized) return response.status(400).json({ error: 'Betingelserne og databehandleraftalen skal godkendes af en bemyndiget person.' });
-      if (!String(request.body?.acceptedByName || '').trim()) return response.status(400).json({ error: 'Skriv navnet på den person, der accepterer.' });
-    }
 
     await service(`/auth/v1/admin/users/${team.editor_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: editorPassword }) });
     await service(`/auth/v1/admin/users/${team.viewer_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: viewerPassword }) });
@@ -58,16 +49,6 @@ module.exports = async function handler(request, response) {
     const nowIso = now.toISOString();
     await service(`/rest/v1/team_invitations?id=eq.${invite.id}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ used_at: nowIso }) });
     await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(team.slug)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ onboarding_status: 'active', activated_at: nowIso, updated_at: nowIso }) });
-
-    if (needsAcceptance && customerId) {
-      await service('/rest/v1/customer_acceptances', secret, { method: 'POST', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({
-        customer_id: customerId, team_slug: team.slug,
-        accepted_by_name: String(request.body.acceptedByName).trim().slice(0, 200),
-        accepted_by_email: invite.contact_email,
-        terms_version: TERMS_VERSION, privacy_version: TERMS_VERSION, dpa_version: TERMS_VERSION,
-        user_agent: String(request.headers['user-agent'] || '').slice(0, 500)
-      }) });
-    }
 
     if (customer?.subscription_status === 'trial' && !customer.trial_started_at) {
       await service(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ trial_started_at: nowIso, trial_ends_at: new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000).toISOString(), updated_at: nowIso }) });

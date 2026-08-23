@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="robots" content="noindex,nofollow">
   <meta name="referrer" content="no-referrer">
-  <link rel="stylesheet" href="/customer-admin.css?v=55">
+  <link rel="stylesheet" href="/customer-admin.css?v=60">
   <title>Kundeadministration – VisuPlanner</title>
 </head>
 <body>
@@ -34,7 +34,7 @@
           <label>Teamnavn<input name="name" placeholder="Fx Team Syd" required></label>
           <label>Ansvarlig arbejdsmail<input name="recovery_email" type="email" required></label>
           <label>Arbejdsplads<input name="workplace" required></label>
-          <label class="wide">Ønsket slutning på URL <small id="customerBoardSlugStatus">Skriv kun den sidste del, fx /team-1 – ikke hele visuplanner.dk-adressen. Feltet kan stå tomt, så vælger systemet en sikker, unik adresse.</small><input name="slug" placeholder="/team-1"></label>
+          <label class="wide">Ønsket slutning på URL <small id="customerBoardSlugStatus">Skriv fx team 1 eller /team-1. Systemet indsætter selv bindestreger og vælger en unik adresse. Skriv ikke hele visuplanner.dk-adressen.</small><input name="slug" placeholder="Fx team 1"></label>
           <div class="wide form-actions"><button type="submit">Opret tavle og send aktiveringslink</button></div>
         </form>
       </details>
@@ -46,6 +46,6 @@
     </section>
   </main>
   <div id="customerAdminStatus" role="status" aria-live="polite"></div>
-  <script src="/customer-admin.js?v=55"></script>
+  <script src="/customer-admin.js?v=60"></script>
 </body>
 </html>

@@ -15,8 +15,6 @@ async function check() {
     document.getElementById('activationIntro').textContent = reset ? 'Linket kan kun bruges én gang og ændrer kun personalekoden.' : 'Koderne opbevares sikkert og kan ses af jeres udpegede kundeadministratorer.';
     document.getElementById('viewerCodeFields').hidden = reset;
     document.querySelectorAll('#viewerCodeFields input').forEach(input => { input.required = !reset; });
-    document.getElementById('agreementFields').hidden = reset || !data.needsAcceptance;
-    document.querySelectorAll('#agreementFields input').forEach(input => { input.required = !reset && data.needsAcceptance; });
     form.querySelector('button').textContent = reset ? 'Gem ny personalekode' : 'Aktivér tavlen';
     form.hidden = false;
   } catch (error) {
@@ -40,9 +38,7 @@ form.addEventListener('submit', async event => {
       body: JSON.stringify({
         token,
         editorPassword: values.editorPassword,
-        viewerPassword: values.viewerPassword,
-        acceptedByName: values.acceptedByName,
-        acceptedAgreement: values.acceptedAgreement === 'on'
+        viewerPassword: values.viewerPassword
       })
     });
     const data = await response.json();
