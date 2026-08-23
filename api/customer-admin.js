@@ -4,9 +4,11 @@ const {
   clean, randomPassword, slugify, service, customerAdminContext,
   audit, sendMail, decryptCredential, encryptCredential, saveTeamCredential
 } = require('../lib/customer-admin-security');
+const { isReservedBoardSlug, withNumericSuffix } = require('../lib/board-slugs');
 
 async function slugAvailable(slug, secret) {
   if (!/^[a-z0-9-]{3,120}$/.test(slug)) return false;
+  if (isReservedBoardSlug(slug)) return false;
   const rows = await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=slug`, secret);
   return !rows?.length;
 }
@@ -15,7 +17,7 @@ async function uniqueSlug(base, secret) {
   const stem = slugify(base);
   let candidate = stem;
   let suffix = 2;
-  while (!(await slugAvailable(candidate, secret))) candidate = `${stem}-${suffix++}`;
+  while (!(await slugAvailable(candidate, secret))) candidate = withNumericSuffix(stem, suffix++);
   return candidate;
 }
 
@@ -56,8 +58,9 @@ async function createBoard(input, context, secret, host) {
   const recoveryEmail = clean(input.recovery_email, 200).toLowerCase();
   if (!name || !workplace || !municipality || !/^\S+@\S+\.\S+$/.test(recoveryEmail)) throw new Error('Udfyld tavlenavn og en gyldig ansvarlig arbejdsmail.');
   const requested = clean(input.slug, 120);
-  const slug = requested ? slugify(requested) : await uniqueSlug(`${customer.url_slug || customer.display_name}-${name}`, secret);
-  if (!(await slugAvailable(slug, secret))) throw new Error('Den ønskede tavleadresse er allerede i brug. Lad URL-feltet stå tomt for automatisk valg.');
+  const requestedSlug = requested ? slugify(requested) : '';
+  const slug = await uniqueSlug(requestedSlug || `${customer.url_slug || customer.display_name}-${name}`, secret);
+  const slugAdjusted = Boolean(requestedSlug && slug !== requestedSlug);
 
   let editor = null;
   let viewer = null;
@@ -88,6 +91,8 @@ async function createBoard(input, context, secret, host) {
         municipality:team.municipality, recovery_email:team.recovery_email,
         onboarding_status:team.onboarding_status
       },
+      requestedSlug,
+      slugAdjusted,
       ...invitation
     };
   } catch (error) {
@@ -145,6 +150,13 @@ module.exports = async function handler(request, response) {
     if (action === 'create-board') {
       const result = await createBoard(body, context, secret, request.headers.host);
       return response.status(200).json({ ok:true, ...result, boardUrl:`/${result.team.slug}` });
+    }
+
+    if (action === 'check-slug') {
+      const requestedSlug = slugify(body.value || body.slug);
+      const available = await slugAvailable(requestedSlug, secret);
+      const slug = available ? requestedSlug : await uniqueSlug(requestedSlug, secret);
+      return response.status(200).json({ ok:true, slug, available, adjusted:!available, requestedSlug });
     }
 
     const team = await scopedTeam(clean(body.team_slug, 120), context.customer.id, secret);

@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const { createCustomerAdminInvitation, saveTeamCredential } = require('../lib/customer-admin-security');
+const { isReservedBoardSlug, withNumericSuffix } = require('../lib/board-slugs');
 
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
@@ -92,6 +93,7 @@ async function deleteSharedOfferCompletely(offer, secret) {
 async function slugAvailable(slug, secret, currentSlug = '') {
   if (!/^[a-z0-9-]{3,120}$/.test(slug)) return false;
   if (slug === currentSlug) return true;
+  if (isReservedBoardSlug(slug)) return false;
   const rows = await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}&select=slug`, secret);
   return !rows?.length;
 }
@@ -100,7 +102,7 @@ async function uniqueSlug(base, secret) {
   const stem = slugify(base);
   let candidate = stem;
   let suffix = 2;
-  while (!(await slugAvailable(candidate, secret))) candidate = `${stem}-${suffix++}`;
+  while (!(await slugAvailable(candidate, secret))) candidate = withNumericSuffix(stem, suffix++);
   return candidate;
 }
 
@@ -218,8 +220,9 @@ async function createBoard(input, customer, secret, host) {
   if (!name || !municipality || !workplace || !/^\S+@\S+\.\S+$/.test(recoveryEmail)) throw new Error('Tavlens navn, kommune, arbejdsplads og kontaktmail skal udfyldes.');
 
   const requested = clean(input.slug, 120);
-  const slug = requested ? slugify(requested) : await uniqueSlug(`${workplace}-${name}`, secret);
-  if (!(await slugAvailable(slug, secret))) throw new Error('Den ønskede tavleadresse er allerede i brug.');
+  const requestedSlug = requested ? slugify(requested) : '';
+  const slug = await uniqueSlug(requestedSlug || `${workplace}-${name}`, secret);
+  const slugAdjusted = Boolean(requestedSlug && slug !== requestedSlug);
 
   const editorEmail = `${slug}-editor@visuplanner.invalid`;
   const viewerEmail = `${slug}-viewer@visuplanner.invalid`;
@@ -244,7 +247,7 @@ async function createBoard(input, customer, secret, host) {
     teamCreated = true;
     const team = rows?.[0] || { slug, name, recovery_email: recoveryEmail, customer_id: customer.id };
     const invitation = await createInvitation(team, customer, secret, host);
-    return { team, ...invitation };
+    return { team, requestedSlug, slugAdjusted, ...invitation };
   } catch (error) {
     if (teamCreated) await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
     if (viewer?.id) await serviceFetch(`/auth/v1/admin/users/${viewer.id}`, secret, { method: 'DELETE' }).catch(() => {});
@@ -345,8 +348,10 @@ module.exports = async function handler(request, response) {
     }
 
     if (action === 'check-slug') {
-      const candidate = slugify(body.value || body.slug);
-      return response.status(200).json({ slug: candidate, available: await slugAvailable(candidate, secret) });
+      const requestedSlug = slugify(body.value || body.slug);
+      const available = await slugAvailable(requestedSlug, secret);
+      const slug = available ? requestedSlug : await uniqueSlug(requestedSlug, secret);
+      return response.status(200).json({ slug, available, adjusted:!available, requestedSlug });
     }
     if (action === 'create-shared-offer') {
       const customers = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret);

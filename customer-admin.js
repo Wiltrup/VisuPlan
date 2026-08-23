@@ -180,10 +180,34 @@ $('customerCreateBoardForm').onsubmit = async event => {
     const result = await post({ action:'create-board', ...values });
     if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
     form.elements.name.value = ''; form.elements.recovery_email.value = ''; form.elements.slug.value = '';
-    notify(result.mailSent ? 'Tavlen er oprettet, og aktiveringslinket er sendt.' : 'Tavlen er oprettet. Aktiveringslinket er kopieret.');
+    const addressNote = result.slugAdjusted ? ` Adressen blev ændret til visuplanner.dk/${result.team.slug}, fordi ønsket var optaget eller reserveret.` : '';
+    notify((result.mailSent ? 'Tavlen er oprettet, og aktiveringslinket er sendt.' : 'Tavlen er oprettet. Aktiveringslinket er kopieret.') + addressNote);
+    $('customerBoardSlugStatus').textContent = 'Skriv kun den sidste del, fx /team-1 – ikke hele visuplanner.dk-adressen. Feltet kan stå tomt, så vælger systemet en sikker, unik adresse.';
     await loadDashboard();
   } catch (error) { notify(error.message,'error'); button.disabled = false; }
 };
+
+{
+  const input = $('customerCreateBoardForm').elements.slug;
+  const note = $('customerBoardSlugStatus');
+  let timer;
+  input.addEventListener('input', () => {
+    clearTimeout(timer);
+    timer = setTimeout(async () => {
+      if (!input.value.trim()) {
+        note.textContent = 'Feltet er tomt – systemet vælger automatisk en sikker, unik adresse.';
+        return;
+      }
+      try {
+        const result = await post({ action:'check-slug', value:input.value });
+        input.value = `/${result.slug}`;
+        note.textContent = result.available
+          ? `visuplanner.dk/${result.slug} er ledig.`
+          : `Den ønskede adresse er optaget eller reserveret. Vi foreslår visuplanner.dk/${result.slug}.`;
+      } catch (error) { note.textContent = error.message; }
+    }, 450);
+  });
+}
 
 ['pointerdown','keydown'].forEach(name => document.addEventListener(name, () => { if (session) resetInactivity(); }, { passive:true }));
 

@@ -320,7 +320,10 @@ function bindActions() {
       const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify(customerPayload(card, action)) });
       await copyFallback(result, action === 'invite-customer-admin' ? 'Administratorinvitationen er oprettet.' : 'Tavlen er oprettet.');
       const messages = { 'create-board':'Tavlen er oprettet, og invitationen er sendt.', 'create-shared-offer':'Det fælles tilbud er oprettet.', 'invite-customer-admin':'Kundeadministratorens invitation er sendt.', 'archive-customer':'Kunden og alle tilknyttede tavler er arkiveret.', 'restore-customer':'Kunden er gendannet.', 'delete-customer':'Kunden og alle tilknyttede data er slettet permanent.' };
-      status(messages[action] || 'Kundens aftale er opdateret.', 'success');
+      const addressNote = action === 'create-board' && result.slugAdjusted
+        ? ` Adressen blev ændret til visuplanner.dk/${result.team.slug}, fordi ønsket var optaget eller reserveret.`
+        : '';
+      status((messages[action] || 'Kundens aftale er opdateret.') + addressNote, 'success');
       await openDashboard();
     } catch (error) { status(error.message, 'error'); button.disabled = false; }
   });
@@ -425,7 +428,12 @@ function bindActions() {
         try {
           const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify({ action:'check-slug', value:input.value }) });
           input.value = result.slug;
-          if (note) { note.textContent = result.available ? `visuplanner.dk/${result.slug} er ledig.` : 'Adressen er allerede i brug.'; note.className = `slug-note ${result.available ? 'good' : 'bad'}`; }
+          if (note) {
+            note.textContent = result.available
+              ? `visuplanner.dk/${result.slug} er ledig.`
+              : `Den ønskede adresse er optaget eller reserveret. Vi foreslår visuplanner.dk/${result.slug}.`;
+            note.className = 'slug-note good';
+          }
         } catch (error) { if (note) note.textContent = error.message; }
       }, 450);
     });
