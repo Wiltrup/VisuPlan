@@ -165,7 +165,6 @@ function customerCard(customer) {
         <label>EAN<input data-field="ean" value="${esc(customer.ean)}"></label>
         <label>Fakturareference<input data-field="invoice_reference" value="${esc(customer.invoice_reference)}"></label>
         <label>Betalingsform<select data-field="payment_method"><option value="">Ikke valgt</option><option value="ean" ${customer.payment_method === 'ean' ? 'selected' : ''}>EAN</option><option value="card" ${customer.payment_method === 'card' ? 'selected' : ''}>Kort</option><option value="mobilepay" ${customer.payment_method === 'mobilepay' ? 'selected' : ''}>MobilePay</option><option value="bank" ${customer.payment_method === 'bank' ? 'selected' : ''}>Bank</option><option value="other" ${customer.payment_method === 'other' ? 'selected' : ''}>Andet</option></select></label>
-        <label class="toggle-setting"><input data-field="club_module_enabled" type="checkbox" ${customer.club_module_enabled ? 'checked' : ''}><span><strong>Klubmodul tilkøbt</strong><small>Giver kundeadministratoren adgang til at oprette og tilknytte klubtavler.</small></span></label>
         <label>Interne noter<textarea data-field="internal_notes" rows="3">${esc(customer.internal_notes)}</textarea></label>
       </div>
       <div class="action-row"><button data-customer-action="save-customer">Gem kundeoplysninger</button></div>
@@ -180,10 +179,12 @@ function customerCard(customer) {
         <label>Betalingsfrist<input data-field="invoice_due_at" type="date" value="${inputDate(customer.invoice_due_at)}"></label>
         <label>Fakturatype<select data-field="invoice_kind"><option value="first">Første år</option><option value="renewal">Årsfornyelse</option></select></label>
         <label>Betalingsform<select data-field="invoice_payment_method"><option value="ean">EAN</option><option value="card">Kort</option><option value="mobilepay">MobilePay</option><option value="bank">Bank</option><option value="other">Andet</option></select></label>
+        <label class="toggle-setting"><input data-field="club_module_enabled" type="checkbox" ${customer.club_module_enabled ? 'checked' : ''}><span><strong>Klubmodul tilkøbt</strong><small>Giver kundeadministratoren adgang til at oprette og tilknytte klubtavler.</small></span></label>
       </div>
       <p class="slug-note">Den valgte pakke er allerede tilgængelig i prøveperioden. Brug kun pakkeændringen, når kunden senere skifter løsning.</p>
       <div class="action-row">
         <button data-customer-action="activate-subscription" class="secondary">Aktivér valgt pakkeændring</button>
+        <button data-customer-action="save-club-module" class="secondary">Gem klubtilkøb</button>
         <button data-customer-action="extend-trial" class="secondary">Forlæng prøve 7 dage</button>
         <button data-customer-action="mark-invoice-sent" class="secondary">Markér faktura sendt</button>
         <button data-customer-action="mark-paid">Betaling modtaget</button>
@@ -203,20 +204,7 @@ function customerCard(customer) {
         </div>
       </details>
     </section>
-    <section class="boards-block shared-offers-block"><h4>Fælles tilbud</h4><p class="slug-note">Et fælles tilbud redigeres ét sted og kan vises på flere af kundens tavler.</p><div class="board-list">${(customer.shared_offers || []).length ? customer.shared_offers.map(offer => sharedOfferCard(offer, customer)).join('') : '<p>Ingen fælles tilbud endnu.</p>'}</div>
-      <details><summary>Opret fælles tilbud til kunden</summary><div class="inline-create shared-offer-create">
-        <label>Navn<input data-new-offer="name" placeholder="Fx Trekløverets Klub"></label>
-        <label>Arbejdsplads<input data-new-offer="workplace" value="${esc(customer.display_name)}"></label>
-        <label>Kommune<input data-new-offer="municipality" value="${esc(customer.municipality)}"></label>
-        <label>Kontaktmail<input data-new-offer="recovery_email" type="email" value="${esc(customer.contact_email)}"></label>
-        <label>Ønsket adresse<input data-new-offer="slug" placeholder="trekloeverets-klub"></label>
-        <label>Redigeringskode<input data-new-offer="editor_password" type="password" minlength="8"></label>
-        <label>Visningskode<input data-new-offer="viewer_password" type="password" minlength="6"></label>
-        <label class="toggle-setting"><input data-new-offer="own_board_enabled" type="checkbox" checked><span><strong>Opret egen klubtavle</strong><small>Kan bruges på klubbens tablet og af eksterne beboere.</small></span></label>
-        <div class="offer-team-grid"><strong>Gør tilbuddet tilgængeligt for</strong>${teamLinkOptions(customer)}</div>
-        <button data-customer-action="create-shared-offer">Opret fælles tilbud</button>
-      </div></details>
-    </section>
+    ${(customer.shared_offers || []).length ? `<section class="boards-block shared-offers-block"><h4>Klubtavler</h4><p class="slug-note">Klubtavler oprettes af kundeadministratoren og kan fortsat administreres her.</p><div class="board-list">${customer.shared_offers.map(offer => sharedOfferCard(offer, customer)).join('')}</div></section>` : ''}
     <details class="customer-danger-zone"><summary>Arkivér kunden</summary><p>Alle kundens tavler og klubtilbud lukkes, men data og filer bevares. Kunden kan gendannes fra listen over arkiverede kunder.</p><button data-customer-action="archive-customer" class="danger">Arkivér hele kunden</button></details>
   </article>`;
 }
@@ -276,6 +264,7 @@ function customerPayload(card, action) {
   const payload = { action, customerId:card.dataset.customer };
   if (action === 'save-customer') {
     ['display_name','legal_name','municipality','contact_name','contact_email','billing_email','phone','cvr','ean','invoice_reference','internal_notes','payment_method'].forEach(name => payload[name] = fieldValue(card, name));
+  } else if (action === 'save-club-module') {
     payload.club_module_enabled = card.querySelector('[data-field="club_module_enabled"]')?.checked === true;
   } else if (action === 'activate-subscription') {
     payload.plan_code = fieldValue(card, 'plan_code');
@@ -292,10 +281,6 @@ function customerPayload(card, action) {
     card.querySelectorAll('[data-new-board]').forEach(input => payload[input.dataset.newBoard] = input.value.trim());
   } else if (action === 'invite-customer-admin') {
     card.querySelectorAll('[data-new-admin]').forEach(input => payload[input.dataset.newAdmin] = input.value.trim());
-  } else if (action === 'create-shared-offer') {
-    const create = card.querySelector('.shared-offer-create');
-    create.querySelectorAll('[data-new-offer]').forEach(input => payload[input.dataset.newOffer] = input.type === 'checkbox' ? input.checked : input.value.trim());
-    payload.team_slugs = [...create.querySelectorAll('[data-offer-team]:checked')].map(input => input.value);
   } else if (action === 'delete-customer') {
     payload.confirmation = 'SLET KUNDE';
   }
@@ -306,6 +291,7 @@ function bindActions() {
   document.querySelectorAll('[data-customer-action]').forEach(button => button.onclick = async () => {
     const card = button.closest('[data-customer]');
     const action = button.dataset.customerAction;
+    if (action === 'save-club-module' && !confirm(card.querySelector('[data-field="club_module_enabled"]')?.checked ? 'Aktivér klubmodulet for kunden?' : 'Fjern kundens adgang til at oprette nye klubtavler? Eksisterende klubtavler bevares.')) return;
     if (action === 'activate-subscription' && !confirm('Aktivér den valgte pakkeændring? Kundens tavlegrænse og priser opdateres med det samme.')) return;
     if (action === 'set-read-only' && !confirm('Lås kundens redigering? Tavlerne kan stadig ses.')) return;
     if (action === 'mark-paid' && !confirm('Bekræft, at betalingen er modtaget. Kunden får fuld adgang, og årsperioden aktiveres.')) return;
@@ -319,7 +305,7 @@ function bindActions() {
     try {
       const result = await api('/api/platform-admin', { method:'POST', body:JSON.stringify(customerPayload(card, action)) });
       await copyFallback(result, action === 'invite-customer-admin' ? 'Administratorinvitationen er oprettet.' : 'Tavlen er oprettet.');
-      const messages = { 'create-board':'Tavlen er oprettet, og invitationen er sendt.', 'create-shared-offer':'Det fælles tilbud er oprettet.', 'invite-customer-admin':'Kundeadministratorens invitation er sendt.', 'archive-customer':'Kunden og alle tilknyttede tavler er arkiveret.', 'restore-customer':'Kunden er gendannet.', 'delete-customer':'Kunden og alle tilknyttede data er slettet permanent.' };
+      const messages = { 'create-board':'Tavlen er oprettet, og invitationen er sendt.', 'save-club-module':'Klubtilkøbet er opdateret.', 'invite-customer-admin':'Kundeadministratorens invitation er sendt.', 'archive-customer':'Kunden og alle tilknyttede tavler er arkiveret.', 'restore-customer':'Kunden er gendannet.', 'delete-customer':'Kunden og alle tilknyttede data er slettet permanent.' };
       const addressNote = action === 'create-board' && result.slugAdjusted
         ? ` Adressen blev ændret til visuplanner.dk${result.publicPath}, fordi ønsket var optaget eller reserveret.`
         : '';

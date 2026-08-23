@@ -469,6 +469,10 @@ module.exports = async function handler(request, response) {
       if (teams.length >= customer.board_limit) throw new Error(`Pakken tillader højst ${customer.board_limit} tavler.`);
       return response.status(200).json({ ok: true, ...(await createBoard(body, customer, secret, request.headers.host)) });
     }
+    if (action === 'save-club-module') {
+      await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&archived_at=is.null`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ club_module_enabled:body.club_module_enabled === true, updated_at:new Date().toISOString() }) });
+      return response.status(200).json({ ok:true });
+    }
     if (action === 'save-customer') {
       const allowed = ['display_name','legal_name','municipality','contact_name','contact_email','billing_email','phone','cvr','ean','invoice_reference','internal_notes','payment_method','club_module_enabled'];
       const update = Object.fromEntries(allowed.filter(key => Object.prototype.hasOwnProperty.call(body, key)).map(key => [key, clean(body[key], key === 'internal_notes' ? 2000 : 300) || null]));
