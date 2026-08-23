@@ -197,9 +197,9 @@ function customerCard(customer) {
           <label>Arbejdsplads<input data-new-board="workplace" value="${esc(customer.display_name)}"></label>
           <label>Kommune<input data-new-board="municipality" value="${esc(customer.municipality)}"></label>
           <label>Kontaktmail<input data-new-board="recovery_email" type="email" value="${esc(customer.contact_email)}"></label>
-          <label>Ønsket URL<input data-new-board="slug" placeholder="granbohus-syd"></label>
+          <label>Ønsket slutning på URL<input data-new-board="slug" placeholder="/team-1"></label>
           <button data-customer-action="create-board">Opret og send aktiveringslink</button>
-          <p class="slug-note" data-slug-status>URL’en kontrolleres, før tavlen oprettes.</p>
+          <p class="slug-note" data-slug-status>Skriv kun den sidste del, fx /team-1 – ikke hele visuplanner.dk-adressen. Feltet kan også stå tomt.</p>
         </div>
       </details>
     </section>
