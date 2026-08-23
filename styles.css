@@ -51,6 +51,41 @@ img.image-load-error{display:none!important}
 .shared-offers-section{margin-top:22px}.shared-offers-heading{margin:0 0 10px 4px;font-size:.8rem;font-weight:950;letter-spacing:.12em;color:#26364d}.shared-offers-list{display:grid;gap:14px}.shared-offer-panel{background:#fff;border-radius:22px;padding:20px;box-shadow:0 8px 30px rgba(25,39,64,.07)}.shared-offer-name{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:15px}.shared-offer-name h3{margin:0;font-size:1.35rem}.shared-offer-name a{color:#536074;font-size:.8rem;font-weight:800}.shared-offer-content{display:grid;grid-template-columns:1fr 2fr;gap:18px}.shared-offer-content>section{background:#f4f7fa;border-radius:15px;padding:14px}.shared-offer-content h4{margin:0 0 11px;font-size:1.05rem}.shared-offer-content strong{display:block;font-size:1.45rem}.shared-offer-photo{margin-bottom:10px}.shared-offer-photo img{width:100%;max-height:170px;object-fit:cover;border-radius:12px}.shared-offer-activity{display:grid;grid-template-columns:110px 1fr;gap:10px;padding:9px 0;border-bottom:1px solid #dde5ed;font-weight:800}.shared-offer-activity:last-child{border:0}.shared-offer-activity time{color:var(--day-color);font-weight:950}.shared-offer-message{margin:14px 0 0;padding:12px 14px;border-radius:13px;background:#fff8de;font-weight:750}.shared-offer-settings{margin-top:8px;padding-top:18px;border-top:1px solid #dfe6ee}.shared-offer-settings h3{margin:0 0 6px}
 .shared-offer-activity{align-items:center}.shared-offer-activity.has-photo{grid-template-columns:76px 110px 1fr}.shared-offer-activity-photo{width:70px;height:58px;padding:0;overflow:hidden;border-radius:11px;background:transparent}.shared-offer-activity-photo img{display:block;width:100%;height:100%;object-fit:cover}
 .demo-club-note{color:#667085;font-size:.75rem;font-weight:750;text-align:right}
+.registration-events-section { margin-top:22px; padding:clamp(18px,3vw,26px); border:2px solid #d4e1ed; border-radius:22px; background:#fff; box-shadow:0 10px 34px rgba(25,39,64,.08); }
+.registration-events-heading { display:flex; align-items:flex-end; justify-content:space-between; gap:14px; margin-bottom:16px; }
+.registration-events-heading h2 { margin:3px 0 0; font-size:clamp(1.45rem,4vw,2rem); }
+.registration-events-heading p:not(.eyebrow) { margin:5px 0 0; color:#667085; }
+.registration-events-heading>span { padding:7px 10px; border-radius:999px; background:#e8f7f4; color:#08796f; font-size:.7rem; font-weight:900; }
+.registration-events-list { display:grid; gap:12px; }
+.registration-event { display:grid; grid-template-columns:90px 1fr auto; align-items:center; gap:15px; padding:15px; border:1px solid #dce4ed; border-radius:18px; background:#fbfcfe; }
+.registration-date-badge { display:grid; place-items:center; align-content:center; min-height:88px; padding:8px; border-radius:15px; background:#eaf8ee; color:#187a3e; text-align:center; }
+.registration-date-badge span { font-size:.7rem; font-weight:900; text-transform:uppercase; }
+.registration-date-badge strong { font-size:1.9rem; line-height:1.05; }
+.registration-event-content { display:grid; grid-template-columns:auto 1fr; align-items:start; gap:12px; }
+.registration-event-content>div:only-child { grid-column:1/-1; }
+.registration-event-content small { color:#0f8b83; font-weight:900; text-transform:uppercase; }
+.registration-event-content h3 { margin:3px 0 5px; font-size:1.18rem; }
+.registration-event-content p { margin:3px 0; color:#5f6d82; font-size:.88rem; line-height:1.4; }
+.registration-event-content .registration-deadline { font-weight:800; }
+.registration-event-photo { width:92px; }
+.registration-event-photo img { display:block; width:92px; height:76px; object-fit:cover; border-radius:12px; }
+.registration-participants { display:flex; align-items:center; gap:7px; flex-wrap:wrap; margin-top:10px; }
+.registration-participants>strong { font-size:.78rem; color:#526074; }
+.registration-name-chip { display:inline-flex; align-items:center; gap:5px; padding:6px 9px; border-radius:999px; background:#edf2f7; color:#344054; font-size:.76rem; font-weight:850; }
+.registration-name-chip.editable { padding-right:5px; }
+.registration-name-chip button { display:grid; place-items:center; width:22px; height:22px; padding:0; border:0; border-radius:50%; background:#fff; color:#b42318; font-size:.68rem; }
+.registration-none { color:#667085; font-size:.78rem; font-style:italic; }
+.registration-event-action { display:grid; justify-items:end; gap:7px; }
+.registration-event-action>button { min-width:115px; border:0; border-radius:12px; padding:11px 15px; background:#172033; color:#fff; font-weight:900; }
+.registration-event-action>button:disabled { background:#dce3eb; color:#667085; cursor:default; }
+.registration-event-action small { color:#667085; font-size:.7rem; }
+.registration-dialog-card label { display:grid; gap:7px; margin-top:16px; color:#445066; font-weight:800; }
+.registration-event-summary { display:grid; gap:3px; margin:16px 0; padding:14px; border-radius:14px; background:#f1f6fa; }
+.registration-event-summary span { color:#667085; font-size:.85rem; }
+.registration-dialog-card>button[type="submit"] { width:100%; border:0; border-radius:12px; padding:13px 16px; background:#172033; color:#fff; font-weight:900; }
+.registration-form-status { min-height:22px; margin:10px 0; font-weight:850; }
+.registration-form-status.success { padding:10px 12px; border-radius:11px; background:#eaf9ef; color:#176d38; }
+.registration-form-status.error { padding:10px 12px; border-radius:11px; background:#fff0ee; color:#b42318; }
 .activity { display:grid; grid-template-columns:auto 120px 1fr auto; align-items:center; background:#f2f5f9; border-radius:14px; padding:10px 13px; gap:10px; }
 .activity:not(:has(.activity-photo)) { grid-template-columns:120px 1fr auto; }
 .activity-photo { width:58px; }
@@ -182,6 +217,7 @@ button:disabled { opacity:.6; cursor:wait; }
   .subscription-banner { align-items:stretch; flex-direction:column; }
   .subscription-banner button { width:100%; }
   .shared-offer-content{grid-template-columns:1fr}.shared-offer-name{align-items:flex-start;flex-direction:column}.shared-offer-panel{padding:17px}.shared-offer-activity.has-photo{grid-template-columns:70px 1fr}.shared-offer-activity.has-photo .shared-offer-activity-photo{grid-row:1/3}.shared-offer-activity.has-photo time{grid-column:2}.shared-offer-activity.has-photo span{grid-column:2}
+  .registration-events-heading{align-items:flex-start;flex-direction:column}.registration-event{grid-template-columns:72px 1fr}.registration-date-badge{min-height:74px}.registration-event-content{grid-template-columns:1fr}.registration-event-photo,.registration-event-photo img{width:100%;height:140px}.registration-event-action{grid-column:1/-1;justify-items:stretch}.registration-event-action>button{width:100%}.registration-event-action small{text-align:center}
 }
 
 /* Fælles klubindhold: en tydelig, rolig sektion med klubbens navn i dagens farve. */

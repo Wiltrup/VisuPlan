@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#2563eb"><link id="offerManifest" rel="manifest"><script>const offerPathParts=location.pathname.split('/').filter(Boolean);const offerPathSlug=offerPathParts.at(-1)||'';document.getElementById('offerManifest').href='/api/shared-offer-manifest?slug='+encodeURIComponent(offerPathSlug)+'&path='+encodeURIComponent('/'+offerPathParts.slice(-2).join('/'));</script><title>Fælles tilbud – VisuPlanner</title>
-  <link rel="stylesheet" href="/shared-offer.css?v=49">
+  <link rel="stylesheet" href="/shared-offer.css?v=58">
 </head>
 <body>
   <div class="offer-shell">
@@ -27,16 +27,27 @@
     <div class="dialog-card editor-card">
       <div class="dialog-heading"><div><p class="eyebrow">FÆLLES TILBUD</p><h2>Rediger klubbens indhold</h2></div><button id="offerCloseEditor" class="icon-button">✕</button></div>
       <p class="note">Indholdet opdateres både på klubbens egen tavle og på alle teamtavler, der viser tilbuddet.</p>
-      <div class="week-editor-bar">
-        <button id="offerPreviousEditWeek" class="secondary week-arrow" type="button" aria-label="Forrige uge">‹</button>
-        <div><span class="week-editor-caption">UGE DER REDIGERES</span><strong id="offerEditorWeekLabel"></strong></div>
-        <button id="offerNextEditWeek" class="secondary week-arrow" type="button" aria-label="Næste uge">›</button>
+      <nav id="offerEditorTabs" class="offer-editor-tabs" hidden>
+        <button id="offerPlannerTab" class="active" type="button">Ugeplan</button>
+        <button id="offerRegistrationsTab" type="button">Tilmeldinger</button>
+      </nav>
+      <div id="offerPlannerPane">
+        <div class="week-editor-bar">
+          <button id="offerPreviousEditWeek" class="secondary week-arrow" type="button" aria-label="Forrige uge">‹</button>
+          <div><span class="week-editor-caption">UGE DER REDIGERES</span><strong id="offerEditorWeekLabel"></strong></div>
+          <button id="offerNextEditWeek" class="secondary week-arrow" type="button" aria-label="Næste uge">›</button>
+        </div>
+        <label>Vælg dag<select id="offerEditDate"></select></label>
+        <section class="form-section"><h3>🍽️ Mad i klubben</h3><input id="offerMealInput" placeholder="Fx Lasagne"><button id="offerOpenImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede</button><label>Billede<input id="offerMealFile" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="offerMealFileNote" class="photo-selection-note" aria-live="polite"></div></section>
+        <section class="form-section"><div class="section-heading"><h3>🎯 Aktiviteter i klubben</h3><button id="offerAddActivity" class="secondary" type="button">+ Aktivitet</button></div><div id="offerActivityEditor"></div></section>
+        <section class="form-section"><h3>💬 Kort besked</h3><textarea id="offerMessageInput" rows="3" maxlength="300" placeholder="Fx Klubben lukker kl. 18 i dag"></textarea></section>
+        <div class="dialog-actions"><button id="offerSave" type="button">Gem og opdatér alle tavler</button></div>
       </div>
-      <label>Vælg dag<select id="offerEditDate"></select></label>
-      <section class="form-section"><h3>🍽️ Mad i klubben</h3><input id="offerMealInput" placeholder="Fx Lasagne"><button id="offerOpenImageSearch" class="pexels-search-button" type="button">🔎 Søg efter billede</button><label>Billede<input id="offerMealFile" type="file" accept="image/jpeg,image/png,image/webp"></label><div id="offerMealFileNote" class="photo-selection-note" aria-live="polite"></div></section>
-      <section class="form-section"><div class="section-heading"><h3>🎯 Aktiviteter i klubben</h3><button id="offerAddActivity" class="secondary" type="button">+ Aktivitet</button></div><div id="offerActivityEditor"></div></section>
-      <section class="form-section"><h3>💬 Kort besked</h3><textarea id="offerMessageInput" rows="3" maxlength="300" placeholder="Fx Klubben lukker kl. 18 i dag"></textarea></section>
-      <div class="dialog-actions"><button id="offerSave" type="button">Gem og opdatér alle tavler</button></div>
+      <div id="offerRegistrationsPane" hidden>
+        <div class="registration-overview-heading"><div><p class="eyebrow">KOMMENDE ARRANGEMENTER</p><h3>Deltagerlister</h3></div><button id="offerRefreshRegistrations" class="secondary" type="button">Opdatér</button></div>
+        <p class="note">Se alle tilmeldinger samlet og opdelt efter team. Navnene slettes automatisk 30 dage efter arrangementet.</p>
+        <div id="offerRegistrationOverview" class="registration-overview"><p class="empty">Henter tilmeldinger…</p></div>
+      </div>
     </div>
     <div id="offerStatus" role="status" aria-live="polite"></div>
   </dialog>
@@ -44,6 +55,6 @@
   <dialog id="offerImageSearchDialog"><div class="dialog-card image-search-card"><div class="dialog-heading"><div><p class="eyebrow">PEXELS</p><h2 id="offerImageSearchTitle">Find et billede</h2></div><button id="offerCloseImageSearch" class="icon-button">✕</button></div><form id="offerImageSearchForm" class="image-search-form"><input id="offerImageSearchInput" placeholder="Fx lasagne" autocomplete="off" required><button type="submit">Søg</button></form><p id="offerImageSearchNote" class="note">Vælg ét billede.</p><div id="offerImageSearchResults" class="image-search-results"></div><p class="pexels-credit">Billeder leveret af <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></p></div><div id="offerImageSearchStatus" role="status" aria-live="polite"></div></dialog>
 
   <dialog id="offerImageDialog" class="image-dialog"><button id="offerCloseImage" class="image-close">✕</button><img id="offerLargeImage" alt=""></dialog>
-  <script src="/shared-offer.js?v=51"></script>
+  <script src="/shared-offer.js?v=58"></script>
 </body>
 </html>

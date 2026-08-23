@@ -37,6 +37,7 @@ const state = {
   residents: [],
   teamTasks: [],
   sharedOffers: [],
+  registrationEvents: [],
   session: null
 };
 let activeModule='board';
@@ -55,6 +56,7 @@ let editingWeekBaseline = '';
 let editingDayIndex = 0;
 let selectedPexelsPhoto = null;
 let mealSearchTarget = 'dinner';
+let activeRegistrationEvent = null;
 const signedImageCache = new Map();
 
 const el = id => document.getElementById(id);
@@ -459,9 +461,10 @@ async function loadSharedOffers(weekStart) {
     // Eksisterende tavler skal fortsætte normalt i det korte mellemrum.
     console.warn('Fælles tilbud er endnu ikke installeret i databasen.', error);
     state.sharedOffers = [];
+    state.registrationEvents = [];
     return;
   }
-  if (!links.length) { state.sharedOffers = []; return; }
+  if (!links.length) { state.sharedOffers = []; state.registrationEvents = []; return; }
   const ids = links.map(link => link.offer_id);
   const idFilter = `(${ids.join(',')})`;
   const dates = weekDates(weekStart);
@@ -481,6 +484,34 @@ async function loadSharedOffers(weekStart) {
       activities: secureActivities.filter(row => row.offer_id === offer.id && row.plan_date === date)
     }]))
   }));
+  await loadRegistrationEvents(offers || [], links);
+}
+
+async function loadRegistrationEvents(offers, links) {
+  const visibleOfferIds = offers
+    .filter(offer => offer.registration_module_enabled === true && links.some(link => link.offer_id === offer.id && link.visible_on_team))
+    .map(offer => offer.id);
+  if (!visibleOfferIds.length) { state.registrationEvents = []; return; }
+  try {
+    const now = new Date();
+    now.setHours(12,0,0,0);
+    const today = isoDate(now);
+    const lastDate = addDaysIso(today, 365);
+    const offerFilter = `(${visibleOfferIds.join(',')})`;
+    const eventRows = await apiFetch(`/rest/v1/shared_offer_activities?offer_id=in.${offerFilter}&registration_enabled=eq.true&plan_date=gte.${today}&plan_date=lte.${lastDate}&select=*&order=plan_date.asc,activity_time.asc,sort_order.asc`, {}, true) || [];
+    if (!eventRows.length) { state.registrationEvents = []; return; }
+    const activityFilter = `(${eventRows.map(item => item.id).join(',')})`;
+    const registrationRows = await apiFetch(`/rest/v1/shared_offer_registrations?activity_id=in.${activityFilter}&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}&select=id,activity_id,participant_name,created_at&order=created_at.asc`, {}, true) || [];
+    state.registrationEvents = await Promise.all(eventRows.map(async item => ({
+      ...item,
+      photo_url:await resolvePhotoUrl(item.photo_url || ''),
+      offer:offers.find(offer => offer.id === item.offer_id),
+      registrations:registrationRows.filter(row => row.activity_id === item.id)
+    })));
+  } catch (error) {
+    console.warn('Tilmeldingsmodulet kunne ikke hentes.', error);
+    state.registrationEvents = [];
+  }
 }
 
 async function loadData({ quiet = false } = {}) {
@@ -615,6 +646,7 @@ function render() {
     <div class="activity-time">${escapeHtml(activityTimeLabel(activity.time, activity.endTime))}</div><div class="activity-name">${escapeHtml(activity.name)}</div>${state.speakEnabled&&activity.audioUrl?`<button class="speak-button inline-speak" data-audio-url="${escapeHtml(activity.audioUrl)}" type="button" aria-label="Afspil ${escapeHtml(activity.name)}">👂</button>`:''}
   </div>`).join('') : '<p class="empty">Ingen aktiviteter</p>';
   renderSharedOffers();
+  renderRegistrationEvents();
   renderTabs();
   renderTaskAssignments();
   bindSpeakButtons();
@@ -632,6 +664,97 @@ function renderSharedOffers() {
     const items = data.activities || [];
     return `<article class="shared-offer-panel"><header class="shared-offer-name"><h3>${escapeHtml(offer.name)}</h3></header><div class="shared-offer-content"><section><h4>🍽️ Mad</h4>${data.meal_photo_url ? `<button class="shared-offer-photo image-button" data-enlarge-image="${escapeHtml(data.meal_photo_url)}" data-image-caption="${escapeHtml(data.meal_name || 'Mad i klubben')}"><img src="${escapeHtml(data.meal_photo_url)}" alt=""></button>` : ''}<strong>${escapeHtml(data.meal_name || 'Ikke udfyldt')}</strong></section><section><h4>🎯 Aktiviteter</h4>${items.length ? items.map(item => `<div class="shared-offer-activity ${item.photo_url ? 'has-photo' : ''}">${item.photo_url ? `<button class="shared-offer-activity-photo image-button" data-enlarge-image="${escapeHtml(item.photo_url)}" data-image-caption="${escapeHtml(item.name)}" aria-label="Vis stort billede af ${escapeHtml(item.name)}"><img src="${escapeHtml(item.photo_url)}" alt=""></button>` : ''}<time>${escapeHtml(activityTimeLabel(item.activity_time, item.activity_end_time))}</time><span>${escapeHtml(item.name)}</span></div>`).join('') : '<p class="empty">Ingen aktiviteter</p>'}</section></div>${data.message ? `<p class="shared-offer-message">💬 ${escapeHtml(data.message)}</p>` : ''}</article>`;
   }).join('');
+}
+
+function registrationDateParts(value) {
+  const date = dateFromIso(value);
+  return {
+    weekday:new Intl.DateTimeFormat('da-DK', { weekday:'long' }).format(date),
+    day:new Intl.DateTimeFormat('da-DK', { day:'numeric' }).format(date),
+    month:new Intl.DateTimeFormat('da-DK', { month:'short' }).format(date).replace('.', '')
+  };
+}
+
+function registrationIsOpen(item) {
+  const now = new Date();
+  now.setHours(12,0,0,0);
+  const today = isoDate(now);
+  return subscriptionCanEdit() && item.plan_date >= today && (!item.registration_deadline || item.registration_deadline >= today);
+}
+
+function renderRegistrationEvents() {
+  const section = el('registrationEventsSection');
+  const events = (state.registrationEvents || []).filter(item => state.sharedOffers.find(offer => offer.id === item.offer_id)?.link?.visible_on_team);
+  section.hidden = !events.length;
+  if (!events.length) { el('registrationEventsList').innerHTML = ''; return; }
+  el('registrationEventsList').innerHTML = events.map(item => {
+    const date = registrationDateParts(item.plan_date);
+    const registrations = item.registrations || [];
+    const participants = registrations.length ? registrations.map(row => isStaffSession()
+      ? `<span class="registration-name-chip editable">${escapeHtml(row.participant_name)}<button data-remove-team-registration="${escapeHtml(row.id)}" aria-label="Fjern ${escapeHtml(row.participant_name)}">✕</button></span>`
+      : `<span class="registration-name-chip">${escapeHtml(row.participant_name)}</span>`).join('')
+      : '<span class="registration-none">Ingen fra jeres team endnu</span>';
+    const open = registrationIsOpen(item);
+    const deadline = item.registration_deadline ? `Tilmelding senest ${formatDate(dateFromIso(item.registration_deadline))}.` : '';
+    return `<article class="registration-event"><div class="registration-date-badge"><span>${escapeHtml(date.weekday)}</span><strong>${escapeHtml(date.day)}</strong><span>${escapeHtml(date.month)}</span></div><div class="registration-event-content">${item.photo_url ? `<button class="registration-event-photo image-button" data-enlarge-image="${escapeHtml(item.photo_url)}" data-image-caption="${escapeHtml(item.name)}"><img src="${escapeHtml(item.photo_url)}" alt=""></button>` : ''}<div><small>${escapeHtml(item.offer?.name || 'Fælles tilbud')} · ${escapeHtml(activityTimeLabel(item.activity_time, item.activity_end_time))}</small><h3>${escapeHtml(item.name)}</h3>${item.registration_note ? `<p>${escapeHtml(item.registration_note)}</p>` : ''}${deadline ? `<p class="registration-deadline">${escapeHtml(deadline)}</p>` : ''}<div class="registration-participants"><strong>Tilmeldte fra ${escapeHtml(state.team.name)}:</strong>${participants}</div></div></div><div class="registration-event-action"><button data-open-registration="${escapeHtml(item.id)}" ${open ? '' : 'disabled'}>${open ? 'Tilmeld' : 'Tilmelding lukket'}</button><small>${registrations.length} fra jeres team</small></div></article>`;
+  }).join('');
+  document.querySelectorAll('[data-open-registration]').forEach(button => button.onclick = () => openRegistrationDialog(button.dataset.openRegistration));
+  document.querySelectorAll('[data-remove-team-registration]').forEach(button => button.onclick = async () => {
+    if (!isStaffSession() || !confirm('Fjern navnet fra jeres deltagerliste?')) return;
+    button.disabled = true;
+    try {
+      await apiFetch(`/rest/v1/shared_offer_registrations?id=eq.${encodeURIComponent(button.dataset.removeTeamRegistration)}&team_slug=eq.${encodeURIComponent(TEAM_SLUG)}`, { method:'DELETE', headers:{ Prefer:'return=minimal' } }, true);
+      state.registrationEvents.forEach(event => { event.registrations = (event.registrations || []).filter(row => row.id !== button.dataset.removeTeamRegistration); });
+      renderRegistrationEvents();
+      setStatus('Tilmeldingen er fjernet.', 'success');
+    } catch (error) { setStatus('Tilmeldingen kunne ikke fjernes. Prøv igen.', 'error'); button.disabled = false; }
+  });
+}
+
+function openRegistrationDialog(activityId) {
+  activeRegistrationEvent = state.registrationEvents.find(item => item.id === activityId) || null;
+  if (!activeRegistrationEvent || !registrationIsOpen(activeRegistrationEvent)) return;
+  const date = registrationDateParts(activeRegistrationEvent.plan_date);
+  el('registrationEventTitle').textContent = activeRegistrationEvent.name;
+  el('registrationEventDetails').textContent = `${activeRegistrationEvent.offer?.name || 'Fælles tilbud'} · ${date.weekday} ${date.day}. ${date.month} · ${activityTimeLabel(activeRegistrationEvent.activity_time, activeRegistrationEvent.activity_end_time)}`;
+  el('registrationParticipantName').value = '';
+  el('registrationFormStatus').textContent = '';
+  el('registrationFormStatus').className = 'registration-form-status';
+  el('registrationSubmit').disabled = false;
+  el('registrationSubmit').textContent = 'Tilmeld';
+  el('registrationDialog').showModal();
+  setTimeout(() => el('registrationParticipantName').focus(), 50);
+}
+
+async function submitRegistration(event) {
+  event.preventDefault();
+  if (!activeRegistrationEvent) return;
+  const participantName = el('registrationParticipantName').value.trim();
+  if (!participantName) return;
+  const button = el('registrationSubmit');
+  const statusTarget = el('registrationFormStatus');
+  button.disabled = true;
+  button.textContent = 'Gemmer…';
+  statusTarget.textContent = '';
+  statusTarget.className = 'registration-form-status';
+  try {
+    const rows = await apiFetch('/rest/v1/shared_offer_registrations?select=id,activity_id,participant_name,created_at', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=representation' }, body:JSON.stringify({ activity_id:activeRegistrationEvent.id, offer_id:activeRegistrationEvent.offer_id, team_slug:TEAM_SLUG, participant_name:participantName }) }, true);
+    const created = rows?.[0] || { id:`new-${Date.now()}`, activity_id:activeRegistrationEvent.id, participant_name:participantName, created_at:new Date().toISOString() };
+    activeRegistrationEvent.registrations = [...(activeRegistrationEvent.registrations || []), created];
+    statusTarget.textContent = 'Tilmeldingen er gemt ✓';
+    statusTarget.className = 'registration-form-status success';
+    button.textContent = 'Tilmeldt ✓';
+    renderRegistrationEvents();
+    setTimeout(() => el('registrationDialog').close(), 1100);
+  } catch (error) {
+    const message = String(error?.message || '');
+    statusTarget.textContent = /duplicate|unique|23505/i.test(message)
+      ? 'Navnet står allerede på deltagerlisten.'
+      : 'Tilmeldingen blev ikke gemt. Kontrollér internetforbindelsen, og prøv igen.';
+    statusTarget.className = 'registration-form-status error';
+    button.disabled = false;
+    button.textContent = 'Prøv igen';
+  }
 }
 
 function weeksSince(start,end){
@@ -1299,7 +1422,7 @@ function openSettings() {
 function renderSharedOfferSettings() {
   const section = el('sharedOfferSettings');
   section.hidden = !state.sharedOffers.length;
-  el('sharedOfferSettingsList').innerHTML = state.sharedOffers.map(offer => `<label class="toggle-setting"><input type="checkbox" data-shared-offer-toggle="${escapeHtml(offer.id)}" ${offer.link?.visible_on_team ? 'checked' : ''}><span><strong>Vis ${escapeHtml(offer.name)}</strong><small>Mad og aktiviteter vises nederst på den almindelige tavle.</small></span></label>`).join('');
+  el('sharedOfferSettingsList').innerHTML = state.sharedOffers.map(offer => `<label class="toggle-setting"><input type="checkbox" data-shared-offer-toggle="${escapeHtml(offer.id)}" ${offer.link?.visible_on_team ? 'checked' : ''}><span><strong>Vis ${escapeHtml(offer.name)}</strong><small>Mad, aktiviteter og eventuelle tilmeldinger vises nederst på den almindelige tavle.</small></span></label>`).join('');
 }
 
 async function requestSubscription(button) {
@@ -1479,6 +1602,9 @@ el('closeAdmin').addEventListener('click', closeAdminWithCheck);
 el('adminDialog').addEventListener('cancel', event => { event.preventDefault(); closeAdminWithCheck(); });
 el('closeImageDialog').addEventListener('click', () => el('imageDialog').close());
 el('imageDialog').addEventListener('click', event => { if (event.target === el('imageDialog')) el('imageDialog').close(); });
+el('closeRegistrationDialog').addEventListener('click', () => el('registrationDialog').close());
+el('registrationDialog').addEventListener('click', event => { if (event.target === el('registrationDialog')) el('registrationDialog').close(); });
+el('registrationForm').addEventListener('submit', submitRegistration);
 el('logoutButton').addEventListener('click', () => { if (confirmDiscardWeekChanges('logge ud')) signOut(); });
 el('viewerLogoutButton').addEventListener('click', leaveBoard);
 el('adminDaySelect').addEventListener('change', () => {

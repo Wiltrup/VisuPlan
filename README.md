@@ -1,5 +1,20 @@
 # VisuPlanner
 
+## v52 – valgfrit tilmeldingsmodul til klubaktiviteter
+
+Version 52 gør det muligt for Techus Nord at aktivere et tilmeldingsmodul på et enkelt fælles klubtilbud. Modulet er slået fra som standard og påvirker derfor ikke andre kunder eller klubber.
+
+Klubpersonalet kan markere en fremtidig aktivitet som “Kræver tilmelding”, tilføje en frist og praktisk information og derefter se alle tilmeldinger i en ny fane i klubbens eksisterende redigeringsvindue. Deltagerne er opdelt efter team. På teamtavlen vises kommende arrangementer uafhængigt af den uge, tavlen aktuelt viser. Beboere og personale skriver blot et navn; teamtavlen viser kun sit eget teams navne.
+
+Aktiviteter beholder nu deres database-id ved almindelige rettelser, så en deltagerliste ikke forsvinder, fordi klubben retter tid, tekst eller billede. Tilmeldingsnavne slettes automatisk 30 dage efter arrangementet via den eksisterende daglige kontrol.
+
+### Opdatering fra v51
+
+1. Kør `supabase-v52-club-registrations.sql` én gang i Supabase SQL Editor. Migrationen tilføjer kun nye kolonner, sikkerhedsregler og en ny tilmeldingstabel.
+2. Udgiv derefter v52-filerne via GitHub/Vercel.
+3. Åbn `/administration`, find den ønskede testklub, og aktivér “Tilmeldingsmodul”. Alle andre klubber forbliver uændrede.
+4. Der skal ikke oprettes nye miljøvariabler eller flere Vercel-funktioner.
+
 ## v51 – kundeadministration, mindre billeder og rolig synkronisering
 
 Version 51 tilføjer et personligt kundeadministrator-login på `/kundeadmin`. Techus Nord inviterer den ansvarlige via en unik 72-timers engangsadresse, som er bundet til præcis én kunde. Kundeadministratoren logger derefter ind med arbejdsmail og en personlig adgangskode og kan kun se og administrere den pågældende kundes tavler.

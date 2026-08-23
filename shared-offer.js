@@ -32,6 +32,7 @@ let pendingPhoto = null;
 let editorMode = false;
 let imageSearchTarget = { kind:'meal', index:null };
 let offerRefreshTimer = null;
+let registrationOverviewLoading = false;
 const signedMediaCache = new Map();
 
 function iso(date) { return date.toISOString().slice(0, 10); }
@@ -98,6 +99,7 @@ async function loadOffer() {
   $('offerName').textContent = offer.name;
   $('offerWorkplace').textContent = offer.workplace || offer.municipality || 'FÆLLES TILBUD';
   $('offerLoginTitle').textContent = `Åbn ${offer.name}`;
+  $('offerEditorTabs').hidden = !offer.registration_module_enabled;
 }
 
 async function login(action, password) {
@@ -206,6 +208,7 @@ function render() {
 async function openEditor() {
   if (!editorMode) return startEditorLogin();
   $('offerEditorDialog').showModal();
+  showEditorTab('planner');
   try { await loadEditorWeek(weekStart, selected); }
   catch (error) { console.error(error); status('Ugen kunne ikke hentes. Prøv igen.'); }
 }
@@ -238,7 +241,18 @@ async function loadEditorDay() {
   $('offerMealFile').value = '';
   pendingPhoto = null;
   photoNote($('offerMealFileNote'), data.meal_photo_path ? 'existing' : 'empty', data.meal_photo_path ? 'Vælg et nyt billede for at udskifte det.' : 'Søg efter et billede eller upload jeres eget.');
-  editingActivities = (editorActivities[date] || []).map(item => ({ time:(item.activity_time || '').slice(0,5), endTime:(item.activity_end_time || '').slice(0,5), name:item.name, photoPath:item.photo_path || item.photo_url || '', photoUrl:item.photo_url || '', photoFile:null }));
+  editingActivities = (editorActivities[date] || []).map(item => ({
+    id:item.id,
+    time:(item.activity_time || '').slice(0,5),
+    endTime:(item.activity_end_time || '').slice(0,5),
+    name:item.name,
+    photoPath:item.photo_path || item.photo_url || '',
+    photoUrl:item.photo_url || '',
+    photoFile:null,
+    registrationEnabled:item.registration_enabled === true,
+    registrationDeadline:item.registration_deadline || '',
+    registrationNote:item.registration_note || ''
+  }));
   renderActivityEditor();
 }
 
@@ -246,12 +260,19 @@ function renderActivityEditor() {
   $('offerActivityEditor').innerHTML = editingActivities.map((item, index) => {
     const hasPhoto = Boolean(item.photoFile || item.photoPath);
     const detail = item.photoFile ? item.photoFile.name : hasPhoto ? 'Vælg et nyt billede for at udskifte det.' : 'Søg eller upload et billede til aktiviteten.';
-    return `<div class="activity-edit-row"><label><span>Start</span><input type="time" data-activity-start="${index}" value="${esc(item.time)}"></label><label><span>Slut</span><input type="time" data-activity-end="${index}" value="${esc(item.endTime)}"></label><input data-activity-name="${index}" value="${esc(item.name)}" placeholder="Aktivitet"><button class="remove-activity" data-remove-activity="${index}" type="button" aria-label="Fjern aktivitet">✕</button><div class="activity-photo-controls"><button data-search-activity-photo="${index}" type="button">🔎 Søg efter billede</button><label>Upload billede<input type="file" accept="image/jpeg,image/png,image/webp" data-activity-photo="${index}"></label>${hasPhoto ? `<button class="clear-photo" data-clear-activity-photo="${index}" type="button">Fjern billede</button>` : ''}<div class="photo-selection-note ${hasPhoto ? '' : 'is-empty'}"><strong>${hasPhoto ? (item.photoFile ? 'Billede valgt ✓' : 'Billede tilknyttet ✓') : 'Intet billede valgt'}</strong><span>${esc(detail)}</span></div></div></div>`;
+    const registrationControls = offer.registration_module_enabled ? `<div class="activity-registration-controls"><label class="registration-toggle"><input type="checkbox" data-registration-enabled="${index}" ${item.registrationEnabled ? 'checked' : ''}><span><strong>Kræver tilmelding</strong><small>Vises under kommende arrangementer på de tilknyttede teamtavler.</small></span></label><div class="activity-registration-fields" ${item.registrationEnabled ? '' : 'hidden'} data-registration-fields="${index}"><label><span>Tilmelding senest</span><input type="date" data-registration-deadline="${index}" value="${esc(item.registrationDeadline)}"></label><label><span>Praktisk information</span><textarea rows="2" maxlength="500" data-registration-note="${index}" placeholder="Fx mødested eller hvad man skal medbringe">${esc(item.registrationNote)}</textarea></label></div></div>` : '';
+    return `<div class="activity-edit-row"><label><span>Start</span><input type="time" data-activity-start="${index}" value="${esc(item.time)}"></label><label><span>Slut</span><input type="time" data-activity-end="${index}" value="${esc(item.endTime)}"></label><input data-activity-name="${index}" value="${esc(item.name)}" placeholder="Aktivitet"><button class="remove-activity" data-remove-activity="${index}" type="button" aria-label="Fjern aktivitet">✕</button><div class="activity-photo-controls"><button data-search-activity-photo="${index}" type="button">🔎 Søg efter billede</button><label>Upload billede<input type="file" accept="image/jpeg,image/png,image/webp" data-activity-photo="${index}"></label>${hasPhoto ? `<button class="clear-photo" data-clear-activity-photo="${index}" type="button">Fjern billede</button>` : ''}<div class="photo-selection-note ${hasPhoto ? '' : 'is-empty'}"><strong>${hasPhoto ? (item.photoFile ? 'Billede valgt ✓' : 'Billede tilknyttet ✓') : 'Intet billede valgt'}</strong><span>${esc(detail)}</span></div></div>${registrationControls}</div>`;
   }).join('') || '<p class="empty">Ingen aktiviteter endnu.</p>';
   document.querySelectorAll('[data-activity-start]').forEach(input => input.oninput = () => { editingActivities[Number(input.dataset.activityStart)].time = input.value; });
   document.querySelectorAll('[data-activity-end]').forEach(input => input.oninput = () => { editingActivities[Number(input.dataset.activityEnd)].endTime = input.value; });
   document.querySelectorAll('[data-activity-name]').forEach(input => input.oninput = () => { editingActivities[Number(input.dataset.activityName)].name = input.value; });
-  document.querySelectorAll('[data-remove-activity]').forEach(button => button.onclick = () => { editingActivities.splice(Number(button.dataset.removeActivity), 1); renderActivityEditor(); });
+  document.querySelectorAll('[data-remove-activity]').forEach(button => button.onclick = () => {
+    const index = Number(button.dataset.removeActivity);
+    const item = editingActivities[index];
+    if (item?.id && item.registrationEnabled && !confirm('Fjern aktiviteten? Eventuelle tilmeldinger til aktiviteten bliver også slettet.')) return;
+    editingActivities.splice(index, 1);
+    renderActivityEditor();
+  });
   document.querySelectorAll('[data-search-activity-photo]').forEach(button => button.onclick = () => openImageSearch('activity', Number(button.dataset.searchActivityPhoto)));
   document.querySelectorAll('[data-activity-photo]').forEach(input => input.onchange = () => {
     const item = editingActivities[Number(input.dataset.activityPhoto)];
@@ -263,6 +284,14 @@ function renderActivityEditor() {
     item.photoFile = null; item.photoPath = ''; item.photoUrl = '';
     renderActivityEditor();
   });
+  document.querySelectorAll('[data-registration-enabled]').forEach(input => input.onchange = () => {
+    const index = Number(input.dataset.registrationEnabled);
+    editingActivities[index].registrationEnabled = input.checked;
+    const fields = document.querySelector(`[data-registration-fields="${index}"]`);
+    if (fields) fields.hidden = !input.checked;
+  });
+  document.querySelectorAll('[data-registration-deadline]').forEach(input => input.oninput = () => { editingActivities[Number(input.dataset.registrationDeadline)].registrationDeadline = input.value; });
+  document.querySelectorAll('[data-registration-note]').forEach(input => input.oninput = () => { editingActivities[Number(input.dataset.registrationNote)].registrationNote = input.value; });
 }
 
 async function compressPhoto(file) {
@@ -344,7 +373,7 @@ async function saveEditor() {
   button.disabled = true;
   button.textContent = 'Gemmer…';
   try {
-    // Kontrollér v43-kolonnen før eksisterende aktivitetsrækker udskiftes.
+    // Kontrollér v43-kolonnen, før dagen gemmes.
     await api('/rest/v1/shared_offer_activities?select=activity_end_time&limit=0');
     let photoPath = editorDays[date]?.meal_photo_path || '';
     if (pendingPhoto) photoPath = await uploadPhoto(pendingPhoto, date);
@@ -353,8 +382,34 @@ async function saveEditor() {
       if (valid[index].photoFile) valid[index].photoPath = await uploadPhoto(valid[index].photoFile, date, 'activities', String(index + 1));
     }
     await api('/rest/v1/shared_offer_days?on_conflict=offer_id,plan_date', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'resolution=merge-duplicates,return=minimal' }, body:JSON.stringify({ offer_id:offer.id, plan_date:date, meal_name:$('offerMealInput').value.trim() || null, meal_photo_url:photoPath || null, message:$('offerMessageInput').value.trim() || null, updated_at:new Date().toISOString() }) });
-    await api(`/rest/v1/shared_offer_activities?offer_id=eq.${offer.id}&plan_date=eq.${date}`, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
-    if (valid.length) await api('/rest/v1/shared_offer_activities', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(valid.map((item, index) => ({ offer_id:offer.id, plan_date:date, activity_time:item.time || null, activity_end_time:item.endTime || null, name:item.name.trim(), photo_url:item.photoPath || null, sort_order:index + 1 }))) });
+    const existingIds = new Set((editorActivities[date] || []).map(item => item.id));
+    const keptIds = new Set(valid.map(item => item.id).filter(Boolean));
+    const removedIds = [...existingIds].filter(id => !keptIds.has(id));
+    for (let index = 0; index < valid.length; index += 1) {
+      const item = valid[index];
+      const payload = {
+        offer_id:offer.id,
+        plan_date:date,
+        activity_time:item.time || null,
+        activity_end_time:item.endTime || null,
+        name:item.name.trim(),
+        photo_url:item.photoPath || null,
+        sort_order:index + 1
+      };
+      if (offer.registration_module_enabled) Object.assign(payload, {
+        registration_enabled:item.registrationEnabled === true,
+        registration_deadline:item.registrationEnabled ? item.registrationDeadline || null : null,
+        registration_note:item.registrationEnabled ? item.registrationNote.trim() || null : null
+      });
+      if (item.id) {
+        await api(`/rest/v1/shared_offer_activities?id=eq.${encodeURIComponent(item.id)}&offer_id=eq.${encodeURIComponent(offer.id)}`, { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(payload) });
+      } else {
+        await api('/rest/v1/shared_offer_activities', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify(payload) });
+      }
+    }
+    for (const id of removedIds) {
+      await api(`/rest/v1/shared_offer_activities?id=eq.${encodeURIComponent(id)}&offer_id=eq.${encodeURIComponent(offer.id)}`, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+    }
     const preferredDay = Math.max(0,$('offerEditDate').selectedIndex);
     await loadEditorWeek(editorWeekStart,preferredDay);
     if (date >= weekStart && date <= add(weekStart, 6)) await loadWeek();
@@ -362,12 +417,110 @@ async function saveEditor() {
     button.textContent = 'Gemt ✓';
   } catch (error) {
     console.error(error);
-    status('Indholdet kunne ikke gemmes. Kontrollér, at v43-databaseopdateringen er kørt.');
+    status('Indholdet kunne ikke gemmes. Kontrollér, at den seneste databaseopdatering er kørt.');
     button.textContent = 'Prøv igen';
   } finally {
     button.disabled = false;
     setTimeout(() => { button.textContent = 'Gem og opdatér alle tavler'; }, 1500);
   }
+}
+
+function showEditorTab(tab) {
+  const registrations = tab === 'registrations' && offer.registration_module_enabled;
+  $('offerPlannerPane').hidden = registrations;
+  $('offerRegistrationsPane').hidden = !registrations;
+  $('offerPlannerTab').classList.toggle('active', !registrations);
+  $('offerRegistrationsTab').classList.toggle('active', registrations);
+  if (registrations) loadRegistrationOverview();
+}
+
+function registrationDateLabel(value) {
+  return new Intl.DateTimeFormat('da-DK', { weekday:'long', day:'numeric', month:'long', year:'numeric' }).format(new Date(`${value}T12:00:00`));
+}
+
+function registrationTeamName(teamSlug) {
+  return offer.linked_teams?.find(team => team.slug === teamSlug)?.name || teamSlug;
+}
+
+function registrationError(error) {
+  const message = String(error?.message || error || '');
+  if (/duplicate|unique|23505|allerede/i.test(message)) return 'Navnet står allerede på deltagerlisten for dette team.';
+  return 'Tilmeldingen kunne ikke gemmes. Kontrollér internetforbindelsen, og prøv igen.';
+}
+
+async function loadRegistrationOverview() {
+  if (!offer.registration_module_enabled || registrationOverviewLoading) return;
+  const target = $('offerRegistrationOverview');
+  registrationOverviewLoading = true;
+  target.innerHTML = '<p class="empty">Henter tilmeldinger…</p>';
+  try {
+    const todayDate = new Date();
+    todayDate.setHours(12,0,0,0);
+    const today = iso(todayDate);
+    const eventRows = await api(`/rest/v1/shared_offer_activities?offer_id=eq.${encodeURIComponent(offer.id)}&registration_enabled=eq.true&plan_date=gte.${today}&select=*&order=plan_date.asc,activity_time.asc,sort_order.asc`) || [];
+    const activityIds = eventRows.map(item => item.id);
+    const rows = activityIds.length ? await api(`/rest/v1/shared_offer_registrations?offer_id=eq.${encodeURIComponent(offer.id)}&activity_id=in.(${activityIds.map(encodeURIComponent).join(',')})&select=*&order=created_at.asc`) || [] : [];
+    $('offerRegistrationsTab').textContent = rows.length ? `Tilmeldinger (${rows.length})` : 'Tilmeldinger';
+    if (!eventRows.length) {
+      target.innerHTML = '<p class="empty">Der er ingen kommende aktiviteter med tilmelding.</p>';
+      return;
+    }
+    target.innerHTML = eventRows.map(activity => {
+      const activityRows = rows.filter(row => row.activity_id === activity.id);
+      const knownTeams = offer.linked_teams || [];
+      const extraSlugs = [...new Set(activityRows.map(row => row.team_slug))].filter(teamSlug => !knownTeams.some(team => team.slug === teamSlug));
+      const teams = [...knownTeams, ...extraSlugs.map(teamSlug => ({ slug:teamSlug, name:registrationTeamName(teamSlug) }))];
+      const teamGroups = teams.map(team => {
+        const teamRows = activityRows.filter(row => row.team_slug === team.slug);
+        const roster = teamRows.length ? teamRows.map(row => `<div class="registration-person-row"><input data-registration-name="${esc(row.id)}" maxlength="80" value="${esc(row.participant_name)}" aria-label="Navn"><button data-save-registration="${esc(row.id)}" type="button">Gem</button><button data-delete-registration="${esc(row.id)}" class="remove-registration" type="button">Fjern</button></div>`).join('') : '<p class="empty registration-empty">Ingen tilmeldte endnu.</p>';
+        return `<section class="registration-team-group"><header><h4>${esc(team.name || team.slug)}</h4><span>${teamRows.length} ${teamRows.length === 1 ? 'person' : 'personer'}</span></header><div class="registration-roster">${roster}</div><form class="registration-add-form" data-add-registration="${esc(activity.id)}" data-registration-team="${esc(team.slug)}"><input maxlength="80" placeholder="Skriv beboernavn eller personale" required><button type="submit">+ Tilføj</button></form></section>`;
+      }).join('') || '<p class="empty">Tilbuddet er ikke tilknyttet nogen teamtavler.</p>';
+      const deadline = activity.registration_deadline ? ` · Tilmelding senest ${format(activity.registration_deadline)}` : '';
+      return `<article class="registration-event-card"><header class="registration-event-heading"><div><p>${esc(registrationDateLabel(activity.plan_date))} · ${esc(timeLabel(activity.activity_time, activity.activity_end_time))}</p><h3>${esc(activity.name)}</h3><small>${esc(activity.registration_note || '')}${esc(deadline)}</small></div><strong>${activityRows.length} tilmeldte</strong></header><div class="registration-team-grid">${teamGroups}</div></article>`;
+    }).join('');
+    bindRegistrationOverviewActions();
+  } catch (error) {
+    console.error(error);
+    target.innerHTML = '<p class="error">Deltagerlisterne kunne ikke hentes. Prøv at opdatere.</p>';
+  } finally {
+    registrationOverviewLoading = false;
+  }
+}
+
+function bindRegistrationOverviewActions() {
+  const target = $('offerRegistrationOverview');
+  target.querySelectorAll('[data-save-registration]').forEach(button => button.onclick = async () => {
+    const id = button.dataset.saveRegistration;
+    const participantName = target.querySelector(`[data-registration-name="${id}"]`)?.value.trim() || '';
+    if (!participantName) return status('Skriv et navn, før du gemmer.');
+    button.disabled = true;
+    try {
+      await api(`/rest/v1/shared_offer_registrations?id=eq.${encodeURIComponent(id)}&offer_id=eq.${encodeURIComponent(offer.id)}`, { method:'PATCH', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ participant_name:participantName }) });
+      status('Navnet er rettet.');
+      await loadRegistrationOverview();
+    } catch (error) { status(registrationError(error)); button.disabled = false; }
+  });
+  target.querySelectorAll('[data-delete-registration]').forEach(button => button.onclick = async () => {
+    if (!confirm('Fjern navnet fra deltagerlisten?')) return;
+    button.disabled = true;
+    try {
+      await api(`/rest/v1/shared_offer_registrations?id=eq.${encodeURIComponent(button.dataset.deleteRegistration)}&offer_id=eq.${encodeURIComponent(offer.id)}`, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+      status('Tilmeldingen er fjernet.');
+      await loadRegistrationOverview();
+    } catch (error) { status('Tilmeldingen kunne ikke fjernes. Prøv igen.'); button.disabled = false; }
+  });
+  target.querySelectorAll('[data-add-registration]').forEach(form => form.onsubmit = async event => {
+    event.preventDefault();
+    const button = event.submitter;
+    const participantName = form.querySelector('input').value.trim();
+    if (!participantName) return;
+    button.disabled = true;
+    try {
+      await api('/rest/v1/shared_offer_registrations', { method:'POST', headers:{ 'Content-Type':'application/json', Prefer:'return=minimal' }, body:JSON.stringify({ activity_id:form.dataset.addRegistration, offer_id:offer.id, team_slug:form.dataset.registrationTeam, participant_name:participantName }) });
+      status('Tilmeldingen er gemt.');
+      await loadRegistrationOverview();
+    } catch (error) { status(registrationError(error)); button.disabled = false; }
+  });
 }
 
 function startEditorLogin() {
@@ -387,7 +540,10 @@ $('offerCloseEditor').onclick = () => $('offerEditorDialog').close();
 $('offerEditDate').onchange = loadEditorDay;
 $('offerPreviousEditWeek').onclick = () => changeEditorWeek(-7);
 $('offerNextEditWeek').onclick = () => changeEditorWeek(7);
-$('offerAddActivity').onclick = () => { editingActivities.push({ time:'10:00', endTime:'', name:'', photoPath:'', photoUrl:'', photoFile:null }); renderActivityEditor(); };
+$('offerPlannerTab').onclick = () => showEditorTab('planner');
+$('offerRegistrationsTab').onclick = () => showEditorTab('registrations');
+$('offerRefreshRegistrations').onclick = loadRegistrationOverview;
+$('offerAddActivity').onclick = () => { editingActivities.push({ time:'10:00', endTime:'', name:'', photoPath:'', photoUrl:'', photoFile:null, registrationEnabled:false, registrationDeadline:'', registrationNote:'' }); renderActivityEditor(); };
 $('offerMealFile').onchange = event => {
   pendingPhoto = event.target.files?.[0] || null;
   if (pendingPhoto) photoNote($('offerMealFileNote'), 'selected', pendingPhoto.name);

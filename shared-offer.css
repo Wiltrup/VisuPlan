@@ -79,6 +79,39 @@ dialog::backdrop { background:rgba(14,23,38,.58); backdrop-filter:blur(3px); }
 .photo-selection-note.is-empty { border-color:#e5eaf1; background:#f7f9fc; }
 .photo-selection-note.is-empty strong { color:#667085; }
 .activity-photo-controls .photo-selection-note { flex:1 1 220px; margin:0; }
+.offer-editor-tabs { display:flex; gap:7px; margin:18px 0; padding:5px; border-radius:14px; background:#e8edf4; }
+.offer-editor-tabs button { flex:1; padding:11px 14px; background:transparent; color:#667085; }
+.offer-editor-tabs button.active { background:#fff; color:#172033; box-shadow:0 3px 12px rgba(23,32,51,.09); }
+.activity-registration-controls { grid-column:1/-1; padding:13px; border:1px solid #c7eadc; border-radius:14px; background:#edf9f5; }
+.registration-toggle { display:flex !important; align-items:center; gap:11px !important; margin:0 !important; cursor:pointer; }
+.registration-toggle input { width:22px; height:22px; flex:0 0 22px; }
+.registration-toggle span { display:grid; gap:2px; }
+.registration-toggle strong { color:#125f48; font-size:.96rem; }
+.registration-toggle small { color:#5e716d; font-weight:600; }
+.activity-registration-fields { display:grid; grid-template-columns:190px 1fr; gap:10px; margin-top:13px; }
+.activity-registration-fields label { font-size:.76rem; }
+.registration-overview-heading { display:flex; justify-content:space-between; align-items:flex-end; gap:14px; margin:18px 0 4px; }
+.registration-overview-heading h3 { margin:3px 0 0; font-size:1.5rem; }
+.registration-overview { display:grid; gap:15px; margin-top:16px; }
+.registration-event-card { overflow:hidden; border:1px solid #dce4ed; border-radius:18px; background:#fff; }
+.registration-event-heading { display:flex; align-items:flex-start; justify-content:space-between; gap:14px; padding:16px 18px; background:#f6f8fb; }
+.registration-event-heading p { margin:0; color:#0e8f86; font-size:.76rem; font-weight:900; text-transform:capitalize; }
+.registration-event-heading h3 { margin:4px 0; }
+.registration-event-heading small { display:block; color:#667085; line-height:1.4; }
+.registration-event-heading>strong { flex:0 0 auto; padding:7px 10px; border-radius:999px; background:#172033; color:#fff; font-size:.75rem; text-transform:uppercase; }
+.registration-team-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:12px; padding:14px; }
+.registration-team-group { padding:13px; border-radius:14px; background:#f4f7fa; }
+.registration-team-group>header { display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.registration-team-group h4 { margin:0; }
+.registration-team-group>header span { color:#667085; font-size:.75rem; font-weight:800; }
+.registration-roster { display:grid; gap:7px; margin-top:10px; }
+.registration-person-row { display:grid; grid-template-columns:1fr auto auto; align-items:center; gap:7px; }
+.registration-person-row input { padding:9px 10px; }
+.registration-person-row button,.registration-add-form button { padding:9px 10px; font-size:.76rem; }
+.registration-person-row .remove-registration { background:#fff0ee; color:#b42318; }
+.registration-empty { margin:8px 2px; font-size:.84rem; }
+.registration-add-form { display:grid; grid-template-columns:1fr auto; gap:7px; margin-top:10px; }
+.registration-add-form input { min-width:0; padding:10px; font-size:.82rem; }
 .pexels-search-button { width:100%; margin-top:13px; background:#172033; }
 .image-search-card { max-height:88vh; }
 .image-search-form { display:grid; grid-template-columns:1fr auto; gap:9px; margin-top:16px; }
@@ -96,6 +129,7 @@ dialog::backdrop { background:rgba(14,23,38,.58); backdrop-filter:blur(3px); }
 #offerStatus,#offerImageSearchStatus { position:fixed; z-index:10; left:50%; bottom:max(18px,env(safe-area-inset-bottom)); max-width:calc(100vw - 32px); padding:12px 18px; transform:translateX(-50%); border-radius:999px; background:#172033; color:#fff; text-align:center; font-weight:850; box-shadow:0 10px 30px rgba(0,0,0,.26); }
 #offerStatus:empty,#offerImageSearchStatus:empty { display:none; }
 button:disabled { opacity:.6; cursor:wait; }
+.offer-editor-tabs[hidden],#offerPlannerPane[hidden],#offerRegistrationsPane[hidden],.activity-registration-fields[hidden] { display:none !important; }
 @media(max-width:760px) {
   .offer-shell { padding:12px; }
   .offer-topbar img { width:clamp(145px,48vw,270px); }
@@ -108,6 +142,10 @@ button:disabled { opacity:.6; cursor:wait; }
   .activity-edit-row>input { grid-column:1/3; }
   .activity-edit-row>.remove-activity { grid-column:3; grid-row:2; }
   .activity-photo-controls { grid-column:1/-1; }
+  .activity-registration-fields,.registration-team-grid { grid-template-columns:1fr; }
+  .registration-event-heading { align-items:flex-start; flex-direction:column; }
+  .registration-person-row { grid-template-columns:1fr auto; }
+  .registration-person-row .remove-registration { grid-column:2; }
   .offer-activity.has-photo { grid-template-columns:78px 1fr; }
   .offer-activity.has-photo time { grid-column:1; }
   .offer-activity.has-photo strong { grid-column:2; }

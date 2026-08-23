@@ -105,7 +105,16 @@ module.exports = async function handler(request, response) {
       });
       trialSent += 1;
     }
-    return response.status(200).json({ ok:true, renewalChecked:(rows || []).length, renewalSent, trialChecked:(trials || []).length, trialSent });
+    let registrationsPurged = 0;
+    try {
+      const result = await service('/rest/v1/rpc/purge_expired_shared_offer_registrations', secret, { method:'POST', body:'{}' });
+      registrationsPurged = Number(result || 0);
+    } catch (error) {
+      // Webkoden kan blive deployet, før v52-migrationen er kørt. De øvrige
+      // påmindelser skal fortsat fungere i det korte mellemrum.
+      console.warn('Gamle klubtilmeldinger kunne ikke ryddes endnu.', error.message);
+    }
+    return response.status(200).json({ ok:true, renewalChecked:(rows || []).length, renewalSent, trialChecked:(trials || []).length, trialSent, registrationsPurged });
   } catch (error) {
     console.error(error);
     return response.status(500).json({ error:'Fornyelseskontrollen mislykkedes.' });

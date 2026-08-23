@@ -146,7 +146,8 @@ async function createSharedOffer(input, customer, secret) {
         workplace: clean(input.workplace || customer.display_name, 200) || null,
         municipality: clean(input.municipality || customer.municipality, 150) || null,
         recovery_email: recoveryEmail, editor_user_id: editor.id, viewer_user_id: viewer.id,
-        own_board_enabled: input.own_board_enabled !== false
+        own_board_enabled: input.own_board_enabled !== false,
+        registration_module_enabled: input.registration_module_enabled === true
       })
     });
     offer = rows?.[0];
@@ -365,7 +366,9 @@ module.exports = async function handler(request, response) {
       const update = {
         name: clean(body.name, 150), workplace: clean(body.workplace, 200) || null,
         municipality: clean(body.municipality, 150) || null, recovery_email: clean(body.recovery_email, 200).toLowerCase(),
-        own_board_enabled: body.own_board_enabled !== false, updated_at: new Date().toISOString()
+        own_board_enabled: body.own_board_enabled !== false,
+        registration_module_enabled: body.registration_module_enabled === true,
+        updated_at: new Date().toISOString()
       };
       if (!update.name || !/^\S+@\S+\.\S+$/.test(update.recovery_email)) return response.status(400).json({ error: 'Udfyld navn og en gyldig kontaktmail.' });
       await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(update) });

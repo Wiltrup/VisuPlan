@@ -25,7 +25,24 @@ module.exports = async function handler(request, response) {
     const offers = await service(`/rest/v1/shared_offers?slug=eq.${encodeURIComponent(slug)}&archived_at=is.null&select=*`, secret);
     const offer = offers?.[0];
     if (!offer) return response.status(404).json({ error: 'Tilbuddet blev ikke fundet.' });
-    if (request.method === 'GET') return response.status(200).json({ id: offer.id, slug: offer.slug, customer_slug: offer.customer_slug || '', name: offer.name, workplace: offer.workplace, municipality: offer.municipality, own_board_enabled: offer.own_board_enabled });
+    if (request.method === 'GET') {
+      let linkedTeams = [];
+      if (offer.registration_module_enabled) {
+        const links = await service(`/rest/v1/shared_offer_team_links?offer_id=eq.${encodeURIComponent(offer.id)}&select=team_slug`, secret);
+        const teamSlugs = (links || []).map(link => link.team_slug);
+        if (teamSlugs.length) {
+          const teams = await service(`/rest/v1/teams_registry?slug=in.(${teamSlugs.map(encodeURIComponent).join(',')})&archived_at=is.null&select=slug,name&order=name.asc`, secret);
+          linkedTeams = teams || [];
+        }
+      }
+      return response.status(200).json({
+        id: offer.id, slug: offer.slug, customer_slug: offer.customer_slug || '', name: offer.name,
+        workplace: offer.workplace, municipality: offer.municipality,
+        own_board_enabled: offer.own_board_enabled,
+        registration_module_enabled: offer.registration_module_enabled === true,
+        linked_teams: linkedTeams
+      });
+    }
     const action = input.action;
     if (!['viewer-login', 'editor-login'].includes(action)) return response.status(400).json({ error: 'Ukendt handling.' });
     if (action === 'viewer-login' && !offer.own_board_enabled) return response.status(403).json({ error: 'Tilbuddet har ikke sin egen tavle.' });

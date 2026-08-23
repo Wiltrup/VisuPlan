@@ -134,6 +134,7 @@ function sharedOfferCard(offer, customer) {
       <label>Kommune<input data-offer-field="municipality" value="${esc(offer.municipality)}"></label>
       <label>Ansvarlig arbejdsmail<input data-offer-field="recovery_email" type="email" value="${esc(offer.recovery_email)}"></label>
       <label class="toggle-setting"><input data-offer-field="own_board_enabled" type="checkbox" ${offer.own_board_enabled ? 'checked' : ''}><span><strong>Egen tavle</strong><small>Kan åbnes på tablet og af eksterne beboere.</small></span></label>
+      <label class="toggle-setting"><input data-offer-field="registration_module_enabled" type="checkbox" ${offer.registration_module_enabled ? 'checked' : ''}><span><strong>Tilmeldingsmodul</strong><small>Viser kommende tilmeldingsaktiviteter på de tilknyttede teamtavler.</small></span></label>
     </div>
     <div class="offer-team-grid"><strong>Tilgængeligt for disse tavler</strong>${teamLinkOptions(customer, selected)}</div>
     <div class="board-actions"><a href="${esc(offerPath)}" target="_blank" rel="noopener">Åbn tilbudstavle</a><button data-offer-action="save-shared-offer">Gem tilbud og tilknytninger</button></div>
@@ -212,6 +213,7 @@ function customerCard(customer) {
         <label>Redigeringskode<input data-new-offer="editor_password" type="password" minlength="8"></label>
         <label>Visningskode<input data-new-offer="viewer_password" type="password" minlength="6"></label>
         <label class="toggle-setting"><input data-new-offer="own_board_enabled" type="checkbox" checked><span><strong>Opret egen klubtavle</strong><small>Kan bruges på klubbens tablet og af eksterne beboere.</small></span></label>
+        <label class="toggle-setting"><input data-new-offer="registration_module_enabled" type="checkbox"><span><strong>Tilmeldingsmodul</strong><small>Valgfrit modul. Det kan også aktiveres senere på det enkelte klubtilbud.</small></span></label>
         <div class="offer-team-grid"><strong>Gør tilbuddet tilgængeligt for</strong>${teamLinkOptions(customer)}</div>
         <button data-customer-action="create-shared-offer">Opret fælles tilbud</button>
       </div></details>
