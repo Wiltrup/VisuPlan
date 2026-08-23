@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { saveTeamCredential } = require('../lib/customer-admin-security');
+const { saveTeamCredential, saveOfferCredential } = require('../lib/customer-admin-security');
 const { safeRoutes, publicPath } = require('../lib/board-routes');
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const hash = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
@@ -47,6 +47,7 @@ module.exports = async function handler(request, response) {
     if (invite.purpose === 'password_reset') {
       await service(`/auth/v1/admin/users/${board.editor_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: editorPassword }) });
       if (kind === 'team') await saveTeamCredential(team.slug, 'editor', editorPassword, secret).catch(error => console.error('Personalekoden kunne ikke gemmes krypteret.', error.message));
+      else await saveOfferCredential(offer.id, 'editor', editorPassword, secret).catch(error => console.error('Klubbens redigeringskode kunne ikke gemmes krypteret.', error.message));
       const invitationTable = kind === 'club' ? 'shared_offer_invitations' : 'team_invitations';
       await service(`/rest/v1/${invitationTable}?id=eq.${invite.id}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ used_at: new Date().toISOString() }) });
       const route = (await safeRoutes(service, secret, kind === 'team' ? `team_slug=eq.${encodeURIComponent(team.slug)}&select=*&limit=1` : `offer_id=eq.${encodeURIComponent(offer.id)}&select=*&limit=1`))?.[0];
@@ -63,6 +64,10 @@ module.exports = async function handler(request, response) {
       saveTeamCredential(team.slug, 'editor', editorPassword, secret),
       saveTeamCredential(team.slug, 'viewer', viewerPassword, secret)
     ]).catch(error => console.error('Tavlekoderne kunne ikke gemmes krypteret.', error.message));
+    else await Promise.all([
+      saveOfferCredential(offer.id, 'editor', editorPassword, secret),
+      saveOfferCredential(offer.id, 'viewer', viewerPassword, secret)
+    ]).catch(error => console.error('Klubbens koder kunne ikke gemmes krypteret.', error.message));
     const now = new Date();
     const nowIso = now.toISOString();
     const invitationTable = kind === 'club' ? 'shared_offer_invitations' : 'team_invitations';

@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { createCustomerAdminInvitation, saveTeamCredential } = require('../lib/customer-admin-security');
+const { createCustomerAdminInvitation, saveTeamCredential, saveOfferCredential } = require('../lib/customer-admin-security');
 const { isReservedBoardSlug, withNumericSuffix } = require('../lib/board-slugs');
 const { safeRoutes, publicPath, uniquePublicSlug, createRoute, routeMaps } = require('../lib/board-routes');
 
@@ -176,6 +176,10 @@ async function createSharedOffer(input, customer, secret) {
       method: 'POST', headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify(teamSlugs.map(team_slug => ({ offer_id: offer.id, team_slug, visible_on_team: true })))
     });
+    await Promise.all([
+      saveOfferCredential(offer.id, 'editor', editorPassword, secret),
+      saveOfferCredential(offer.id, 'viewer', viewerPassword, secret)
+    ]).catch(error => console.error('Klubbens koder kunne ikke gemmes krypteret.', error.message));
     return { ...offer, public_path:publicPath(route) || `/${customerSlug}/${offer.slug}`, board_slug:boardSlug, slugAdjusted:Boolean(requestedSlug && boardSlug !== requestedSlug) };
   } catch (error) {
     if (offer?.id) await serviceFetch(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}`, secret, { method: 'DELETE', headers: { Prefer: 'return=minimal' } }).catch(() => {});
@@ -419,6 +423,7 @@ module.exports = async function handler(request, response) {
       const value = String(body.value || '');
       if (value.length < (kind === 'viewer' ? 6 : 8)) return response.status(400).json({ error: kind === 'viewer' ? 'Visningskoden skal have mindst 6 tegn.' : 'Redigeringskoden skal have mindst 8 tegn.' });
       await serviceFetch(`/auth/v1/admin/users/${offer[`${kind}_user_id`]}`, secret, { method: 'PUT', body: JSON.stringify({ password: value }) });
+      await saveOfferCredential(offer.id, kind, value, secret).catch(error => console.error('Klubbens kode kunne ikke gemmes krypteret.', error.message));
       return response.status(200).json({ ok: true });
     }
     if (action === 'delete-request') {

@@ -55,10 +55,8 @@ body{margin:0;min-height:100vh;background:radial-gradient(circle at top left,#e5
 .team-edit{margin-top:10px;border-top:1px solid var(--line);padding-top:10px}
 .team-edit summary{cursor:pointer;font-weight:800;font-size:.83rem}
 .team-edit .field-grid{grid-template-columns:1fr;margin-top:10px}
-.offer-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
-.offer-card{border:1px solid var(--line);border-radius:13px;padding:13px}
-.offer-card h3{margin:0 0 8px}
-.offer-card a{color:var(--teal);font-weight:800}
+.offer-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.offer-card{min-width:0}
 .admin-person,.audit-row{display:flex;justify-content:space-between;gap:15px;border-bottom:1px solid #edf0f3;padding:9px 0}
 .admin-person span,.audit-row span,.audit-row time{color:var(--muted);font-size:.82rem}
 .help-button{display:inline-flex;margin-top:15px;border-radius:11px;padding:11px 14px;background:#e7edf3;color:#344054;font-weight:850;text-decoration:none}

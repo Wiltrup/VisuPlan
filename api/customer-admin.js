@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const customerAdminAccess = require('../lib/customer-admin-access-handler');
 const {
   clean, randomPassword, slugify, service, customerAdminContext,
-  audit, sendMail, decryptCredential, encryptCredential, saveTeamCredential
+  audit, sendMail, decryptCredential, encryptCredential, saveTeamCredential, saveOfferCredential
 } = require('../lib/customer-admin-security');
 const { isReservedBoardSlug, withNumericSuffix } = require('../lib/board-slugs');
 const { safeRoutes, publicPath, uniquePublicSlug, createRoute, routeMaps } = require('../lib/board-routes');
@@ -62,6 +62,12 @@ async function deleteAuthUser(userId, secret) {
   await service(`/auth/v1/admin/users/${userId}`, secret, { method:'DELETE' }).catch(error => {
     console.warn('Tavlens tekniske login kunne ikke slettes eller var allerede slettet.', userId, error.message);
   });
+}
+
+async function deleteOfferCompletely(offer, secret) {
+  await deleteStoragePrefix(`offers/${offer.id}`, secret);
+  await service(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}&customer_id=eq.${encodeURIComponent(offer.customer_id)}`, secret, { method:'DELETE', headers:{ Prefer:'return=minimal' } });
+  await Promise.all([deleteAuthUser(offer.editor_user_id, secret), deleteAuthUser(offer.viewer_user_id, secret)]);
 }
 
 const hash = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
@@ -247,6 +253,11 @@ module.exports = async function handler(request, response) {
         ? await service(`/rest/v1/team_credentials?team_slug=in.(${teamSlugs.join(',')})&select=team_slug,editor_code_ciphertext,viewer_code_ciphertext,editor_changed_at,viewer_changed_at`, secret)
         : [];
       const credentialMap = new Map((credentials || []).map(item => [item.team_slug, item]));
+      const offerIds = (offers || []).map(offer => offer.id).filter(Boolean);
+      const offerCredentials = offerIds.length
+        ? await service(`/rest/v1/shared_offer_credentials?offer_id=in.(${offerIds.map(encodeURIComponent).join(',')})&select=offer_id,editor_code_ciphertext,viewer_code_ciphertext,editor_changed_at,viewer_changed_at`, secret).catch(() => [])
+        : [];
+      const offerCredentialMap = new Map((offerCredentials || []).map(item => [item.offer_id, item]));
       const boardLimit = Number(context.customer.board_limit || 1);
       await service(`/rest/v1/customer_admins?id=eq.${encodeURIComponent(context.admin.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ last_login_at:new Date().toISOString() }) }).catch(() => {});
       return response.status(200).json({
@@ -258,7 +269,10 @@ module.exports = async function handler(request, response) {
         }),
         remainingBoards:Math.max(0, boardLimit - (teams || []).length),
         canCreateBoards:!['read_only','cancelled','overdue'].includes(context.customer.subscription_status) && (teams || []).length < boardLimit,
-        admins:admins || [], logs:logs || [], offers:(offers || []).map(offer => ({ ...offer, public_path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || context.customer.url_slug}/${offer.slug}` }))
+        admins:admins || [], logs:logs || [], offers:(offers || []).map(offer => {
+          const stored = offerCredentialMap.get(offer.id) || {};
+          return { ...offer, public_path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || context.customer.url_slug}/${offer.slug}`, has_editor_code:Boolean(stored.editor_code_ciphertext), has_viewer_code:Boolean(stored.viewer_code_ciphertext), editor_changed_at:stored.editor_changed_at || null, viewer_changed_at:stored.viewer_changed_at || null };
+        })
       });
     }
     if (request.method !== 'POST') return response.status(405).json({ error:'Kun GET og POST er tilladt.' });
@@ -282,9 +296,25 @@ module.exports = async function handler(request, response) {
       return response.status(200).json({ ok:true, ...result, boardUrl:result.publicPath });
     }
 
-    if (['send-club-invite','send-club-reset','reset-club-code'].includes(action)) {
+    if (['send-club-invite','send-club-reset','reveal-club-code','reset-club-code','save-club','delete-club'].includes(action)) {
       const offer = await scopedOffer(clean(body.offer_id, 80), context.customer.id, secret);
       if (!offer) return response.status(404).json({ error:'Klubtavlen blev ikke fundet hos denne kunde.' });
+      if (action === 'delete-club') {
+        if (String(body.confirmation || '') !== 'SLET KLUBTAVLE') return response.status(400).json({ error:'Sletningen blev ikke bekræftet korrekt.' });
+        await audit(context, 'club_deleted', null, `club:${offer.slug}`, secret);
+        await deleteOfferCompletely(offer, secret);
+        return response.status(200).json({ ok:true });
+      }
+      if (action === 'save-club') {
+        const update = {
+          name:clean(body.name, 150), workplace:clean(body.workplace, 200),
+          recovery_email:clean(body.recovery_email, 200).toLowerCase(), updated_at:new Date().toISOString()
+        };
+        if (!update.name || !update.workplace || !/^\S+@\S+\.\S+$/.test(update.recovery_email)) return response.status(400).json({ error:'Udfyld gyldige kluboplysninger.' });
+        await service(`/rest/v1/shared_offers?id=eq.${encodeURIComponent(offer.id)}&customer_id=eq.${encodeURIComponent(context.customer.id)}`, secret, { method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify(update) });
+        await audit(context, 'club_updated', null, `club:${offer.slug}`, secret);
+        return response.status(200).json({ ok:true });
+      }
       if (action === 'send-club-invite' || action === 'send-club-reset') {
         const purpose = action === 'send-club-reset' ? 'password_reset' : 'activation';
         const invitation = await createClubInvitation(offer, context.customer, secret, request.headers.host, purpose);
@@ -292,10 +322,24 @@ module.exports = async function handler(request, response) {
         return response.status(200).json({ ok:true, ...invitation });
       }
       const kind = body.kind === 'viewer' ? 'viewer' : 'editor';
+      if (action === 'reveal-club-code') {
+        const rows = await service(`/rest/v1/shared_offer_credentials?offer_id=eq.${encodeURIComponent(offer.id)}&select=*`, secret).catch(() => []);
+        const encrypted = rows?.[0]?.[`${kind}_code_ciphertext`];
+        if (!encrypted) return response.status(404).json({ error:'Koden er ikke gemt endnu. Vælg en ny kode én gang for at gøre den synlig.' });
+        const value = decryptCredential(encrypted);
+        await audit(context, 'club_code_revealed', null, `club:${offer.slug}:${kind}`, secret);
+        return response.status(200).json({ ok:true, value });
+      }
       const value = String(body.value || '');
       const minimum = kind === 'viewer' ? 6 : 8;
       if (value.length < minimum) return response.status(400).json({ error:`Koden skal have mindst ${minimum} tegn.` });
+      encryptCredential(value);
+      const otherKind = kind === 'viewer' ? 'editor' : 'viewer';
+      const credentialRows = await service(`/rest/v1/shared_offer_credentials?offer_id=eq.${encodeURIComponent(offer.id)}&select=*`, secret).catch(() => []);
+      const otherEncrypted = credentialRows?.[0]?.[`${otherKind}_code_ciphertext`];
+      if (otherEncrypted && decryptCredential(otherEncrypted) === value) return response.status(400).json({ error:'Tavle- og redigeringskoden skal være forskellige.' });
       await service(`/auth/v1/admin/users/${offer[`${kind}_user_id`]}`, secret, { method:'PUT', body:JSON.stringify({ password:value }) });
+      await saveOfferCredential(offer.id, kind, value, secret);
       await audit(context, 'club_code_changed', null, `club:${offer.slug}:${kind}`, secret);
       return response.status(200).json({ ok:true });
     }

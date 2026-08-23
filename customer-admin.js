@@ -52,7 +52,7 @@ function notify(message, type = '') {
 }
 
 const dateTime = value => value ? new Intl.DateTimeFormat('da-DK', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)) : 'Ikke registreret';
-const codeLabel = kind => kind === 'viewer' ? 'Tavlekode' : 'Personalekode';
+const codeLabel = (kind, scope = 'team') => kind === 'viewer' ? 'Tavlekode' : (scope === 'club' ? 'Redigeringskode' : 'Personalekode');
 const auditTargetLabel = value => {
   const target = String(value || '');
   if (target.startsWith('deleted_team:')) return target.slice(13);
@@ -67,14 +67,17 @@ const actionLabels = {
   board_created:'Tavle oprettet', code_revealed:'Kode vist', code_changed:'Kode ændret',
   team_updated:'Tavleoplysninger ændret', activation_sent:'Aktiveringslink sendt', password_reset_sent:'Nulstillingslink sendt',
   board_deleted:'Tavle slettet', club_created:'Klubtavle oprettet', club_activation_sent:'Aktiveringslink til klub sendt',
-  club_password_reset_sent:'Nulstillingslink til klub sendt', club_code_changed:'Klubbens kode ændret'
+  club_password_reset_sent:'Nulstillingslink til klub sendt', club_code_changed:'Klubbens kode ændret',
+  club_code_revealed:'Klubbens kode vist', club_updated:'Kluboplysninger ændret', club_deleted:'Klubtavle slettet'
 };
 
-function credentialHtml(team, kind) {
-  const hasCode = team[`has_${kind}_code`];
-  const changed = team[`${kind}_changed_at`];
+function credentialHtml(item, kind, scope = 'team') {
+  const hasCode = item[`has_${kind}_code`];
+  const changed = item[`${kind}_changed_at`];
   const minimum = kind === 'viewer' ? 6 : 8;
-  return `<section class="credential-row" data-credential="${kind}"><div class="credential-title"><strong>${codeLabel(kind)}</strong><span class="credential-value">${hasCode ? '••••••••' : 'Ikke tilgængelig endnu'}</span></div><small>${hasCode ? `Senest ændret ${dateTime(changed)}` : 'Vælg en ny kode for at gøre den synlig her.'}</small><div class="credential-actions">${hasCode ? `<button class="reveal-code" data-action="reveal-code" data-kind="${kind}" type="button">Vis kode</button>` : ''}</div><form class="credential-reset" data-reset-code="${kind}"><input name="value" type="password" minlength="${minimum}" placeholder="Ny ${codeLabel(kind).toLowerCase()} – mindst ${minimum} tegn" required><button type="submit">Vælg ny</button></form></section>`;
+  const resetAttribute = scope === 'club' ? 'data-reset-club-code' : 'data-reset-code';
+  const label = codeLabel(kind, scope);
+  return `<section class="credential-row" data-credential="${kind}"><div class="credential-title"><strong>${label}</strong><span class="credential-value">${hasCode ? '••••••••' : 'Ikke tilgængelig endnu'}</span></div><small>${hasCode ? `Senest ændret ${dateTime(changed)}` : 'Vælg en ny kode én gang for at gøre den synlig her.'}</small><div class="credential-actions">${hasCode ? `<button class="reveal-code" data-action="reveal-code" data-scope="${scope}" data-kind="${kind}" type="button">Vis kode</button>` : ''}</div><form class="credential-reset" ${resetAttribute}="${kind}"><input name="value" type="password" minlength="${minimum}" placeholder="Ny ${label.toLowerCase()} – mindst ${minimum} tegn" required><button type="submit">Vælg ny</button></form></section>`;
 }
 
 function boardHtml(team) {
@@ -85,7 +88,7 @@ function boardHtml(team) {
 
 function clubHtml(offer) {
   const active = offer.onboarding_status === 'active';
-  return `<article class="offer-card" data-offer="${esc(offer.id)}"><div class="board-head"><div><h3>${esc(offer.name)}</h3><code>visuplanner.dk${esc(offer.public_path)}</code></div><span class="badge ${active ? '' : 'pending'}">${active ? 'Aktiv' : 'Afventer aktivering'}</span></div><p>${esc(offer.workplace || '')} · ${esc(offer.recovery_email || '')}</p><div class="board-actions">${active ? `<a href="${esc(offer.public_path)}" target="_blank" rel="noopener">Åbn klubtavle</a><button data-club-action="send-club-reset" type="button">Send nulstillingslink</button>` : '<button data-club-action="send-club-invite" type="button">Send aktiveringslink igen</button>'}</div><details><summary>Nødhjælp: vælg nye koder</summary><form data-reset-club-code="editor"><input name="value" type="password" minlength="8" placeholder="Ny redigeringskode – mindst 8 tegn" required><button type="submit">Vælg ny</button></form><form data-reset-club-code="viewer"><input name="value" type="password" minlength="6" placeholder="Ny tavlekode – mindst 6 tegn" required><button type="submit">Vælg ny</button></form></details></article>`;
+  return `<article class="customer-board offer-card" data-offer="${esc(offer.id)}"><div class="board-head"><div><h3>${esc(offer.name)}</h3><code>visuplanner.dk${esc(offer.public_path)}</code></div><span class="badge ${active ? '' : 'pending'}">${active ? 'Aktiv' : 'Afventer aktivering'}</span></div><div class="board-meta"><span>${esc(offer.workplace || '')} · ${esc(dashboard.customer.municipality || '')}</span><span>Ansvarlig: ${esc(offer.recovery_email || '')}</span></div><div class="credential-list">${credentialHtml(offer,'viewer','club')}${credentialHtml(offer,'editor','club')}</div><div class="board-actions">${active ? `<a href="${esc(offer.public_path)}" target="_blank" rel="noopener">Åbn klubtavle</a><button data-club-action="send-club-reset" type="button">Send nulstillingslink</button>` : '<button data-club-action="send-club-invite" type="button">Send aktiveringslink igen</button>'}<button data-club-action="delete-club" class="danger" type="button">Slet klubtavle</button></div><details class="team-edit"><summary>Ret klubnavn og kontakt</summary><form data-save-club class="field-grid"><label>Klubnavn<input name="name" value="${esc(offer.name)}" required></label><label>Ansvarlig mail<input name="recovery_email" type="email" value="${esc(offer.recovery_email || '')}" required></label><label>Arbejdsplads<input name="workplace" value="${esc(offer.workplace || '')}" required></label><div class="form-actions"><button type="submit">Gem oplysninger</button></div></form></details></article>`;
 }
 
 function render() {
@@ -126,11 +129,14 @@ async function post(body) {
 
 function bindDashboardActions() {
   document.querySelectorAll('[data-action="reveal-code"]').forEach(button => button.onclick = async () => {
-    const board = button.closest('[data-team]');
+    const scope = button.dataset.scope === 'club' ? 'club' : 'team';
+    const board = button.closest(scope === 'club' ? '[data-offer]' : '[data-team]');
     const row = button.closest('[data-credential]');
     button.disabled = true;
     try {
-      const result = await post({ action:'reveal-code', team_slug:board.dataset.team, kind:button.dataset.kind });
+      const result = await post(scope === 'club'
+        ? { action:'reveal-club-code', offer_id:board.dataset.offer, kind:button.dataset.kind }
+        : { action:'reveal-code', team_slug:board.dataset.team, kind:button.dataset.kind });
       const value = row.querySelector('.credential-value');
       value.textContent = result.value;
       const copy = document.createElement('button');
@@ -159,6 +165,11 @@ function bindDashboardActions() {
     try { await post({ action:'save-team', team_slug:board.dataset.team, ...values }); notify('Tavleoplysningerne er gemt.'); await loadDashboard(); }
     catch (error) { notify(error.message,'error'); button.disabled = false; }
   });
+  document.querySelectorAll('[data-save-club]').forEach(form => form.onsubmit = async event => {
+    event.preventDefault(); const card = form.closest('[data-offer]'); const values = Object.fromEntries(new FormData(form)); const button = event.submitter; button.disabled = true;
+    try { await post({ action:'save-club', offer_id:card.dataset.offer, ...values }); notify('Kluboplysningerne er gemt.'); await loadDashboard(); }
+    catch (error) { notify(error.message,'error'); button.disabled = false; }
+  });
   document.querySelectorAll('[data-action="send-invite"],[data-action="send-editor-reset"]').forEach(button => button.onclick = async () => {
     const board = button.closest('[data-team]'); button.disabled = true;
     try { const result = await post({ action:button.dataset.action, team_slug:board.dataset.team }); if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {}); notify(result.mailSent ? 'Linket er sendt.' : 'Mail kunne ikke sendes. Linket er kopieret.'); await loadDashboard(); }
@@ -178,11 +189,19 @@ function bindDashboardActions() {
   });
   document.querySelectorAll('[data-club-action]').forEach(button => button.onclick = async () => {
     const card = button.closest('[data-offer]');
+    const action = button.dataset.clubAction;
+    if (action === 'delete-club') {
+      const name = card.querySelector('h3').textContent;
+      if (!confirm(`Slet ${name} permanent? Alt klubindhold, billeder, tilmeldinger, koder og login bliver slettet. Handlingen kan ikke fortrydes.`)) return;
+      if (prompt('Skriv SLET KLUBTAVLE for at bekræfte:') !== 'SLET KLUBTAVLE') return;
+    }
     button.disabled = true;
     try {
-      const result = await post({ action:button.dataset.clubAction, offer_id:card.dataset.offer });
+      const result = await post({ action, offer_id:card.dataset.offer, ...(action === 'delete-club' ? { confirmation:'SLET KLUBTAVLE' } : {}) });
+      if (action === 'delete-club') { notify('Klubtavlen er slettet.'); await loadDashboard(); return; }
       if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
       notify(result.mailSent ? 'Linket er sendt.' : 'Mail kunne ikke sendes. Linket er kopieret.');
+      await loadDashboard();
     } catch (error) { notify(error.message, 'error'); button.disabled = false; }
   });
   document.querySelectorAll('[data-reset-club-code]').forEach(form => form.onsubmit = async event => {
@@ -192,7 +211,7 @@ function bindDashboardActions() {
     const value = new FormData(form).get('value');
     if (!confirm(`Vælg en ny ${kind === 'viewer' ? 'tavlekode' : 'redigeringskode'} til klubben?`)) return;
     const button = event.submitter; button.disabled = true;
-    try { await post({ action:'reset-club-code', offer_id:card.dataset.offer, kind, value }); notify('Klubbens kode er ændret.'); form.reset(); }
+    try { await post({ action:'reset-club-code', offer_id:card.dataset.offer, kind, value }); notify(`${codeLabel(kind,'club')}n er ændret.`); await loadDashboard(); }
     catch (error) { notify(error.message, 'error'); button.disabled = false; }
   });
 }
@@ -228,6 +247,7 @@ function resetInactivity() {
 
 $('customerAdminLogout').onclick = logout;
 $('customerAdminReload').onclick = () => loadDashboard().then(() => notify('Oversigten er opdateret.')).catch(error => notify(error.message,'error'));
+$('customerAdminReloadClubs').onclick = () => loadDashboard().then(() => notify('Oversigten er opdateret.')).catch(error => notify(error.message,'error'));
 $('customerCreateBoardForm').onsubmit = async event => {
   event.preventDefault(); const form = event.currentTarget; const button = event.submitter; button.disabled = true; const values = Object.fromEntries(new FormData(form));
   try {
