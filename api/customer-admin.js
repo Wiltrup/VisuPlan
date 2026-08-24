@@ -232,6 +232,14 @@ async function scopedOffer(id, customerId, secret) {
   return rows?.[0] || null;
 }
 
+async function clubCredentialRows(offerId, secret) {
+  try {
+    return await service(`/rest/v1/shared_offer_credentials?offer_id=eq.${encodeURIComponent(offerId)}&select=*`, secret);
+  } catch {
+    throw new Error('Klubbens sikre kodevisning er ikke gjort klar endnu. Kontakt Techus Nord.');
+  }
+}
+
 module.exports = async function handler(request, response) {
   response.setHeader('Cache-Control', 'no-store');
   if (request.query?.flow === 'access') return customerAdminAccess(request, response);
@@ -337,7 +345,7 @@ module.exports = async function handler(request, response) {
       }
       const kind = body.kind === 'viewer' ? 'viewer' : 'editor';
       if (action === 'reveal-club-code') {
-        const rows = await service(`/rest/v1/shared_offer_credentials?offer_id=eq.${encodeURIComponent(offer.id)}&select=*`, secret).catch(() => []);
+        const rows = await clubCredentialRows(offer.id, secret);
         const encrypted = rows?.[0]?.[`${kind}_code_ciphertext`];
         if (!encrypted) return response.status(404).json({ error:'Koden er ikke gemt endnu. Vælg en ny kode én gang for at gøre den synlig.' });
         const value = decryptCredential(encrypted);
@@ -349,7 +357,7 @@ module.exports = async function handler(request, response) {
       if (value.length < minimum) return response.status(400).json({ error:`Koden skal have mindst ${minimum} tegn.` });
       encryptCredential(value);
       const otherKind = kind === 'viewer' ? 'editor' : 'viewer';
-      const credentialRows = await service(`/rest/v1/shared_offer_credentials?offer_id=eq.${encodeURIComponent(offer.id)}&select=*`, secret).catch(() => []);
+      const credentialRows = await clubCredentialRows(offer.id, secret);
       const otherEncrypted = credentialRows?.[0]?.[`${otherKind}_code_ciphertext`];
       if (otherEncrypted && decryptCredential(otherEncrypted) === value) return response.status(400).json({ error:'Tavle- og redigeringskoden skal være forskellige.' });
       await service(`/auth/v1/admin/users/${offer[`${kind}_user_id`]}`, secret, { method:'PUT', body:JSON.stringify({ password:value }) });

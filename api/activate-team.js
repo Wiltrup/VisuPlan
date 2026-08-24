@@ -1,5 +1,5 @@
 const crypto = require('crypto');
-const { saveTeamCredential, saveOfferCredential } = require('../lib/customer-admin-security');
+const { encryptCredential, saveTeamCredential, saveOfferCredential } = require('../lib/customer-admin-security');
 const { safeRoutes, publicPath } = require('../lib/board-routes');
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const hash = value => crypto.createHash('sha256').update(String(value || '')).digest('hex');
@@ -8,6 +8,15 @@ async function service(path, secret, options = {}) {
   const response = await fetch(`${SUPABASE_URL}${path}`, { ...options, headers: { apikey: secret, Authorization: `Bearer ${secret}`, 'Content-Type': 'application/json', ...(options.headers || {}) } });
   if (!response.ok) throw new Error(await response.text());
   return data(response);
+}
+
+async function assertClubCredentialStorage(offerId, secret, values) {
+  values.forEach(value => encryptCredential(value));
+  try {
+    await service(`/rest/v1/shared_offer_credentials?offer_id=eq.${encodeURIComponent(offerId)}&select=offer_id&limit=1`, secret);
+  } catch {
+    throw new Error('Klubbens sikre kodevisning er ikke gjort klar endnu. Kontakt Techus Nord.');
+  }
 }
 
 module.exports = async function handler(request, response) {
@@ -45,9 +54,10 @@ module.exports = async function handler(request, response) {
     if (editorPassword.length < 8) return response.status(400).json({ error: `${kind === 'club' ? 'Redigeringskoden' : 'Personalekoden'} skal have mindst 8 tegn.` });
 
     if (invite.purpose === 'password_reset') {
+      if (kind === 'club') await assertClubCredentialStorage(offer.id, secret, [editorPassword]);
       await service(`/auth/v1/admin/users/${board.editor_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: editorPassword }) });
       if (kind === 'team') await saveTeamCredential(team.slug, 'editor', editorPassword, secret).catch(error => console.error('Personalekoden kunne ikke gemmes krypteret.', error.message));
-      else await saveOfferCredential(offer.id, 'editor', editorPassword, secret).catch(error => console.error('Klubbens redigeringskode kunne ikke gemmes krypteret.', error.message));
+      else await saveOfferCredential(offer.id, 'editor', editorPassword, secret);
       const invitationTable = kind === 'club' ? 'shared_offer_invitations' : 'team_invitations';
       await service(`/rest/v1/${invitationTable}?id=eq.${invite.id}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ used_at: new Date().toISOString() }) });
       const route = (await safeRoutes(service, secret, kind === 'team' ? `team_slug=eq.${encodeURIComponent(team.slug)}&select=*&limit=1` : `offer_id=eq.${encodeURIComponent(offer.id)}&select=*&limit=1`))?.[0];
@@ -58,6 +68,8 @@ module.exports = async function handler(request, response) {
     if (viewerPassword.length < 6) return response.status(400).json({ error: 'Tavlekoden skal have mindst 6 tegn.' });
     if (editorPassword === viewerPassword) return response.status(400).json({ error: 'De to koder skal være forskellige.' });
 
+    if (kind === 'club') await assertClubCredentialStorage(offer.id, secret, [editorPassword, viewerPassword]);
+
     await service(`/auth/v1/admin/users/${board.editor_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: editorPassword }) });
     await service(`/auth/v1/admin/users/${board.viewer_user_id}`, secret, { method: 'PUT', body: JSON.stringify({ password: viewerPassword }) });
     if (kind === 'team') await Promise.all([
@@ -67,7 +79,7 @@ module.exports = async function handler(request, response) {
     else await Promise.all([
       saveOfferCredential(offer.id, 'editor', editorPassword, secret),
       saveOfferCredential(offer.id, 'viewer', viewerPassword, secret)
-    ]).catch(error => console.error('Klubbens koder kunne ikke gemmes krypteret.', error.message));
+    ]);
     const now = new Date();
     const nowIso = now.toISOString();
     const invitationTable = kind === 'club' ? 'shared_offer_invitations' : 'team_invitations';
@@ -83,6 +95,9 @@ module.exports = async function handler(request, response) {
     return response.status(200).json({ ok: true, slug: board.slug, path:publicPath(route) || (kind === 'club' ? `/${offer.customer_slug}/${offer.slug}` : `/${team.slug}`), kind });
   } catch (error) {
     console.error(error);
-    return response.status(500).json({ error: 'Aktiveringen kunne ikke gennemføres. Prøv igen eller bed om et nyt link.' });
+    const message = /kodevisning|krypter/i.test(String(error.message))
+      ? error.message
+      : 'Aktiveringen kunne ikke gennemføres. Prøv igen eller bed om et nyt link.';
+    return response.status(500).json({ error: message });
   }
 };
