@@ -1,6 +1,9 @@
 {
   "cleanUrls": true,
   "trailingSlash": false,
+  "redirects": [
+    { "source": "/trekloeveret-team-2", "destination": "/cfbb/team-2", "permanent": true }
+  ],
   "rewrites": [
     { "source": "/opret", "destination": "/opret.html" },
     { "source": "/aktiver", "destination": "/aktiver.html" },

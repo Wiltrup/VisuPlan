@@ -2,9 +2,9 @@ const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 const CURRENT_BOARD_PATH = location.pathname.replace(/\/+$/, '') || '/';
 let ROUTE_RESOLUTION = null;
-try { ROUTE_RESOLUTION = JSON.parse(sessionStorage.getItem('visuplanner-board-route') || 'null'); } catch {}
+try { ROUTE_RESOLUTION = window.__VISUPLANNER_BOARD_ROUTE__ || JSON.parse(sessionStorage.getItem('visuplanner-board-route') || 'null'); } catch {}
 if (ROUTE_RESOLUTION?.path !== CURRENT_BOARD_PATH || ROUTE_RESOLUTION?.kind !== 'team') ROUTE_RESOLUTION = null;
-const TEAM_SLUG = ROUTE_RESOLUTION?.target_slug || location.pathname.split('/').filter(Boolean)[0] || 'trekloeveret-team-2';
+const TEAM_SLUG = ROUTE_RESOLUTION?.target_slug || location.pathname.split('/').filter(Boolean).at(-1) || '';
 const PUBLIC_BOARD_PATH = ROUTE_RESOLUTION ? CURRENT_BOARD_PATH : `/${TEAM_SLUG}`;
 const PLATFORM_ADMIN_EMAIL = 'wiltrup@wiltrup.com';
 const SESSION_KEY = 'visuplanner-session';
@@ -65,6 +65,27 @@ let activeRegistrationEvent = null;
 const signedImageCache = new Map();
 
 const el = id => document.getElementById(id);
+const detachedLoginForms = new Map();
+function showCredentialDialog(dialogId, formId) {
+  const dialog = el(dialogId);
+  const detached = detachedLoginForms.get(dialogId);
+  if (detached) {
+    dialog.appendChild(detached);
+    detachedLoginForms.delete(dialogId);
+  }
+  dialog.showModal();
+  return el(formId);
+}
+function completeCredentialDialog(dialogId, formId) {
+  const dialog = el(dialogId);
+  const form = el(formId);
+  dialog.close();
+  if (form) {
+    form.remove();
+    detachedLoginForms.set(dialogId, form);
+  }
+  history.replaceState(null, '', PUBLIC_BOARD_PATH);
+}
 const escapeHtml = (value = '') => String(value).replace(/[&<>'"]/g, character => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
 }[character]));
@@ -347,7 +368,7 @@ async function signOut() {
       const viewerSession = await refreshSavedSession(VIEWER_SESSION_KEY);
       if (viewerSession) { saveSession(viewerSession, true); await loadData({ quiet: true }); startAutoRefresh(); return; }
     } catch { sessionStorage.removeItem(VIEWER_SESSION_KEY); }
-    el('viewerLoginDialog').showModal();
+    showCredentialDialog('viewerLoginDialog', 'viewerLoginForm');
   }
 }
 
@@ -359,8 +380,8 @@ async function leaveBoard() {
     sessionStorage.removeItem(SESSION_KEY);
     sessionStorage.removeItem(VIEWER_SESSION_KEY);
     renderLoginState();
+    showCredentialDialog('viewerLoginDialog', 'viewerLoginForm');
     el('viewerPinInput').value = '';
-    el('viewerLoginDialog').showModal();
   }
 }
 
@@ -1587,31 +1608,33 @@ el('prevDay').addEventListener('click', () => { selectedIndex = (selectedIndex +
 el('nextDay').addEventListener('click', () => { selectedIndex = (selectedIndex + 1) % 7; render(); });
 el('adminButton').addEventListener('click', () => {
   if (isStaffSession()) return openAdmin();
+  showCredentialDialog('loginDialog', 'loginForm');
   el('pinInput').value = '';
   el('loginError').textContent = '';
-  el('loginDialog').showModal();
 });
 el('viewerLoginForm').addEventListener('submit', async event => {
   event.preventDefault();
+  el('viewerUsername').value = el('viewerUsername').dataset.canonical || el('viewerUsername').value;
   const button = el('viewerLoginSubmit');
   button.disabled = true; button.textContent = 'Åbner…'; el('viewerLoginError').textContent = '';
   try {
     await signInViewer(el('viewerPinInput').value);
-    el('viewerLoginDialog').close();
     await loadData();
+    completeCredentialDialog('viewerLoginDialog', 'viewerLoginForm');
     startAutoRefresh();
   } catch (error) { el('viewerLoginError').textContent = error.message; }
   finally { button.disabled = false; button.textContent = 'Åbn tavlen'; }
 });
 el('loginForm').addEventListener('submit', async event => {
   event.preventDefault();
+  el('staffUsername').value = el('staffUsername').dataset.canonical || el('staffUsername').value;
   const button = el('loginSubmit');
   button.disabled = true;
   button.textContent = 'Logger ind…';
   try {
     await signIn(el('pinInput').value);
-    el('loginDialog').close();
     await loadData({ quiet: true });
+    completeCredentialDialog('loginDialog', 'loginForm');
     startAutoRefresh();
     openAdmin();
   } catch (error) {
@@ -1712,9 +1735,14 @@ async function init() {
     if(!response.ok)throw new Error(team.error||'Tavlen blev ikke fundet.');
     state.team=team;
     document.querySelectorAll('.eyebrow').forEach(node=>{if(node.textContent.trim()==='TEAM 2')node.textContent=team.name.toUpperCase()});
-    el('viewerUsername').value=team.name;
+    const loginIdentity = `${team.name} · ${team.workplace || team.municipality || PUBLIC_BOARD_PATH}`;
+    el('viewerUsername').value=loginIdentity;
+    el('viewerUsername').dataset.canonical=loginIdentity;
+    el('viewerLoginSlug').value=TEAM_SLUG;
     document.querySelector('#viewerLoginDialog .note').textContent=`Indtast ${team.name}s fælles tavlekode. Browseren kan selv tilbyde at gemme koden på enheder, du stoler på.`;
-    document.querySelector('#loginForm input[name="username"]').value=`${team.name} – personale`;
+    el('staffUsername').value=`${loginIdentity} – personale`;
+    el('staffUsername').dataset.canonical=el('staffUsername').value;
+    el('staffLoginSlug').value=TEAM_SLUG;
   } catch(error) {
     document.body.innerHTML=`<main class="app-shell"><section class="panel"><h1>Tavlen blev ikke fundet</h1><p>${escapeHtml(error.message)}</p><a class="button" href="/login">Find jeres tavle</a></section></main>`;
     return;
@@ -1724,7 +1752,7 @@ async function init() {
   await restoreSession();
   if (!state.session || (!isStaffSession() && !isViewerSession())) {
     clearSession();
-    el('viewerLoginDialog').showModal();
+    showCredentialDialog('viewerLoginDialog', 'viewerLoginForm');
     return;
   }
   const loaded = await loadData();

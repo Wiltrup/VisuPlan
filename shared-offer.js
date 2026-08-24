@@ -2,7 +2,7 @@ const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 const CURRENT_OFFER_PATH = location.pathname.replace(/\/+$/, '') || '/';
 let ROUTE_RESOLUTION = null;
-try { ROUTE_RESOLUTION = JSON.parse(sessionStorage.getItem('visuplanner-board-route') || 'null'); } catch {}
+try { ROUTE_RESOLUTION = window.__VISUPLANNER_BOARD_ROUTE__ || JSON.parse(sessionStorage.getItem('visuplanner-board-route') || 'null'); } catch {}
 if (ROUTE_RESOLUTION?.path !== CURRENT_OFFER_PATH || ROUTE_RESOLUTION?.kind !== 'club') ROUTE_RESOLUTION = null;
 const slug = ROUTE_RESOLUTION?.target_slug || location.pathname.split('/').filter(Boolean).at(-1) || '';
 const DAYS = [
@@ -34,6 +34,7 @@ let editorActivities = {};
 let editingActivities = [];
 let pendingPhoto = null;
 let editorMode = false;
+let detachedOfferLoginForm = null;
 let imageSearchTarget = { kind:'meal', index:null };
 let offerRefreshTimer = null;
 let registrationOverviewLoading = false;
@@ -103,6 +104,11 @@ async function loadOffer() {
   $('offerName').textContent = offer.name;
   $('offerWorkplace').textContent = offer.workplace || offer.municipality || 'FÆLLES TILBUD';
   $('offerLoginTitle').textContent = `Åbn ${offer.name}`;
+  const loginIdentity = `${offer.name} · ${offer.workplace || offer.municipality || CURRENT_OFFER_PATH}`;
+  $('offerLoginUsername').value = `${loginIdentity} · tavle`;
+  $('offerLoginUsername').dataset.viewer = $('offerLoginUsername').value;
+  $('offerLoginUsername').dataset.editor = `${loginIdentity} · redigering`;
+  $('offerLoginSlug').value = slug;
   $('offerEditorTabs').hidden = !offer.registration_module_enabled;
 }
 
@@ -113,11 +119,25 @@ async function login(action, password) {
   session = data;
   sessionStorage.setItem(`visuplanner-offer-${slug}`, JSON.stringify(data));
   editorMode = action === 'editor-login';
-  $('offerLoginDialog').close();
   $('offerLogout').hidden = false;
   await loadWeek();
+  $('offerLoginDialog').close();
+  const form = $('offerLoginForm');
+  if (form) {
+    form.remove();
+    detachedOfferLoginForm = form;
+  }
+  history.replaceState(null, '', CURRENT_OFFER_PATH);
   startAutoRefresh();
   if (editorMode) openEditor();
+}
+
+function showOfferLogin() {
+  if (detachedOfferLoginForm) {
+    $('offerLoginDialog').appendChild(detachedOfferLoginForm);
+    detachedOfferLoginForm = null;
+  }
+  $('offerLoginDialog').showModal();
 }
 
 function startAutoRefresh() {
@@ -528,16 +548,18 @@ function bindRegistrationOverviewActions() {
 }
 
 function startEditorLogin() {
+  showOfferLogin();
   $('offerLoginTitle').textContent = `Rediger ${offer.name}`;
   $('offerLoginNote').textContent = 'Indtast tilbuddets redigeringskode.';
   $('offerLoginSubmit').textContent = 'Log ind og redigér';
   $('offerEditorLogin').hidden = true;
   $('offerLoginForm').dataset.mode = 'editor-login';
+  $('offerLoginAction').value = 'editor-login';
+  $('offerLoginUsername').value = $('offerLoginUsername').dataset.editor;
   $('offerLoginPassword').value = '';
-  $('offerLoginDialog').showModal();
 }
 
-$('offerLoginForm').onsubmit = async event => { event.preventDefault(); $('offerLoginError').textContent = ''; try { await login(event.currentTarget.dataset.mode || 'viewer-login', $('offerLoginPassword').value); } catch (error) { $('offerLoginError').textContent = error.message; } };
+$('offerLoginForm').onsubmit = async event => { event.preventDefault(); const mode=event.currentTarget.dataset.mode||'viewer-login'; $('offerLoginUsername').value=mode==='editor-login'?$('offerLoginUsername').dataset.editor:$('offerLoginUsername').dataset.viewer; $('offerLoginError').textContent = ''; try { await login(mode, $('offerLoginPassword').value); } catch (error) { $('offerLoginError').textContent = error.message; } };
 $('offerEditorLogin').onclick = startEditorLogin;
 $('offerEdit').onclick = openEditor;
 $('offerCloseEditor').onclick = () => $('offerEditorDialog').close();
@@ -577,7 +599,7 @@ window.addEventListener('pageshow', () => {
       await loadWeek();
       startAutoRefresh();
     }
-    else $('offerLoginDialog').showModal();
+    else showOfferLogin();
   } catch (error) {
     document.body.innerHTML = `<main class="dialog-card"><h1>Tilbuddet kunne ikke åbnes</h1><p>${esc(error.message)}</p><a href="/">Til forsiden</a></main>`;
   }

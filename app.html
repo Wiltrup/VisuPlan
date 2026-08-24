@@ -4,8 +4,10 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#2563eb" />
-  <link id="appManifest" rel="manifest" href="/manifest.webmanifest" />
-  <script>try{const p=location.pathname.replace(/\/+$/,'')||'/';const r=JSON.parse(sessionStorage.getItem('visuplanner-board-route')||'null');const s=r?.path===p&&r.kind==='team'?r.target_slug:(location.pathname.split('/').filter(Boolean)[0]||'trekloeveret-team-2');document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(s)+'&path='+encodeURIComponent(p)}catch{}</script>
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-title" content="VisuPlanner" />
+  <link id="appManifest" rel="manifest" />
+  <script>try{const p=location.pathname.replace(/\/+$/,'')||'/';const r=window.__VISUPLANNER_BOARD_ROUTE__||JSON.parse(sessionStorage.getItem('visuplanner-board-route')||'null');const s=r?.path===p&&r.kind==='team'?r.target_slug:(location.pathname.split('/').filter(Boolean).at(-1)||'');if(s)document.getElementById('appManifest').href='/api/team-manifest?slug='+encodeURIComponent(s)+'&path='+encodeURIComponent(p)}catch{}</script>
   <link rel="stylesheet" href="/styles.css?v=59" />
   <title>VisuPlanner</title>
 </head>
@@ -77,13 +79,14 @@
   </div>
 
   <dialog id="viewerLoginDialog" class="viewer-login-dialog">
-    <form id="viewerLoginForm" class="dialog-card viewer-login-card">
+    <form id="viewerLoginForm" class="dialog-card viewer-login-card" method="post" action="/api/team-login">
       <img class="viewer-login-logo" src="/assets/brand/wordmark.png" alt="VisuPlanner">
       <p class="eyebrow">TEAM 2</p>
       <h2>Åbn jeres tavle</h2>
       <p class="note">Indtast Team 2's fælles kode. Browseren kan selv tilbyde at gemme koden på enheder, du stoler på.</p>
-      <label>Team<input id="viewerUsername" name="username" value="Team 2" autocomplete="username" readonly></label>
+      <label>Team<input id="viewerUsername" name="username" type="text" value="Team 2" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
       <label>Teamkode<input id="viewerPinInput" name="password" type="password" autocomplete="current-password" required autofocus></label>
+      <input id="viewerLoginSlug" name="slug" type="hidden"><input name="action" type="hidden" value="viewer-login">
       <p id="viewerLoginError" class="error"></p>
       <button id="viewerLoginSubmit" type="submit">Åbn tavlen</button>
       <button id="openViewerHelp" class="subtle-help-link" type="button">Problemer med adgang?</button>
@@ -92,12 +95,13 @@
   </dialog>
 
   <dialog id="loginDialog">
-    <form method="dialog" id="loginForm" class="dialog-card">
+    <form method="post" action="/api/team-login" id="loginForm" class="dialog-card">
       <h2>Personalelogin</h2>
-      <label>Team<input name="username" value="Team 2 – personale" autocomplete="username" readonly></label>
+      <label>Team<input id="staffUsername" name="username" type="text" value="Team 2 – personale" autocomplete="username" autocapitalize="none" spellcheck="false" required></label>
       <label>Personale-kode
         <input id="pinInput" name="password" type="password" autocomplete="current-password" required />
       </label>
+      <input id="staffLoginSlug" name="slug" type="hidden"><input name="action" type="hidden" value="login">
       <p id="loginError" class="error"></p>
       <button id="forgotStaffPassword" type="button" class="subtle-help-link">Glemt personalekoden?</button>
       <div class="dialog-actions">
@@ -278,6 +282,6 @@
 
   <div id="syncStatus" class="sync-status" role="status" aria-live="polite"></div>
 
-  <script src="/app.js?v=62"></script>
+  <script src="/app.js?v=63"></script>
 </body>
 </html>

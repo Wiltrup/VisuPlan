@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#2563eb"><link id="offerManifest" rel="manifest"><script>try{const p=location.pathname.replace(/\/+$/,'')||'/';const r=JSON.parse(sessionStorage.getItem('visuplanner-board-route')||'null');const parts=location.pathname.split('/').filter(Boolean);const s=r?.path===p&&r.kind==='club'?r.target_slug:(parts.at(-1)||'');document.getElementById('offerManifest').href='/api/shared-offer-manifest?slug='+encodeURIComponent(s)+'&path='+encodeURIComponent(p)}catch{}</script><title>Fælles tilbud – VisuPlanner</title>
+  <meta name="theme-color" content="#2563eb"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="VisuPlanner"><link id="offerManifest" rel="manifest"><script>try{const p=location.pathname.replace(/\/+$/,'')||'/';const r=window.__VISUPLANNER_BOARD_ROUTE__||JSON.parse(sessionStorage.getItem('visuplanner-board-route')||'null');const parts=location.pathname.split('/').filter(Boolean);const s=r?.path===p&&r.kind==='club'?r.target_slug:(parts.at(-1)||'');if(s)document.getElementById('offerManifest').href='/api/shared-offer-manifest?slug='+encodeURIComponent(s)+'&path='+encodeURIComponent(p)}catch{}</script><title>Fælles tilbud – VisuPlanner</title>
   <link rel="stylesheet" href="/shared-offer.css?v=58">
 </head>
 <body>
@@ -21,7 +21,7 @@
     <footer class="site-footer"><p>VisuPlanner er et produkt fra Techus Nord · CVR 46689984.</p><p>Designet og udviklet af Jakob Wiltrup © 2026 · <a href="mailto:wiltrup@wiltrup.com">wiltrup@wiltrup.com</a></p></footer>
   </div>
 
-  <dialog id="offerLoginDialog"><form id="offerLoginForm" class="dialog-card"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"><p class="eyebrow">FÆLLES TILBUD</p><h2 id="offerLoginTitle">Åbn tavlen</h2><p id="offerLoginNote">Indtast tilbuddets fælles visningskode.</p><input id="offerLoginPassword" type="password" autocomplete="current-password" required autofocus><p id="offerLoginError" class="error"></p><button id="offerLoginSubmit" type="submit">Åbn tavlen</button><button id="offerEditorLogin" class="subtle" type="button">Redigér tilbuddet</button><a href="/">← Til VisuPlanner</a></form></dialog>
+  <dialog id="offerLoginDialog"><form id="offerLoginForm" class="dialog-card" method="post" action="/api/shared-offer-login"><img src="/assets/brand/wordmark.png" alt="VisuPlanner"><p class="eyebrow">FÆLLES TILBUD</p><h2 id="offerLoginTitle">Åbn tavlen</h2><p id="offerLoginNote">Indtast tilbuddets fælles visningskode.</p><label>Klub<input id="offerLoginUsername" name="username" type="text" autocomplete="username" autocapitalize="none" spellcheck="false" required></label><label>Kode<input id="offerLoginPassword" name="password" type="password" autocomplete="current-password" required autofocus></label><input id="offerLoginSlug" name="slug" type="hidden"><input id="offerLoginAction" name="action" type="hidden" value="viewer-login"><p id="offerLoginError" class="error"></p><button id="offerLoginSubmit" type="submit">Åbn tavlen</button><button id="offerEditorLogin" class="subtle" type="button">Redigér tilbuddet</button><a href="/">← Til VisuPlanner</a></form></dialog>
 
   <dialog id="offerEditorDialog">
     <div class="dialog-card editor-card">
@@ -55,6 +55,6 @@
   <dialog id="offerImageSearchDialog"><div class="dialog-card image-search-card"><div class="dialog-heading"><div><p class="eyebrow">PEXELS</p><h2 id="offerImageSearchTitle">Find et billede</h2></div><button id="offerCloseImageSearch" class="icon-button">✕</button></div><form id="offerImageSearchForm" class="image-search-form"><input id="offerImageSearchInput" placeholder="Fx lasagne" autocomplete="off" required><button type="submit">Søg</button></form><p id="offerImageSearchNote" class="note">Vælg ét billede.</p><div id="offerImageSearchResults" class="image-search-results"></div><p class="pexels-credit">Billeder leveret af <a href="https://www.pexels.com" target="_blank" rel="noopener">Pexels</a></p></div><div id="offerImageSearchStatus" role="status" aria-live="polite"></div></dialog>
 
   <dialog id="offerImageDialog" class="image-dialog"><button id="offerCloseImage" class="image-close">✕</button><img id="offerLargeImage" alt=""></dialog>
-  <script src="/shared-offer.js?v=61"></script>
+  <script src="/shared-offer.js?v=62"></script>
 </body>
 </html>
