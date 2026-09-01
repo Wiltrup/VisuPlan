@@ -6,6 +6,9 @@
     document.title = 'Tavlen blev ikke fundet – VisuPlanner';
     status.innerHTML = `${message}<br><br><a href="/login">Find jeres tavle</a>`;
   };
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/service-worker.js', { scope:'/' }).catch(error => console.warn('Service worker kunne ikke registreres.', error));
+  }
   if (parts.length !== 2 || !parts.every(part => /^[a-z0-9-]{2,80}$/.test(part))) return fail('Tavlen blev ikke fundet.');
   try {
     const response = await fetch(`/api/team-login?resolve_customer=${encodeURIComponent(parts[0])}&resolve_slug=${encodeURIComponent(parts[1])}`, { cache:'no-store' });
