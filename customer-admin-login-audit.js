@@ -29,10 +29,10 @@
     sentForAttempt = true;
     pendingLogin = false;
     try {
-      const response = await fetch('/api/customer-admin-login-event', {
+      const response = await fetch('/api/customer-admin', {
         method:'POST',
         headers:{ Authorization:`Bearer ${saved.access_token}`, 'Content-Type':'application/json' },
-        body:'{}'
+        body:JSON.stringify({ action:'admin-login' })
       });
       if (response.ok && typeof window.loadDashboard === 'function') {
         await window.loadDashboard();
