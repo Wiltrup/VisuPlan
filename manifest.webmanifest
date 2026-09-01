@@ -8,5 +8,9 @@
   "background_color": "#eef2f7",
   "theme_color": "#2563eb",
   "lang": "da-DK",
-  "description": "En enkel og visuel ugeplan"
+  "description": "En enkel og visuel ugeplan",
+  "icons": [
+    { "src": "/assets/brand/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/assets/brand/app-icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
 }
