@@ -27,7 +27,11 @@ module.exports = async function handler(request, response) {
       background_color:'#eef2f7',
       theme_color:'#2563eb',
       lang:'da-DK',
-      description:`Visuel ugeplan for ${team.workplace || team.name}`
+      description:`Visuel ugeplan for ${team.workplace || team.name}`,
+      icons:[
+        { src:'/assets/brand/app-icon.svg', sizes:'any', type:'image/svg+xml', purpose:'any' },
+        { src:'/assets/brand/app-icon.svg', sizes:'any', type:'image/svg+xml', purpose:'maskable' }
+      ]
     }));
   } catch (error) {
     console.error(error);
