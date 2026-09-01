@@ -13,6 +13,12 @@ module.exports=async function handler(request,response){
     response.setHeader('Content-Type','application/manifest+json');response.setHeader('Cache-Control','public, max-age=300');
     const fallbackPath=`/${offer.customer_slug||'tilbud'}/${slug}`;
     const boardPath=/^\/[a-z0-9-]+\/[a-z0-9-]+$/.test(requestedPath)?requestedPath:fallbackPath;
-    return response.status(200).send(JSON.stringify({id:boardPath,name:`VisuPlanner – ${offer.name}`,short_name:offer.name.slice(0,30),start_url:boardPath,scope:'/',display:'standalone',background_color:'#eef2f7',theme_color:'#2563eb',lang:'da-DK',description:`Mad og aktiviteter fra ${offer.workplace||offer.name}`}));
+    return response.status(200).send(JSON.stringify({
+      id:boardPath,name:`VisuPlanner – ${offer.name}`,short_name:offer.name.slice(0,30),start_url:boardPath,scope:'/',display:'standalone',background_color:'#eef2f7',theme_color:'#2563eb',lang:'da-DK',description:`Mad og aktiviteter fra ${offer.workplace||offer.name}`,
+      icons:[
+        {src:'/assets/brand/app-icon.svg',sizes:'any',type:'image/svg+xml',purpose:'any'},
+        {src:'/assets/brand/app-icon.svg',sizes:'any',type:'image/svg+xml',purpose:'maskable'}
+      ]
+    }));
   }catch(error){console.error(error);return response.status(500).json({error:'Manifestet kunne ikke hentes.'})}
 };
