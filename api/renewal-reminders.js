@@ -51,11 +51,11 @@ async function sendTrialReminder(customer) {
     body:JSON.stringify({
       from:'VisuPlanner <notifikation@visuplanner.dk>',
       to:[recipient],
-      subject:'Jeres gratis prøveperiode udløber snart',
+      subject:'Jeres prøveperiode udløber snart',
       text:[
         `Hej${customer.contact_name ? ` ${customer.contact_name}` : ''}`,
         '',
-        'Jeres gratis prøveperiode på VisuPlanner nærmer sig udløbsdatoen.',
+        'Jeres prøveperiode på VisuPlanner nærmer sig udløbsdatoen.',
         '',
         'Ønsker I at fortsætte? Log ind i kundeadministrationen på VisuPlanner. Her kan I se prøveperiodens udløbsdato og vælge “Aktiver”. Techus Nord behandler derefter anmodningen.',
         '',
