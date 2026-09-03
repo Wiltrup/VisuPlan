@@ -44,7 +44,7 @@
 
     if (status.status === 'trial') {
       const days = daysUntil(status.trial_ends_at);
-      title.textContent = 'Gratis prøveperiode';
+      title.textContent = 'Prøveperiode';
       text.textContent = status.trial_ends_at
         ? `Prøveperioden udløber ${formatDate(status.trial_ends_at)}${days !== null ? ` · ${days} ${days === 1 ? 'dag' : 'dage'} tilbage` : ''}.`
         : 'Prøveperiodens udløbsdato er ikke fastsat.';
