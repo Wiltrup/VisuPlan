@@ -20,8 +20,9 @@
     if (!page.ok) throw new Error('Tavlen kunne ikke åbnes.');
     const routeScript = `<script>window.__VISUPLANNER_BOARD_ROUTE__=${JSON.stringify(route).replace(/</g, '\\u003c')}<\/script>`;
     const pwaSessionScript = `<script src="/pwa-viewer-session.js?v=1"><\/script>`;
+    const subscriptionScopeStyle = `<style>#subscriptionBanner,#settingsSubscriptionSection{display:none!important}<\/style>`;
     const resumeScript = `<script>(()=>{let hiddenAt=null;document.addEventListener('visibilitychange',()=>{if(document.hidden){hiddenAt=Date.now();return;}if(!hiddenAt||Date.now()-hiddenAt<20*60*1000)return;hiddenAt=null;if(document.querySelector('dialog[open]'))return;location.reload();},{capture:true});})();<\/script>`;
-    const html = (await page.text()).replace('<head>', `<head>${routeScript}${pwaSessionScript}${resumeScript}`);
+    const html = (await page.text()).replace('<head>', `<head>${routeScript}${pwaSessionScript}${subscriptionScopeStyle}${resumeScript}`);
     document.open(); document.write(html); document.close();
   } catch (error) {
     fail(error.message || 'Tavlen kunne ikke åbnes.');
