@@ -28,6 +28,11 @@
       <div class="dashboard-head"><div><p class="eyebrow">KUNDEADMINISTRATION</p><h1 id="customerAdminCustomerName">Jeres VisuPlanner</h1><p id="customerAdminIdentity"></p></div><button id="customerAdminLogout" class="secondary" type="button">Log ud</button></div>
       <section class="capacity-panel"><div><strong id="customerAdminCapacity">0 af 0 tavler</strong><span id="customerAdminRemaining">Indlæser…</span></div><div class="capacity-track"><span id="customerAdminCapacityBar"></span></div></section>
 
+      <section id="customerSubscriptionPanel" class="dashboard-section secondary-section" hidden>
+        <p class="eyebrow">ABONNEMENT</p>
+        <div class="section-heading"><div><h2 id="customerSubscriptionTitle">Jeres abonnement</h2><p id="customerSubscriptionText">Henter status…</p></div><button id="customerSubscriptionActivate" type="button" hidden>Aktiver</button></div>
+      </section>
+
       <details id="createBoardPanel" class="create-board-panel">
         <summary>Opret ny tavle</summary>
         <form id="customerCreateBoardForm" class="field-grid">
@@ -47,6 +52,7 @@
   </main>
   <div id="customerAdminStatus" role="status" aria-live="polite"></div>
   <script src="/customer-admin.js?v=66"></script>
+  <script src="/customer-admin-subscription.js?v=1"></script>
   <script src="/customer-admin-login-audit.js?v=1"></script>
 </body>
 </html>
