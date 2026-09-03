@@ -55,9 +55,9 @@ async function sendTrialReminder(customer) {
       text:[
         `Hej${customer.contact_name ? ` ${customer.contact_name}` : ''}`,
         '',
-        'I har nu haft mulighed for at prøve VisuPlanner i 10 dage. Den gratis prøveperiode varer som udgangspunkt 14 dage.',
+        'Jeres gratis prøveperiode på VisuPlanner nærmer sig udløbsdatoen.',
         '',
-        'Ønsker I at fortsætte? Åbn Grundindstillinger på jeres tavle, og vælg “Aktiver”. Så kan I fortsætte med at redigere, mens Techus Nord behandler anmodningen.',
+        'Ønsker I at fortsætte? Log ind i kundeadministrationen på VisuPlanner. Her kan I se prøveperiodens udløbsdato og vælge “Aktiver”. Techus Nord behandler derefter anmodningen.',
         '',
         'Venlig hilsen',
         'Techus Nord'
@@ -95,11 +95,6 @@ module.exports = async function handler(request, response) {
     const trials = await service(`/rest/v1/customers?archived_at=is.null&subscription_status=eq.trial&subscription_interest_at=is.null&trial_started_at=not.is.null&trial_started_at=lte.${encodeURIComponent(dayTenThreshold.toISOString())}&trial_ends_at=gt.${encodeURIComponent(now.toISOString())}&select=*&order=trial_ends_at.asc`, secret);
     let trialSent = 0;
     for (const customer of trials || []) {
-      // En dag-10-mail tilhører prøveforløbet, ikke den aktuelle udløbsdato.
-      // Derfor må en administrativ forlængelse af trial_ends_at aldrig gøre
-      // kunden berettiget til samme mail igen. Den brede kontrol nedenfor
-      // fanger også allerede udsendte mails fra den gamle logik, som gemte
-      // den daværende udløbsdato i period_date.
       const existing = await service(`/rest/v1/customer_notifications?customer_id=eq.${encodeURIComponent(customer.id)}&notification_type=eq.trial_day_10&select=id&limit=1`, secret);
       if (existing?.length) continue;
       await sendTrialReminder(customer);
@@ -115,8 +110,6 @@ module.exports = async function handler(request, response) {
       const result = await service('/rest/v1/rpc/purge_expired_shared_offer_registrations', secret, { method:'POST', body:'{}' });
       registrationsPurged = Number(result || 0);
     } catch (error) {
-      // Webkoden kan blive deployet, før v52-migrationen er kørt. De øvrige
-      // påmindelser skal fortsat fungere i det korte mellemrum.
       console.warn('Gamle klubtilmeldinger kunne ikke ryddes endnu.', error.message);
     }
     return response.status(200).json({ ok:true, renewalChecked:(rows || []).length, renewalSent, trialChecked:(trials || []).length, trialSent, registrationsPurged });
