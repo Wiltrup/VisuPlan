@@ -11,6 +11,7 @@
     { "source": "/kundeadmin-aktiver", "destination": "/kundeadmin-aktiver.html" },
     { "source": "/saadan-virker-det", "destination": "/saadan-virker-det.html" },
     { "source": "/priser", "destination": "/priser.html" },
+    { "source": "/kontakt", "destination": "/kontakt.html" },
     { "source": "/ofte-spurgte-spoergsmaal", "destination": "/ofte-spurgte-spoergsmaal.html" },
     { "source": "/faq", "destination": "/ofte-spurgte-spoergsmaal.html" },
     { "source": "/betingelser", "destination": "/betingelser.html" },
