@@ -22,7 +22,7 @@ async function notifyOwner(subject, text) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'VisuPlanner <notifikation@visuplanner.dk>', to: ['wiltrup@wiltrup.com'], subject, text })
+    body: JSON.stringify({ from: 'VisuPlanner <notifikation@visuplanner.dk>', to: ['wiltrup@wiltrup.com'], reply_to:'wiltrup@wiltrup.com', subject, text })
   });
   if (!response.ok) console.error('Mailnotifikation fejlede', await response.text());
   return response.ok;
@@ -34,7 +34,7 @@ async function notifyCustomer(email, subject, text) {
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ from: 'VisuPlanner <notifikation@visuplanner.dk>', to: [email], subject, text })
+    body: JSON.stringify({ from: 'VisuPlanner <notifikation@visuplanner.dk>', to: [email], reply_to:'wiltrup@wiltrup.com', subject, text })
   });
   if (!response.ok) console.error('Kundebekræftelse fejlede', await response.text());
   return response.ok;
