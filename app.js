@@ -170,9 +170,30 @@ function daysRemaining(value) {
   return Math.max(1, Math.ceil((new Date(value) - new Date()) / 86400000));
 }
 
+function subscriptionLockMessage() {
+  const subscription = state.team?.subscription || {};
+  const status = subscription.status || '';
+  if (status === 'trial' || status === 'read_only') {
+    return {
+      title: 'Redigering er låst – prøveperioden er udløbet',
+      text: 'Jeres prøveperiode eller aktiveringsfrist er udløbet. Tavlen kan stadig vises, og indholdet er bevaret. Kontakt Techus Nord på service@techusnord.dk for hjælp til at fortsætte.'
+    };
+  }
+  if (['payment_overdue', 'payment_failed', 'unpaid', 'suspended', 'paused', 'cancelled', 'canceled', 'expired'].includes(status)) {
+    return {
+      title: 'Redigering er midlertidigt låst',
+      text: 'Redigeringen er suspenderet på grund af betalings- eller abonnementsstatus. Tavlen kan stadig vises, og indholdet er bevaret. Kontakt Techus Nord på service@techusnord.dk for at få genåbnet adgangen.'
+    };
+  }
+  return {
+    title: 'Redigering er midlertidigt låst',
+    text: 'Jeres abonnement giver i øjeblikket ikke adgang til redigering. Tavlen kan stadig vises, og indholdet er bevaret. Kontakt Techus Nord på service@techusnord.dk for at få hjælp.'
+  };
+}
+
 function requireEditable() {
   if (subscriptionCanEdit()) return true;
-  setStatus('Prøveperioden er udløbet. Tavlen kan stadig ses, men redigering er låst.', 'error');
+  setStatus(subscriptionLockMessage().text, 'error');
   return false;
 }
 
@@ -180,39 +201,39 @@ function renderSubscriptionBanner() {
   const banner = el('subscriptionBanner');
   const settingsSection = el('settingsSubscriptionSection');
   const subscription = state.team?.subscription || { status: 'legacy', can_edit: true };
+  const locked = !subscriptionCanEdit();
   const canRequest = isStaffSession() && ['trial', 'read_only'].includes(subscription.status);
-  if (!canRequest) {
+  if (!canRequest && !locked) {
     banner.hidden = true;
     settingsSection.hidden = true;
     return;
   }
   banner.hidden = false;
-  settingsSection.hidden = false;
-  banner.classList.toggle('expired', !subscription.can_edit);
+  settingsSection.hidden = !canRequest;
+  banner.classList.toggle('expired', locked);
   const requested = Boolean(subscription.subscription_interest_at);
   const bannerButton = el('requestSubscriptionButton');
   const settingsButton = el('requestSubscriptionSettingsButton');
-  bannerButton.hidden = false;
+  bannerButton.hidden = !canRequest || requested;
   bannerButton.disabled = requested;
   bannerButton.textContent = requested ? 'Anmodning sendt ✓' : 'Aktiver';
   settingsButton.disabled = requested;
   settingsButton.textContent = requested ? 'Anmodning sendt ✓' : 'Aktiver';
-  if (subscription.status === 'trial' && subscription.can_edit && requested && subscription.activation_grace_ends_at) {
+  if (locked) {
+    const message = subscriptionLockMessage();
+    el('subscriptionTitle').textContent = message.title;
+    el('subscriptionText').textContent = message.text;
+    el('settingsSubscriptionText').textContent = message.text;
+  } else if (subscription.status === 'trial' && requested && subscription.activation_grace_ends_at) {
     const days = daysRemaining(subscription.activation_grace_ends_at);
     el('subscriptionTitle').textContent = `Aktivering anmodet · ${days} ${days === 1 ? 'dag' : 'dage'} tilbage`;
     el('subscriptionText').textContent = 'Vi behandler jeres anmodning hurtigst muligt.';
     el('settingsSubscriptionText').textContent = 'Vi behandler jeres anmodning hurtigst muligt.';
-  } else if (subscription.status === 'trial' && subscription.can_edit && subscription.trial_ends_at) {
+  } else if (subscription.status === 'trial' && subscription.trial_ends_at) {
     const days = daysRemaining(subscription.trial_ends_at);
-    el('subscriptionTitle').textContent = `Gratis prøveperiode · ${days} ${days === 1 ? 'dag' : 'dage'} tilbage`;
+    el('subscriptionTitle').textContent = `Prøveperiode · ${days} ${days === 1 ? 'dag' : 'dage'} tilbage`;
     el('subscriptionText').textContent = 'Ønsker I at fortsætte? Vælg “Aktiver”.';
     el('settingsSubscriptionText').textContent = `I har ${days} ${days === 1 ? 'dag' : 'dage'} tilbage af prøveperioden. Ønsker I at fortsætte? Vælg “Aktiver”.`;
-  } else {
-    el('subscriptionTitle').textContent = 'Redigering er låst';
-    el('subscriptionText').textContent = requested ? 'Aktiveringsfristen er udløbet. Techus Nord behandler jeres anmodning hurtigst muligt.' : 'Tavlen kan fortsat ses. Ønsker I at fortsætte? Vælg “Aktiver”.';
-    el('settingsSubscriptionText').textContent = requested
-      ? 'Aktiveringsfristen er udløbet. Vi behandler jeres anmodning hurtigst muligt.'
-      : 'Prøveperioden er udløbet. Ønsker I at fortsætte? Vælg “Aktiver”.';
   }
 }
 
