@@ -250,6 +250,14 @@ function setEditorLockedState() {
     if (!allowed.has(control.id)) control.disabled = locked;
   });
   el('adminDialog').classList.toggle('editor-locked', locked);
+  if (locked) {
+    const banner = el('subscriptionBanner');
+    banner.hidden = false;
+    banner.classList.add('expired');
+    const message = subscriptionLockMessage();
+    el('subscriptionTitle').textContent = message.title;
+    el('subscriptionText').textContent = message.text;
+  }
 }
 
 function setSettingsLockedState() {
@@ -890,6 +898,8 @@ async function setEditingWeek(weekStart, preferredDay = 0) {
   el('adminWeekLabel').textContent = formatWeekRange(editingWeekStart);
   el('adminDaySelect').innerHTML = DAYS.map((day, index) => `<option value="${index}" ${index === preferredDay ? 'selected' : ''}>${day.name} ${formatDate(dateForIndex(index, editingWeekStart))}</option>`).join('');
   loadAdminDay();
+  renderSubscriptionBanner();
+  setEditorLockedState();
   markWeekEditorClean();
   setStatus('Ugen er hentet', 'success');
 }
