@@ -150,7 +150,7 @@ function customerCard(customer) {
     : `Fornyelse: ${date(customer.subscription_renews_at)}`;
   return `<article class="customer-card" data-customer="${esc(customer.id)}">
     <div class="customer-head"><div><h3>${esc(customer.display_name)}</h3><p>${esc(customer.legal_name || customer.municipality || '')}</p></div><span class="status-badge ${esc(customer.subscription_status)}">${esc(statusLabels[customer.subscription_status] || customer.subscription_status)}</span></div>
-    <div class="customer-facts"><span>${esc(planLabels[customer.plan_code] || customer.plan_code)}</span><span>${customer.teams.length} af ${customer.board_limit} tavler</span><span>${esc(trialText)}</span>${customer.subscription_status === 'trial' && customer.subscription_interest_at ? '<span class="interest-flag">Aktivering anmodet</span>' : ''}</div>
+    <div class="customer-facts"><strong class="status-badge ${customer.subscription_status === 'read_only' ? 'read_only' : 'active'}">${customer.subscription_status === 'read_only' ? '🔒 REDIGERING LÅST – ALLE TAVLER' : 'Redigering: ' + (customer.subscription_status === 'trial' && new Date(customer.trial_ends_at) <= new Date() && (!graceEnd || new Date(graceEnd) <= new Date()) ? 'LÅST – prøveperiode udløbet' : ['cancelled'].includes(customer.subscription_status) ? 'LÅST' : 'ÅBEN')}</strong><span>${esc(planLabels[customer.plan_code] || customer.plan_code)}</span><span>${customer.teams.length} af ${customer.board_limit} tavler</span><span>${esc(trialText)}</span>${customer.subscription_status === 'trial' && customer.subscription_interest_at ? '<span class="interest-flag">Aktivering anmodet</span>' : ''}</div>
     ${customerAdministratorSection(customer)}
     <details><summary>Kunde- og fakturaoplysninger</summary>
       <div class="field-grid">
@@ -188,7 +188,9 @@ function customerCard(customer) {
         <button data-customer-action="extend-trial" class="secondary">Forlæng prøve 7 dage</button>
         <button data-customer-action="mark-invoice-sent" class="secondary">Markér faktura sendt</button>
         <button data-customer-action="mark-paid">Betaling modtaget</button>
-        <button data-customer-action="set-read-only" class="warning">Lås redigering</button>
+        <button data-customer-action="set-read-only" class="warning" ${customer.subscription_status === "read_only" ? "disabled" : ""}>Lås redigering</button>
+        <label>Manuel abonnementsstatus<select data-field="manual_subscription_status">${Object.entries(statusLabels).map(([value,label]) => `<option value="${value}" ${customer.subscription_status === value ? "selected" : ""}>${esc(label)}</option>`).join("")}</select></label>
+        <button data-customer-action="set-subscription-status" class="secondary">Gem abonnementsstatus</button>
       </div>
     </details>
     <section class="boards-block"><h4>Tavler under samme betaler</h4><div class="board-list">${customer.teams.length ? customer.teams.map(team => teamCard(team)).join('') : '<p>Ingen tavler endnu.</p>'}</div>
@@ -271,7 +273,8 @@ function customerPayload(card, action) {
     payload.board_limit = Number(fieldValue(card, 'board_limit'));
     payload.intro_price_dkk = fieldValue(card, 'intro_price_dkk') === '' ? null : Number(fieldValue(card, 'intro_price_dkk'));
     payload.renewal_price_dkk = fieldValue(card, 'renewal_price_dkk') === '' ? null : Number(fieldValue(card, 'renewal_price_dkk'));
-  } else if (action === 'extend-trial') payload.days = 7;
+  } else if (action === 'set-subscription-status') payload.subscription_status = fieldValue(card, 'manual_subscription_status');
+  else if (action === 'extend-trial') payload.days = 7;
   else if (action === 'mark-invoice-sent') {
     payload.invoice_number = fieldValue(card, 'invoice_number');
     payload.invoice_due_at = fieldValue(card, 'invoice_due_at');
@@ -293,6 +296,7 @@ function bindActions() {
     const action = button.dataset.customerAction;
     if (action === 'save-club-module' && !confirm(card.querySelector('[data-field="club_module_enabled"]')?.checked ? 'Aktivér klubmodulet for kunden?' : 'Fjern kundens adgang til at oprette nye klubtavler? Eksisterende klubtavler bevares.')) return;
     if (action === 'activate-subscription' && !confirm('Aktivér den valgte pakkeændring? Kundens tavlegrænse og priser opdateres med det samme.')) return;
+    if (action === 'set-subscription-status' && !confirm('Skift kundens abonnementsstatus? Dette kan straks låse eller genåbne redigering for alle kundens tavler.')) return;
     if (action === 'set-read-only' && !confirm('Lås kundens redigering? Tavlerne kan stadig ses.')) return;
     if (action === 'mark-paid' && !confirm('Bekræft, at betalingen er modtaget. Kunden får fuld adgang, og årsperioden aktiveres.')) return;
     if (action === 'archive-customer' && !confirm('Arkivér hele kunden? Alle kundens tavler og klubtilbud lukkes, men indholdet bevares.')) return;
