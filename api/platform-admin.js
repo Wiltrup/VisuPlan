@@ -524,13 +524,22 @@ module.exports = async function handler(request, response) {
       await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(update) });
       return response.status(200).json({ ok: true });
     }
-    if (['activate-subscription','extend-trial','mark-invoice-sent','mark-paid','set-read-only'].includes(action)) {
+    if (['activate-subscription','extend-trial','mark-invoice-sent','mark-paid','set-read-only','set-subscription-status'].includes(action)) {
       const rows = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
       const customer = rows?.[0];
       if (!customer) return response.status(404).json({ error: 'Kunden blev ikke fundet.' });
       const now = new Date();
       let update = { updated_at: now.toISOString() };
-      if (action === 'activate-subscription') {
+      if (action === 'set-subscription-status') {
+        const allowedStatuses = ['trial','contracted','invoice_sent','active','overdue','read_only','cancelled'];
+        if (!allowedStatuses.includes(body.subscription_status)) return response.status(400).json({ error: 'Ugyldig abonnementsstatus.' });
+        update.subscription_status = body.subscription_status;
+        if (body.subscription_status === 'trial') {
+          update.trial_started_at = now.toISOString();
+          update.trial_ends_at = new Date(now.getTime() + 14 * DAY).toISOString();
+          update.subscription_interest_at = null;
+        }
+      } else if (action === 'activate-subscription') {
         const planCode = PLANS[body.plan_code] ? body.plan_code : 'intro3';
         const plan = PLANS[planCode];
         const limit = planCode === 'custom' ? Math.max(1, Number(body.board_limit) || customer.board_limit || 1) : plan.limit;
