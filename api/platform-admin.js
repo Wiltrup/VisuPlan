@@ -524,13 +524,19 @@ module.exports = async function handler(request, response) {
       await serviceFetch(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(slug)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify(update) });
       return response.status(200).json({ ok: true });
     }
-    if (['activate-subscription','extend-trial','mark-invoice-sent','mark-paid','set-read-only','set-subscription-status'].includes(action)) {
+    if (['activate-subscription','extend-trial','mark-invoice-sent','mark-paid','set-read-only','set-subscription-status','set-trial-expiry'].includes(action)) {
       const rows = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
       const customer = rows?.[0];
       if (!customer) return response.status(404).json({ error: 'Kunden blev ikke fundet.' });
       const now = new Date();
       let update = { updated_at: now.toISOString() };
-      if (action === 'set-subscription-status') {
+      if (action === 'set-trial-expiry') {
+        const expiry = String(body.trial_expiry_date || '');
+        if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(expiry) || !Number.isFinite(Date.parse(expiry + 'T23:59:59Z')) || new Date(expiry + 'T23:59:59Z').toISOString().slice(0,10) !== expiry) return response.status(400).json({ error: 'Vælg en gyldig udløbsdato.' });
+        update.trial_ends_at = expiry + 'T23:59:59.999Z';
+        // A manual expiry date must take precedence over any old activation grace period.
+        update.subscription_interest_at = null;
+      } else if (action === 'set-subscription-status') {
         const allowedStatuses = ['trial','contracted','invoice_sent','active','overdue','read_only','cancelled'];
         if (!allowedStatuses.includes(body.subscription_status)) return response.status(400).json({ error: 'Ugyldig abonnementsstatus.' });
         update.subscription_status = body.subscription_status;
