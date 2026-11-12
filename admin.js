@@ -185,7 +185,7 @@ function customerCard(customer) {
       <div class="action-row">
         <button data-customer-action="activate-subscription" class="secondary">Aktivér valgt pakkeændring</button>
         <button data-customer-action="save-club-module" class="secondary">Gem klubtilkøb</button>
-        <button data-customer-action="extend-trial" class="secondary">Forlæng prøve 7 dage</button>
+        <label>Ny udløbsdato for prøveperiode<input type="date" data-field="trial_expiry_date" value="${customer.trial_ends_at ? new Date(customer.trial_ends_at).toISOString().slice(0,10) : ""}"></label><button data-customer-action="set-trial-expiry" class="secondary">Gem udløbsdato</button>
         <button data-customer-action="mark-invoice-sent" class="secondary">Markér faktura sendt</button>
         <button data-customer-action="mark-paid">Betaling modtaget</button>
         <button data-customer-action="set-read-only" class="warning" ${customer.subscription_status === "read_only" ? "disabled" : ""}>Lås redigering</button>
@@ -274,6 +274,7 @@ function customerPayload(card, action) {
     payload.intro_price_dkk = fieldValue(card, 'intro_price_dkk') === '' ? null : Number(fieldValue(card, 'intro_price_dkk'));
     payload.renewal_price_dkk = fieldValue(card, 'renewal_price_dkk') === '' ? null : Number(fieldValue(card, 'renewal_price_dkk'));
   } else if (action === 'set-subscription-status') payload.subscription_status = fieldValue(card, 'manual_subscription_status');
+  else if (action === 'set-trial-expiry') payload.trial_expiry_date = fieldValue(card, 'trial_expiry_date');
   else if (action === 'extend-trial') payload.days = 7;
   else if (action === 'mark-invoice-sent') {
     payload.invoice_number = fieldValue(card, 'invoice_number');
@@ -296,6 +297,7 @@ function bindActions() {
     const action = button.dataset.customerAction;
     if (action === 'save-club-module' && !confirm(card.querySelector('[data-field="club_module_enabled"]')?.checked ? 'Aktivér klubmodulet for kunden?' : 'Fjern kundens adgang til at oprette nye klubtavler? Eksisterende klubtavler bevares.')) return;
     if (action === 'activate-subscription' && !confirm('Aktivér den valgte pakkeændring? Kundens tavlegrænse og priser opdateres med det samme.')) return;
+    if (action === 'set-trial-expiry' && !confirm('Gem denne udløbsdato for prøveperioden? Datoen kan være tidligere end den nuværende, og adgangen kan blive låst straks.')) return;
     if (action === 'set-subscription-status' && !confirm('Skift kundens abonnementsstatus? Dette kan straks låse eller genåbne redigering for alle kundens tavler.')) return;
     if (action === 'set-read-only' && !confirm('Lås kundens redigering? Tavlerne kan stadig ses.')) return;
     if (action === 'mark-paid' && !confirm('Bekræft, at betalingen er modtaget. Kunden får fuld adgang, og årsperioden aktiveres.')) return;
