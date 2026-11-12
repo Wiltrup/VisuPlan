@@ -173,7 +173,13 @@ function daysRemaining(value) {
 function subscriptionLockMessage() {
   const subscription = state.team?.subscription || {};
   const status = subscription.status || '';
-  if (status === 'trial' || status === 'read_only') {
+  if (status === 'read_only') {
+    return {
+      title: 'Adgangen til redigering er låst',
+      text: 'Techus Nord har midlertidigt låst redigeringen af jeres tavler. Tavlerne kan stadig vises, og alt indhold er bevaret. Kontakt service@techusnord.dk for at få genåbnet adgangen.'
+    };
+  }
+  if (status === 'trial') {
     return {
       title: 'Redigering er låst – prøveperioden er udløbet',
       text: 'Jeres prøveperiode eller aktiveringsfrist er udløbet. Tavlen kan stadig vises, og indholdet er bevaret. Kontakt Techus Nord på service@techusnord.dk for hjælp til at fortsætte.'
