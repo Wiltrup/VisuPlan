@@ -8,7 +8,7 @@ let expandedCustomerId = null;
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
 const slugify = value => String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/æ/g, 'ae').replace(/ø/g, 'oe').replace(/å/g, 'aa').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kunde';
-const planLabels = { intro3:'Op til 3 tavler', intro8:'Op til 8 tavler', intro12:'Op til 12 tavler', custom:'Skræddersyet', legacy:'Eksisterende kunde' };
+const planLabels = { intro1:'1 tavle', intro3:'Op til 3 tavler', intro8:'Op til 8 tavler', intro12:'Op til 12 tavler', custom:'Skræddersyet', legacy:'Eksisterende kunde' };
 const statusLabels = { trial:'Prøveperiode', contracted:'Aftale indgået', invoice_sent:'Faktura sendt', active:'Betalt og aktiv', overdue:'Forfalden', read_only:'Kun visning', cancelled:'Opsagt' };
 
 async function auth(email, password) {
