@@ -542,7 +542,7 @@ module.exports = async function handler(request, response) {
         update.subscription_status = body.subscription_status;
         if (body.subscription_status === 'trial') {
           update.trial_started_at = now.toISOString();
-          update.trial_ends_at = new Date(now.getTime() + 14 * DAY).toISOString();
+          update.trial_ends_at = new Date(new Date(now).setUTCMonth(now.getUTCMonth() + 1)).toISOString();
           update.subscription_interest_at = null;
         }
       } else if (action === 'activate-subscription') {
