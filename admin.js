@@ -1,6 +1,10 @@
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 let session = null;
+let customerDirectory = [];
+let customerFilter = 'all';
+let customerSearch = '';
+let expandedCustomerId = null;
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
 const slugify = value => String(value || '').trim().toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/æ/g, 'ae').replace(/ø/g, 'oe').replace(/å/g, 'aa').replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'kunde';
@@ -47,18 +51,62 @@ function planOptions(selected = 'intro3') {
   return Object.entries(planLabels).filter(([key]) => key !== 'legacy').map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
 }
 
-function summaryHtml(customers) {
-  const boards = customers.reduce((sum, customer) => sum + customer.teams.length, 0);
-  const trials = customers.filter(customer => customer.subscription_status === 'trial').length;
-  const active = customers.filter(customer => ['contracted','invoice_sent','active','overdue'].includes(customer.subscription_status)).length;
-  const attention = customers.filter(customer => needsAttention(customer)).length;
-  return [
-    ['Kunder', customers.length],
-    ['Tavler', boards],
-    ['Aktive aftaler', active],
-    ['Kræver blik', attention]
-  ].map(([label, value]) => `<article class="summary-card"><strong>${value}</strong><span>${label}</span></article>`).join('');
+function customerIsLocked(customer) {
+  if (['read_only','cancelled'].includes(customer.subscription_status)) return true;
+  if (customer.subscription_status !== 'trial') return false;
+  const grace = activationGraceEndsAt(customer);
+  return (!customer.trial_ends_at || new Date(customer.trial_ends_at) <= new Date()) &&
+    (!grace || new Date(grace) <= new Date());
 }
+
+function summaryHtml(customers) {
+  const counts = [
+    ['all', 'Kunder', customers.length],
+    ['active', 'Redigering åben', customers.filter(customer => !customerIsLocked(customer)).length],
+    ['locked', 'Låste', customers.filter(customerIsLocked).length],
+    ['attention', 'Kræver opmærksomhed', customers.filter(needsAttention).length]
+  ];
+  return counts.map(([key,label,count]) => `<button type="button" class="summary-card summary-filter ${customerFilter === key ? 'selected' : ''}" data-summary-filter="${key}" aria-pressed="${customerFilter === key}"><strong>${count}</strong><span>${label}</span></button>`).join('');
+}
+
+function customerListRow(customer) {
+  const locked = customerIsLocked(customer);
+  const dateLabel = customer.subscription_status === 'trial' ? `Prøve slutter: ${date(customer.trial_ends_at)}` : `Fornyelse: ${date(customer.subscription_renews_at)}`;
+  const expanded = expandedCustomerId === String(customer.id);
+  return `<div class="customer-directory-item ${expanded ? 'is-expanded' : ''}">
+    <button type="button" class="customer-directory-toggle" data-open-customer="${esc(customer.id)}" aria-expanded="${expanded}">
+      <span class="customer-directory-name"><strong>${esc(customer.display_name)}</strong><small>${esc(customer.municipality || customer.legal_name || '')} · ${esc(dateLabel)}</small></span>
+      <span class="customer-directory-badges"><span class="status-badge ${esc(customer.subscription_status)}">${esc(statusLabels[customer.subscription_status] || customer.subscription_status)}</span><span class="status-badge ${locked ? 'read_only' : 'active'}">${locked ? '🔒 Låst' : 'Åben'}</span></span>
+      <span class="customer-directory-chevron" aria-hidden="true">${expanded ? '▴' : '▾'}</span>
+    </button>
+    ${expanded ? `<div class="customer-directory-detail">${customerCard(customer)}</div>` : ''}
+  </div>`;
+}
+
+function renderCustomerDirectory() {
+  const search = customerSearch.trim().toLocaleLowerCase('da-DK');
+  const customers = customerDirectory.filter(customer => {
+    const matches = !search || [customer.display_name,customer.legal_name,customer.municipality,customer.contact_name,customer.contact_email].some(value => String(value || '').toLocaleLowerCase('da-DK').includes(search));
+    const statusMatches = customerFilter === 'all' ||
+      (customerFilter === 'active' && !customerIsLocked(customer)) ||
+      (customerFilter === 'locked' && customerIsLocked(customer)) ||
+      (customerFilter === 'attention' && needsAttention(customer));
+    return matches && statusMatches;
+  }).sort((a,b) => String(a.display_name).localeCompare(String(b.display_name),'da'));
+  $('customerCards').innerHTML = customers.length ? customers.map(customerListRow).join('') : '<p class="empty-requests">Ingen kunder matcher søgningen eller filteret.</p>';
+  $('customerListCount').textContent = `${customers.length} af ${customerDirectory.length} kunder`;
+  $('adminSummary').innerHTML = summaryHtml(customerDirectory);
+  document.querySelectorAll('[data-summary-filter]').forEach(button => button.onclick = () => {
+    customerFilter = button.dataset.summaryFilter;
+    renderCustomerDirectory();
+  });
+  document.querySelectorAll('[data-open-customer]').forEach(button => button.onclick = () => {
+    expandedCustomerId = expandedCustomerId === button.dataset.openCustomer ? null : button.dataset.openCustomer;
+    renderCustomerDirectory();
+  });
+  bindActions();
+}
+
 
 function needsAttention(customer) {
   const renewalDays = daysUntil(customer.subscription_renews_at);
@@ -241,12 +289,14 @@ async function openDashboard() {
   const data = await api('/api/platform-admin');
   $('adminLoginCard').hidden = true;
   $('adminDashboard').hidden = false;
-  $('adminSummary').innerHTML = summaryHtml(data.customers);
+  customerDirectory = data.customers;
+  $('customerSearch').value = customerSearch;
+  $('customerStatusFilter').value = customerFilter;
   const attention = data.customers.filter(needsAttention);
   $('renewalSection').hidden = !attention.length;
   $('renewalCards').innerHTML = attention.map(attentionHtml).join('');
   $('onboardingRequests').innerHTML = data.onboarding.length ? data.onboarding.map(requestCard).join('') : '<p class="empty-requests">Ingen nye forespørgsler.</p>';
-  $('customerCards').innerHTML = data.customers.length ? data.customers.map(customerCard).join('') : '<p class="empty-requests">Ingen kunder endnu.</p>';
+  renderCustomerDirectory();
   $('archivedCustomersSection').hidden = !data.archivedCustomers.length;
   $('archivedCustomerCards').innerHTML = data.archivedCustomers.map(archivedCustomerCard).join('');
   $('archivedSection').hidden = !data.archivedTeams.length;
