@@ -12,3 +12,25 @@
 #adminStatus{z-index:2147483647}
 @media(max-width:850px){.admin-summary{grid-template-columns:repeat(2,1fr)}.field-grid,.inline-create{grid-template-columns:1fr 1fr}.inline-create button{grid-column:1/-1}.request-card .request-form{grid-template-columns:1fr}}
 @media(max-width:560px){.admin-summary,.field-grid,.field-grid.two,.inline-create{grid-template-columns:1fr}.customer-head,.attention-card,.customer-admin-row,.pending-admin-invite{display:block}.pending-admin-invite button{margin-top:8px}.customer-card{padding:15px}}
+
+/* Customer directory */
+.customer-directory{margin-top:32px}
+.customer-directory-heading h2{margin:0 0 4px}
+.customer-directory-controls{display:grid;grid-template-columns:minmax(0,2fr) minmax(180px,1fr);gap:14px;margin:18px 0}
+.customer-directory-controls label{font-size:.84rem}
+.customer-directory-controls select{width:100%;padding:13px 14px;border:1px solid #d5dce6;border-radius:12px;background:white;font:inherit}
+.customer-directory-item{background:#fff;border:1px solid #dce4ed;border-radius:16px;margin:10px 0;overflow:hidden;box-shadow:0 3px 12px #17203308}
+.customer-directory-item.is-expanded{border-color:#94b8b3;box-shadow:0 8px 28px #17203312}
+.customer-directory-toggle{width:100%;display:flex;align-items:center;gap:14px;text-align:left;background:#fff;color:#172033;border:0;border-radius:0;padding:17px 19px}
+.customer-directory-toggle:hover{background:#f5f9fa}
+.customer-directory-name{flex:1;min-width:0;display:grid;gap:4px}
+.customer-directory-name strong{font-size:1.08rem}
+.customer-directory-name small{font-size:.82rem;color:#667085;font-weight:500;overflow-wrap:anywhere}
+.customer-directory-badges{display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.customer-directory-chevron{font-size:1.25rem;color:#667085}
+.customer-directory-detail{border-top:1px solid #e4eaf0;padding:12px;background:#f8fafc}
+.customer-directory-detail>.customer-card{margin:0;box-shadow:none}
+.summary-filter{cursor:pointer;text-align:left;font:inherit;color:inherit;border:2px solid transparent}
+.summary-filter.selected{border-color:#0f9f96}
+.summary-filter:hover{border-color:#9acdc8}
+@media(max-width:650px){.customer-directory-controls{grid-template-columns:1fr}.customer-directory-toggle{flex-wrap:wrap}.customer-directory-badges{justify-content:flex-start}.customer-directory-name{flex-basis:100%}}
