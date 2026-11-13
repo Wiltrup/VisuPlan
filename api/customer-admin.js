@@ -40,7 +40,7 @@ module.exports = async function handler(request, response) {
           const ownerText = `Kunde: ${context.customer.display_name}\nKundeadministrator: ${context.admin.name} (${context.admin.email})\n\nKunden ønsker at fortsætte med VisuPlanner. Kontakt kunden om pakke, faktura og aktivering.`;
           const customerText = `Hej ${context.admin.name}\n\nVi har modtaget jeres anmodning om at fortsætte med VisuPlanner. Techus Nord behandler anmodningen hurtigst muligt.\n\nVenlig hilsen\nTechus Nord`;
           await Promise.all([
-            sendMail('wiltrup@wiltrup.com', `Kunde ønsker aktivering af VisuPlanner: ${context.customer.display_name}`, ownerText),
+            sendMail('service@techusnord.dk', `Kunde ønsker aktivering af VisuPlanner: ${context.customer.display_name}`, ownerText),
             sendMail(context.admin.email, 'Vi har modtaget jeres anmodning om aktivering', customerText)
           ]).catch(error => console.error('Aktiveringsmail kunne ikke sendes.', error.message));
           context.customer.subscription_interest_at = now;
