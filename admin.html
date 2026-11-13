@@ -2,7 +2,7 @@
 <html lang="da">
 <head>
   <meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <link rel="stylesheet" href="/admin.css?v=43"><link rel="stylesheet" href="/admin-extra.css?v=43"><link rel="stylesheet" href="/admin-v38.css?v=53">
+  <link rel="stylesheet" href="/admin.css?v=43"><link rel="stylesheet" href="/admin-extra.css?v=43"><link rel="stylesheet" href="/admin-v38.css?v=54">
   <title>Administration – VisuPlanner</title>
 </head>
 <body>
@@ -22,13 +22,13 @@
       <div id="adminSummary" class="admin-summary"></div>
       <section id="renewalSection" class="attention-section" hidden><h2>Kræver opmærksomhed</h2><div id="renewalCards"></div></section>
       <section class="request-section"><h2>Nye oprettelsesforespørgsler</h2><div id="onboardingRequests"></div></section>
-      <section class="customer-section"><div id="customerCards"></div></section>
+      <section class="customer-section customer-directory"><div class="customer-directory-heading"><div><p class="eyebrow">KUNDEOVERSIGT</p><h2>Alle kunder</h2><p id="customerListCount" class="archived-note"></p></div></div><div class="customer-directory-controls"><label>Søg kunde<input id="customerSearch" type="search" placeholder="Navn, kommune eller kontaktperson" autocomplete="off"></label><label>Vis kunder<select id="customerStatusFilter"><option value="all">Alle kunder</option><option value="active">Redigering åben</option><option value="locked">Låste</option><option value="attention">Kræver opmærksomhed</option></select></label></div><div id="customerCards"></div></section>
       <section id="archivedCustomersSection" class="request-section" hidden><h2>Arkiverede kunder</h2><p class="archived-note">En arkiveret kunde og alle kundens tavler er lukket, men indholdet er bevaret. Her kan kunden gendannes eller slettes permanent.</p><div id="archivedCustomerCards"></div></section>
       <section id="archivedSection" class="request-section" hidden><h2>Arkiverede tavler</h2><div id="archivedTeamCards"></div></section>
       <section class="request-section"><h2>Hjælp til tavleadgang</h2><div id="accessHelpRequests"></div></section>
     </section>
   </main>
   <div id="adminStatus" role="status" aria-live="polite"></div>
-  <script src="/admin.js?v=64"></script>
-</body>
+  <script src="/admin.js?v=65"></script>
+<script>document.getElementById("customerSearch").addEventListener("input",event=>{customerSearch=event.target.value;renderCustomerDirectory()});document.getElementById("customerStatusFilter").addEventListener("change",event=>{customerFilter=event.target.value;renderCustomerDirectory()});</script></body>
 </html>
