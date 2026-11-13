@@ -15,6 +15,7 @@ const tokenHash = token => crypto.createHash('sha256').update(token).digest('hex
 const isoAfter = (date, years = 1) => { const next = new Date(date); next.setFullYear(next.getFullYear() + years); return next.toISOString(); };
 
 const PLANS = {
+  intro1: { label: '1 tavle', limit: 1, intro: 695, renewal: 795 },
   intro3: { label: 'Op til 3 tavler', limit: 3, intro: 1850, renewal: 2200 },
   intro8: { label: 'Op til 8 tavler', limit: 8, intro: 3200, renewal: 3800 },
   intro12: { label: 'Op til 12 tavler', limit: 12, intro: 4400, renewal: 5200 },
