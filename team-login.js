@@ -104,7 +104,7 @@ module.exports = async function handler(request, response) {
         method: 'POST', headers: { Prefer: 'return=minimal' },
         body: JSON.stringify({ team_slug: team.slug, customer_id: team.customer_id, purpose: 'password_reset', token_hash: hash, contact_email: team.recovery_email, expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() })
       });
-      const origin = `https://${request.headers.host || 'visuplanner.dk'}`;
+      const origin = 'https://visuplanner.dk';
       await sendReset(team.recovery_email, team.name, `${origin}/aktiver?token=${encodeURIComponent(token)}`);
       return response.status(200).json({ ok: true });
     }
