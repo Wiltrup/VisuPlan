@@ -385,6 +385,8 @@ module.exports = async function handler(request, response) {
       const customers = await serviceFetch(`/rest/v1/customers?id=eq.${encodeURIComponent(customerId)}&select=*`, secret);
       const customer = customers?.[0];
       if (!customer) return response.status(404).json({ error: 'Kunden blev ikke fundet.' });
+      const existingClubs = await serviceFetch(`/rest/v1/shared_offers?customer_id=eq.${encodeURIComponent(customerId)}&archived_at=is.null&select=id&limit=1`, secret);
+      if (existingClubs?.length) return response.status(409).json({ error: 'Kunden har allerede en klubtavle. Klubmodulet omfatter kun én klubtavle.' });
       const customerTeams = await serviceFetch(`/rest/v1/teams_registry?customer_id=eq.${encodeURIComponent(customerId)}&archived_at=is.null&select=slug`, secret);
       const allowed = new Set((customerTeams || []).map(team => team.slug));
       body.team_slugs = (Array.isArray(body.team_slugs) ? body.team_slugs : []).filter(teamSlug => allowed.has(teamSlug));
