@@ -223,7 +223,7 @@ async function createInvitation(team, customer, secret, host, purpose = 'activat
       expires_at: new Date(Date.now() + hours * 60 * 60 * 1000).toISOString()
     })
   });
-  const origin = `https://${host || 'visuplanner.dk'}`;
+  const origin = 'https://visuplanner.dk';
   const inviteUrl = `${origin}/aktiver?token=${encodeURIComponent(token)}`;
   return { inviteUrl, mailSent: await sendInvitation(team.recovery_email, team.name, inviteUrl, purpose) };
 }
