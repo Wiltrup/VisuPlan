@@ -22,7 +22,7 @@ async function sendReminder(customer, days) {
     headers:{ Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
     body:JSON.stringify({
       from:'VisuPlanner <notifikation@visuplanner.dk>',
-      to:['wiltrup@wiltrup.com'],
+      to:['service@techusnord.dk'],
       subject:`Årsfornyelse nærmer sig: ${customer.display_name}`,
       text:[
         `Kunde: ${customer.display_name}`,
