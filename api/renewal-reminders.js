@@ -22,8 +22,8 @@ async function sendReminder(customer, days) {
     headers:{ Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
     body:JSON.stringify({
       from:'VisuPlanner <notifikation@visuplanner.dk>',
-      to:['wiltrup@wiltrup.com'],
-      reply_to:'wiltrup@wiltrup.com',
+      to:['service@techusnord.dk'],
+      reply_to:'service@techusnord.dk',
       subject:`Årsfornyelse nærmer sig: ${customer.display_name}`,
       text:[
         `Kunde: ${customer.display_name}`,
@@ -52,7 +52,7 @@ async function sendTrialReminder(customer) {
     body:JSON.stringify({
       from:'VisuPlanner <notifikation@visuplanner.dk>',
       to:[recipient],
-      reply_to:'wiltrup@wiltrup.com',
+      reply_to:'service@techusnord.dk',
       subject:'Jeres prøveperiode udløber snart',
       text:[
         `Hej${customer.contact_name ? ` ${customer.contact_name}` : ''}`,
