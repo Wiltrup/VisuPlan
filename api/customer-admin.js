@@ -32,6 +32,7 @@ module.exports = async function handler(request, response) {
           return response.status(200).json({ ok:true, already_active:true, ...subscriptionPayload(context.customer) });
         }
         const now = new Date().toISOString();
+        let notificationSent = null;
         if (!context.customer.subscription_interest_at) {
           await service(`/rest/v1/customers?id=eq.${encodeURIComponent(context.customer.id)}`, secret, {
             method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ subscription_interest_at:now, updated_at:now })
@@ -39,13 +40,15 @@ module.exports = async function handler(request, response) {
           await audit(context, 'subscription_requested', null, 'subscription', secret);
           const ownerText = `Kunde: ${context.customer.display_name}\nKundeadministrator: ${context.admin.name} (${context.admin.email})\n\nKunden ønsker at fortsætte med VisuPlanner. Kontakt kunden om pakke, faktura og aktivering.`;
           const customerText = `Hej ${context.admin.name}\n\nVi har modtaget jeres anmodning om at fortsætte med VisuPlanner. Techus Nord behandler anmodningen hurtigst muligt.\n\nVenlig hilsen\nTechus Nord`;
-          await Promise.all([
+          const notificationResults = await Promise.allSettled([
             sendMail('service@techusnord.dk', `Kunde ønsker aktivering af VisuPlanner: ${context.customer.display_name}`, ownerText),
             sendMail(context.admin.email, 'Vi har modtaget jeres anmodning om aktivering', customerText)
-          ]).catch(error => console.error('Aktiveringsmail kunne ikke sendes.', error.message));
+          ]);
+          notificationSent = notificationResults.every(item => item.status === 'fulfilled' && item.value === true);
+          if (!notificationSent) console.error('Kundeanmodningen blev gemt, men mindst én aktiveringsmail kunne ikke sendes.');
           context.customer.subscription_interest_at = now;
         }
-        return response.status(200).json({ ok:true, ...subscriptionPayload(context.customer) });
+        return response.status(200).json({ ok:true, notification_sent:notificationSent, ...subscriptionPayload(context.customer) });
       }
 
       const now = new Date().toISOString();
