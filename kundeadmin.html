@@ -16,12 +16,12 @@
       <h1>Administrér jeres tavler</h1>
       <p>Log ind med din registrerede e-mailadresse og personlige adgangskode.</p>
       <form id="customerAdminLoginForm">
-        <label>Arbejdsmail<input id="customerAdminEmail" type="email" autocomplete="username" required></label>
+        <label>E-mail<input id="customerAdminEmail" type="email" autocomplete="username" required></label>
         <label>Adgangskode<input id="customerAdminPassword" type="password" autocomplete="current-password" required></label>
         <p id="customerAdminLoginError" class="form-message error" aria-live="polite"></p>
         <button type="submit">Log ind</button>
       </form>
-      <details class="forgot-panel"><summary>Glemt adgangskode?</summary><form id="customerAdminForgotForm"><label>Din registrerede arbejdsmail<input id="customerAdminForgotEmail" type="email" autocomplete="email" required></label><button type="submit">Send nulstillingslink</button><p id="customerAdminForgotStatus" class="form-message" aria-live="polite"></p></form></details>
+      <details class="forgot-panel"><summary>Glemt adgangskode?</summary><form id="customerAdminForgotForm"><label>Din registrerede e-mailadresse<input id="customerAdminForgotEmail" type="email" autocomplete="email" required></label><button type="submit">Send nulstillingslink</button><p id="customerAdminForgotStatus" class="form-message" aria-live="polite"></p></form></details>
     </section>
 
     <section id="customerAdminDashboard" hidden>
@@ -37,7 +37,7 @@
         <summary>Opret ny tavle</summary>
         <form id="customerCreateBoardForm" class="field-grid">
           <label>Teamnavn<input name="name" placeholder="Fx Team Syd" required></label>
-          <label>Ansvarlig arbejdsmail<input name="recovery_email" type="email" required></label>
+          <label>Ansvarlig e-mailadresse<input name="recovery_email" type="email" required></label>
           <label>Arbejdsplads<input name="workplace" required></label>
           <label class="wide">Ønsket slutning på URL <small id="customerBoardSlugStatus">Skriv fx team 1 eller /team-1. Systemet indsætter selv bindestreger og vælger en unik adresse. Skriv ikke hele visuplanner.dk-adressen.</small><input name="slug" placeholder="Fx team 1"></label>
           <div class="wide form-actions"><button type="submit">Opret tavle og send aktiveringslink</button></div>
@@ -45,7 +45,7 @@
       </details>
 
       <section class="dashboard-section"><div class="section-heading"><div><p class="eyebrow">TAVLER</p><h2>Jeres teamtavler</h2></div><button id="customerAdminReload" class="secondary" type="button">Opdatér oversigt</button></div><div id="customerAdminBoards" class="board-grid"></div></section>
-      <section id="customerAdminOffersSection" class="dashboard-section" hidden><div class="section-heading"><div><p class="eyebrow">KLUBMODUL</p><h2>Jeres klubtavle</h2></div><button id="customerAdminReloadClubs" class="secondary" type="button">Opdatér oversigt</button></div><div id="customerAdminOffers" class="offer-grid"></div><details id="customerCreateClubPanel"><summary>Opret klubtavle</summary><form id="customerCreateClubForm" class="field-grid"><label>Klubbens navn<input name="name" placeholder="Fx Klub Solsikken" required></label><label>Ansvarlig arbejdsmail<input name="recovery_email" type="email" required></label><label>Arbejdsplads<input name="workplace" required></label><label class="wide">Ønsket slutning på URL <small id="customerClubSlugStatus">Skriv kun den sidste del, fx solsikken – ikke hele adressen.</small><input name="slug" placeholder="Fx solsikken"></label><fieldset class="wide"><legend>Gør tilgængelig på disse tavler</legend><div id="customerClubTeams"></div></fieldset><p class="wide">Den ansvarlige medarbejder modtager et engangslink og vælger selv klubbens redigerings- og tavlekode.</p><div class="wide form-actions"><button type="submit">Opret klubtavle og send aktiveringslink</button></div></form></details></section>
+      <section id="customerAdminOffersSection" class="dashboard-section" hidden><div class="section-heading"><div><p class="eyebrow">KLUBMODUL</p><h2>Jeres klubtavle</h2></div><button id="customerAdminReloadClubs" class="secondary" type="button">Opdatér oversigt</button></div><div id="customerAdminOffers" class="offer-grid"></div><details id="customerCreateClubPanel"><summary>Opret klubtavle</summary><form id="customerCreateClubForm" class="field-grid"><label>Klubbens navn<input name="name" placeholder="Fx Klub Solsikken" required></label><label>Ansvarlig e-mailadresse<input name="recovery_email" type="email" required></label><label>Arbejdsplads<input name="workplace" required></label><label class="wide">Ønsket slutning på URL <small id="customerClubSlugStatus">Skriv kun den sidste del, fx solsikken – ikke hele adressen.</small><input name="slug" placeholder="Fx solsikken"></label><fieldset class="wide"><legend>Gør tilgængelig på disse tavler</legend><div id="customerClubTeams"></div></fieldset><p class="wide">Den ansvarlige medarbejder modtager et engangslink og vælger selv klubbens redigerings- og tavlekode.</p><div class="wide form-actions"><button type="submit">Opret klubtavle og send aktiveringslink</button></div></form></details></section>
       <section class="dashboard-section secondary-section"><p class="eyebrow">ADGANG</p><h2>Kundeadministratorer</h2><div id="customerAdminColleagues"></div><a id="customerAdminHelp" class="help-button" href="mailto:service@techusnord.dk">Hjælp: Kontakt Techus Nord / VisuPlanner</a></section>
       <details class="dashboard-section activity-section"><summary>Seneste administratorhandlinger</summary><div id="customerAdminAudit"></div></details>
     </section>
