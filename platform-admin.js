@@ -89,7 +89,8 @@ async function sendInvitation(email, name, link, purpose = 'activation') {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: 'VisuPlanner <velkommen@visuplanner.dk>', to: [email],
+      from: 'VisuPlanner <service@techusnord.dk>', to: [email],
+      reply_to: 'service@techusnord.dk',
       subject: reset ? `Vælg en ny personalekode til ${name}` : `Gør ${name} klar i VisuPlanner`,
       text: reset
         ? `Vælg en ny personalekode via dette engangslink:\n\n${link}\n\nLinket udløber efter 1 time.`
