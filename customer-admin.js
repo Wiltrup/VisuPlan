@@ -241,8 +241,11 @@ $('customerAdminLoginForm').onsubmit = async event => {
 $('customerAdminForgotForm').onsubmit = async event => {
   event.preventDefault(); const button = event.submitter; button.disabled = true;
   try {
-    await fetch('/api/customer-admin?flow=access', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'request-reset', email:$('customerAdminForgotEmail').value.trim() }) });
-    $('customerAdminForgotStatus').textContent = 'Hvis mailen er registreret, er der sendt et nulstillingslink.';
+    const response = await fetch('/api/customer-admin?flow=access', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ action:'request-reset', email:$('customerAdminForgotEmail').value.trim() }) });
+    if (!response.ok) throw new Error('Forespørgslen kunne ikke behandles. Prøv igen eller kontakt service@techusnord.dk.');
+    $('customerAdminForgotStatus').textContent = 'Hvis e-mailadressen er registreret, forsøger vi at sende et nulstillingslink. Modtager du det ikke, så kontakt service@techusnord.dk.';
+  } catch (error) {
+    $('customerAdminForgotStatus').textContent = error.message;
   } finally { button.disabled = false; }
 };
 
