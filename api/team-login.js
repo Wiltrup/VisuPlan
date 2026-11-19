@@ -57,6 +57,7 @@ async function sendReset(email, name, link) {
     body: JSON.stringify({
       from: 'VisuPlanner <velkommen@visuplanner.dk>',
       to: [email],
+      reply_to: 'service@techusnord.dk',
       subject: `Vælg en ny personalekode til ${name}`,
       text: `Vælg en ny personalekode via dette engangslink:\n\n${link}\n\nLinket udløber efter 1 time.`
     })
