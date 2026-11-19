@@ -4,6 +4,7 @@ let session = null;
 let customerDirectory = [];
 let customerFilter = 'all';
 let customerSearch = '';
+let currentAgreementVersion = '';
 let expandedCustomerId = null;
 const $ = id => document.getElementById(id);
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[char]));
@@ -199,6 +200,11 @@ function customerCard(customer) {
   return `<article class="customer-card" data-customer="${esc(customer.id)}">
     <div class="customer-head"><div><h3>${esc(customer.display_name)}</h3><p>${esc(customer.legal_name || customer.municipality || '')}</p></div><span class="status-badge ${esc(customer.subscription_status)}">${esc(statusLabels[customer.subscription_status] || customer.subscription_status)}</span></div>
     <div class="customer-facts"><strong class="status-badge ${customer.subscription_status === 'read_only' ? 'read_only' : 'active'}">${customer.subscription_status === 'read_only' ? '🔒 REDIGERING LÅST – ALLE TAVLER' : 'Redigering: ' + (customer.subscription_status === 'trial' && new Date(customer.trial_ends_at) <= new Date() && (!graceEnd || new Date(graceEnd) <= new Date()) ? 'LÅST – prøveperiode udløbet' : ['cancelled'].includes(customer.subscription_status) ? 'LÅST' : 'ÅBEN')}</strong><span>${esc(planLabels[customer.plan_code] || customer.plan_code)}</span><span>${customer.teams.length} af ${customer.board_limit} tavler</span><span>${esc(trialText)}</span>${customer.subscription_status === 'trial' && customer.subscription_interest_at ? '<span class="interest-flag">Aktivering anmodet</span>' : ''}</div>
+    <div class="legal-state ${customer.latest_acceptance?.terms_version === currentAgreementVersion ? 'legal-state-approved' : 'legal-state-pending'}">
+      ${customer.latest_acceptance?.terms_version === currentAgreementVersion
+        ? `<strong>✓ Juridiske aftaler godkendt</strong><span>Godkendt ${dateTime(customer.latest_acceptance.accepted_at)} af ${esc(customer.latest_acceptance.accepted_by_name)} · Betingelser v1.2 og databehandleraftale v1.1</span>`
+        : '<strong>Afventer godkendelse af juridiske aftaler</strong><span>Kundeadministratoren skal godkende betingelser og databehandleraftale ved login, før administrationen kan bruges.</span>'}
+    </div>
     ${customerAdministratorSection(customer)}
     <details><summary>Kunde- og fakturaoplysninger</summary>
       <div class="field-grid">
@@ -289,6 +295,7 @@ async function openDashboard() {
   const data = await api('/api/platform-admin');
   $('adminLoginCard').hidden = true;
   $('adminDashboard').hidden = false;
+  currentAgreementVersion = data.termsVersion || '';
   customerDirectory = data.customers;
   $('customerSearch').value = customerSearch;
   $('customerStatusFilter').value = customerFilter;
