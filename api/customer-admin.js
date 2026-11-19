@@ -1,5 +1,6 @@
 const mainHandler = require('../lib/customer-admin-main-handler');
 const { customerAdminContext, audit, service, sendMail } = require('../lib/customer-admin-security');
+const { customerAgreement } = require('../lib/customer-legal');
 
 function subscriptionPayload(customer) {
   return {
@@ -22,6 +23,9 @@ module.exports = async function handler(request, response) {
     try {
       const context = await customerAdminContext(request.headers.authorization || '', secret);
       if (!context) return response.status(403).json({ error:'Du har ikke adgang som kundeadministrator.' });
+      if (action !== 'admin-login' && !(await customerAgreement(context.customer.id, secret))) {
+        return response.status(403).json({ error:'Godkend først forretningsbetingelser og databehandleraftalen i kundeadministrationen.' });
+      }
 
       if (action === 'subscription-status') {
         return response.status(200).json(subscriptionPayload(context.customer));
