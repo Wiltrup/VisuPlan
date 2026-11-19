@@ -5,7 +5,7 @@ const { safeRoutes, publicPath, uniquePublicSlug, createRoute, routeMaps } = req
 
 const SUPABASE_URL = 'https://fzrtvogirhmnbicdaffc.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
-const TERMS_VERSION = '2026-08-16-v1.2';
+const { AGREEMENT_VERSION: TERMS_VERSION } = require('../lib/customer-legal');
 const DAY = 24 * 60 * 60 * 1000;
 
 const clean = (value, max = 300) => String(value || '').trim().slice(0, max);
