@@ -173,7 +173,7 @@ Kør `supabase-v21-foundation.sql` én gang i Supabase SQL Editor. Scriptet tilf
 
 Teamets ansvarlige arbejdsmail bør være en rigtig, unik arbejdsmail. Når mailen ændres i administratorpanelet, kobles den til personaleloginnet og kan bruges til “Glemt personalekoden?”. Den samme mail kan ikke samtidig være Supabase-login for platformadministratoren.
 
-Onboarding- og adgangsanmodninger gemmes altid i administratorpanelet. Tilføj miljøvariablen `RESEND_API_KEY` i Vercel og verificér `visuplanner.dk` hos Resend for også at modtage dem som mail på `service@techusnord.dk`. Hvis mailleveringen er nede, ligger anmodningen stadig sikkert i administrationen.
+Onboarding- og adgangsanmodninger gemmes altid i administratorpanelet. Tilføj miljøvariablen `RESEND_API_KEY` i Vercel og verificér afsenderdomænet `techusnord.dk` hos Resend. Alle VisuPlanner-systemmails sendes fra `VisuPlanner <service@techusnord.dk>`, svar går til samme adresse, og interne notifikationer sendes til `service@techusnord.dk`. Invitations- og nulstillingsmails sendes fortsat til den enkelte kundes registrerede mail. Indtil domænet er verificeret hos Resend, kan mails fra denne afsender blive afvist. Hvis mailleveringen er nede, ligger anmodningen stadig sikkert i administrationen.
 
 Team- og personalelogin gemmes kun i `sessionStorage`. Chrome, Safari og andre browsere kan selv tilbyde at huske loginoplysningerne. På en midlertidig computer kan brugeren derfor afslå browserens tilbud, og VisuPlanner-login forsvinder, når browsersessionen afsluttes.
 
