@@ -50,6 +50,16 @@ function notify(message, type = '') {
   node.className = `show ${type}`;
   setTimeout(() => { if (node.textContent === message) node.className = ''; }, 4200);
 }
+async function copyInviteFallback(result) {
+  if (!result.inviteUrl || result.mailSent) return false;
+  try {
+    await navigator.clipboard.writeText(result.inviteUrl);
+    return true;
+  } catch {
+    window.prompt('Mailen kunne ikke sendes. Kopiér engangslinket manuelt:', result.inviteUrl);
+    return false;
+  }
+}
 
 const dateTime = value => value ? new Intl.DateTimeFormat('da-DK', { dateStyle:'medium', timeStyle:'short' }).format(new Date(value)) : 'Ikke registreret';
 const codeLabel = (kind, scope = 'team') => kind === 'viewer' ? 'Tavlekode' : (scope === 'club' ? 'Redigeringskode' : 'Personalekode');
@@ -183,7 +193,7 @@ function bindDashboardActions() {
   });
   document.querySelectorAll('[data-action="send-invite"],[data-action="send-editor-reset"]').forEach(button => button.onclick = async () => {
     const board = button.closest('[data-team]'); button.disabled = true;
-    try { const result = await post({ action:button.dataset.action, team_slug:board.dataset.team }); if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {}); notify(result.mailSent ? 'Linket er sendt.' : 'Mail kunne ikke sendes. Linket er kopieret.'); await loadDashboard(); }
+    try { const result = await post({ action:button.dataset.action, team_slug:board.dataset.team }); const copied = await copyInviteFallback(result); notify(result.mailSent ? 'Linket er sendt.' : copied ? 'Mailen kunne ikke sendes. Linket er kopieret.' : 'Mailen kunne ikke sendes. Kopiér linket fra dialogen.', result.mailSent ? '' : 'error'); await loadDashboard(); }
     catch (error) { notify(error.message,'error'); button.disabled = false; }
   });
   document.querySelectorAll('[data-action="delete-board"]').forEach(button => button.onclick = async () => {
@@ -210,8 +220,8 @@ function bindDashboardActions() {
     try {
       const result = await post({ action, offer_id:card.dataset.offer, ...(action === 'delete-club' ? { confirmation:'SLET KLUBTAVLE' } : {}) });
       if (action === 'delete-club') { notify('Klubtavlen er slettet.'); await loadDashboard(); return; }
-      if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
-      notify(result.mailSent ? 'Linket er sendt.' : 'Mail kunne ikke sendes. Linket er kopieret.');
+      const copied = await copyInviteFallback(result);
+      notify(result.mailSent ? 'Linket er sendt.' : copied ? 'Mailen kunne ikke sendes. Linket er kopieret.' : 'Mailen kunne ikke sendes. Kopiér linket fra dialogen.', result.mailSent ? '' : 'error');
       await loadDashboard();
     } catch (error) { notify(error.message, 'error'); button.disabled = false; }
   });
@@ -266,10 +276,10 @@ $('customerCreateBoardForm').onsubmit = async event => {
   event.preventDefault(); const form = event.currentTarget; const button = event.submitter; button.disabled = true; const values = Object.fromEntries(new FormData(form));
   try {
     const result = await post({ action:'create-board', ...values });
-    if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
+    const copied = await copyInviteFallback(result);
     form.elements.name.value = ''; form.elements.recovery_email.value = ''; form.elements.slug.value = '';
     const addressNote = result.slugAdjusted ? ` Adressen blev ændret til visuplanner.dk${result.publicPath}, fordi ønsket var optaget eller reserveret.` : '';
-    notify((result.mailSent ? 'Tavlen er oprettet, og aktiveringslinket er sendt.' : 'Tavlen er oprettet. Aktiveringslinket er kopieret.') + addressNote);
+    notify((result.mailSent ? 'Tavlen er oprettet, og aktiveringslinket er sendt.' : copied ? 'Tavlen er oprettet, men mailen fejlede. Linket er kopieret.' : 'Tavlen er oprettet, men mailen fejlede. Kopiér linket fra dialogen.') + addressNote, result.mailSent ? '' : 'error');
     $('customerBoardSlugStatus').textContent = 'Skriv fx team 1 eller /team-1. Systemet indsætter selv bindestreger og vælger en unik adresse.';
     await loadDashboard();
   } catch (error) { notify(error.message,'error'); button.disabled = false; }
@@ -309,8 +319,8 @@ $('customerCreateClubForm').onsubmit = async event => {
   try {
     const result = await post(payload);
     const changed = result.slugAdjusted ? ` Adressen blev justeret til visuplanner.dk${result.publicPath}.` : '';
-    if (result.inviteUrl && !result.mailSent) await navigator.clipboard.writeText(result.inviteUrl).catch(() => {});
-    notify(`${result.mailSent ? 'Klubtavlen er oprettet, og aktiveringslinket er sendt.' : 'Klubtavlen er oprettet. Aktiveringslinket er kopieret.'}${changed}`);
+    const copied = await copyInviteFallback(result);
+    notify(`${result.mailSent ? 'Klubtavlen er oprettet, og aktiveringslinket er sendt.' : copied ? 'Klubtavlen er oprettet, men mailen fejlede. Linket er kopieret.' : 'Klubtavlen er oprettet, men mailen fejlede. Kopiér linket fra dialogen.'}${changed}`, result.mailSent ? '' : 'error');
     form.reset();
     await loadDashboard();
   } catch (error) { notify(error.message, 'error'); button.disabled = false; }
