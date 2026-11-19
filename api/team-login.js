@@ -55,7 +55,7 @@ async function sendReset(email, name, link) {
     method: 'POST',
     headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      from: 'VisuPlanner <velkommen@visuplanner.dk>',
+      from: 'VisuPlanner <service@techusnord.dk>',
       to: [email],
       reply_to: 'service@techusnord.dk',
       subject: `Vælg en ny personalekode til ${name}`,
