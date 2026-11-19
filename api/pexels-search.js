@@ -3,6 +3,29 @@ const SUPABASE_KEY = 'sb_publishable_oHmuwX8xm8d-77XLapdBFw_ragbZH4F';
 
 module.exports = async function handler(request, response) {
   if (request.method !== 'GET') return response.status(405).json({ error: 'Kun GET er tilladt.' });
+  // Temporary B05 read-only probe; remove after verification.
+  if (request.query?.audit === 'resend-b05') {
+    response.setHeader('Cache-Control', 'no-store');
+    const key = process.env.RESEND_API_KEY;
+    if (!key) return response.status(200).json({ check:'missing_api_key' });
+    try {
+      const upstream = await fetch('https://api.resend.com/domains', {
+        headers: { Authorization:'Bearer ' + key, Accept:'application/json' },
+        signal: AbortSignal.timeout(8000)
+      });
+      if (!upstream.ok) return response.status(200).json({ check:'provider_rejected', provider_http_status:upstream.status });
+      const result = await upstream.json();
+      if (!Array.isArray(result.data)) return response.status(200).json({ check:'unexpected_response' });
+      const domain = result.data.find(item => String(item.name || '').toLowerCase() === 'techusnord.dk');
+      return response.status(200).json({
+        check:'resend_domain_listing', registered: Boolean(domain),
+        status: domain ? String(domain.status || 'unknown') : 'not_listed'
+      });
+    } catch {
+      return response.status(200).json({ check:'provider_unreachable' });
+    }
+  }
+
   const authorization = request.headers.authorization || '';
   if (!authorization.startsWith('Bearer ')) return response.status(401).json({ error: 'Log ind som personale først.' });
   const authCheck = await fetch(`${SUPABASE_URL}/auth/v1/user`, { headers: { apikey: SUPABASE_KEY, Authorization: authorization } });
