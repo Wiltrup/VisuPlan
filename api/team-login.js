@@ -19,8 +19,10 @@ async function service(path, secret, options = {}) {
 }
 
 function activationGraceEndsAt(customer) {
-  if (!customer?.subscription_interest_at || !customer.trial_started_at) return null;
-  return new Date(new Date(customer.trial_started_at).getTime() + 25 * 86400000).toISOString();
+  if (!customer?.subscription_interest_at || !customer.trial_ends_at) return null;
+  const trialEnd = new Date(customer.trial_ends_at);
+  if (Number.isNaN(trialEnd.getTime())) return null;
+  return new Date(trialEnd.getTime() + 7 * 86400000).toISOString();
 }
 
 function canEdit(customer) {
