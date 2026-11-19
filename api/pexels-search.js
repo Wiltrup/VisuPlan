@@ -13,7 +13,11 @@ module.exports = async function handler(request, response) {
         headers: { Authorization:'Bearer ' + key, Accept:'application/json' },
         signal: AbortSignal.timeout(8000)
       });
-      if (!upstream.ok) return response.status(200).json({ check:'provider_rejected', provider_http_status:upstream.status });
+      if (!upstream.ok) {
+        const detail = await upstream.json().catch(() => ({}));
+        const code = ['restricted_api_key','authentication_error','missing_api_key','validation_error'].includes(detail.name) ? detail.name : 'other';
+        return response.status(200).json({ check:'provider_rejected', provider_http_status:upstream.status, error_code:code });
+      }
       const result = await upstream.json();
       if (!Array.isArray(result.data)) return response.status(200).json({ check:'unexpected_response' });
       const domain = result.data.find(item => String(item.name || '').toLowerCase() === 'techusnord.dk');
