@@ -80,6 +80,7 @@
     try {
       const result = await post('request-subscription');
       render(result);
+      if (result.notification_sent === false) alert('Jeres anmodning er registreret, men en automatisk mail kunne ikke sendes. Kontakt service@techusnord.dk, så vi kan følge op.');
     } catch (error) {
       button.disabled = false;
       alert(error.message);
