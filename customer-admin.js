@@ -136,8 +136,27 @@ function render() {
   bindDashboardActions();
 }
 
+function showAgreementGate(agreement) {
+  $('customerAdminLogin').hidden = true;
+  $('customerAdminDashboard').hidden = true;
+  $('customerLegalGate').hidden = false;
+  $('customerLegalParty').textContent = agreement.legal_party;
+  $('customerLegalIdentity').textContent = `${agreement.admin_name} · ${agreement.admin_email} · ${agreement.municipality || ''}`;
+  $('customerLegalTermsVersion').textContent = `v${agreement.terms_version}`;
+  $('customerLegalDpaVersion').textContent = `v${agreement.dpa_version}`;
+  $('customerLegalTermsLink').href = agreement.terms_url;
+  $('customerLegalDpaLink').href = agreement.dpa_url;
+  $('customerLegalError').textContent = '';
+}
+
 async function loadDashboard() {
   dashboard = await api();
+  if (dashboard.agreement_required === true) {
+    showAgreementGate(dashboard.agreement);
+    resetInactivity();
+    return;
+  }
+  $('customerLegalGate').hidden = true;
   $('customerAdminLogin').hidden = true;
   $('customerAdminDashboard').hidden = false;
   render();
@@ -236,6 +255,31 @@ function bindDashboardActions() {
     catch (error) { notify(error.message, 'error'); button.disabled = false; }
   });
 }
+
+$('customerLegalForm').onsubmit = async event => {
+  event.preventDefault();
+  const button = $('customerLegalAccept');
+  const message = $('customerLegalError');
+  const values = new FormData(event.currentTarget);
+  button.disabled = true;
+  message.textContent = '';
+  try {
+    await post({
+      action:'accept-agreements',
+      version:dashboard.agreement.version,
+      accept_terms:values.has('accept_terms'),
+      accept_dpa:values.has('accept_dpa'),
+      authorized:values.has('authorized')
+    });
+    await loadDashboard();
+    notify('Aftalerne er godkendt. Velkommen til administrationen.');
+  } catch (error) {
+    message.textContent = error.message || 'Godkendelsen kunne ikke gemmes. Prøv igen.';
+  } finally {
+    button.disabled = false;
+  }
+};
+$('customerLegalLogout').onclick = logout;
 
 $('customerAdminLoginForm').onsubmit = async event => {
   event.preventDefault(); $('customerAdminLoginError').textContent = '';
