@@ -113,8 +113,8 @@ module.exports = async function handler(request, response) {
       ]);
       const maps = routeMaps(routes);
       const directory = [
-        ...(teams || []).map(team => ({ ...team, kind:'team', path:publicPath(maps.byTeam.get(team.slug)) || `/${team.slug}` })),
-        ...(offers || []).filter(offer => offer.onboarding_status !== 'invited').map(offer => ({ ...offer, kind:'club', path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || 'tilbud'}/${offer.slug}` }))
+        ...(teams || []).map(team => ({ slug:team.slug, name:team.name, municipality:team.municipality, workplace:team.workplace, kind:'team', path:publicPath(maps.byTeam.get(team.slug)) || `/${team.slug}` })),
+        ...(offers || []).filter(offer => offer.onboarding_status !== 'invited').map(offer => ({ slug:offer.slug, name:offer.name, municipality:offer.municipality, workplace:offer.workplace, kind:'club', path:publicPath(maps.byOffer.get(offer.id)) || `/${offer.customer_slug || 'tilbud'}/${offer.slug}` }))
       ].sort((a, b) => `${a.municipality}\0${a.workplace}\0${a.kind}\0${a.name}`.localeCompare(`${b.municipality}\0${b.workplace}\0${b.kind}\0${b.name}`, 'da'));
       return response.status(200).json(directory);
     }
