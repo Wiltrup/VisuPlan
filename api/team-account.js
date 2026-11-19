@@ -71,15 +71,18 @@ module.exports = async function handler(request, response) {
       const validTrialEnd = Boolean(trialEndsAt && !Number.isNaN(trialEndsAt.getTime()));
       const graceEndsAt = validTrialEnd ? new Date(trialEndsAt.getTime() + 7 * 86400000) : null;
       const graceCanEdit = ['contracted', 'invoice_sent', 'active', 'overdue'].includes(customer.subscription_status) || (customer.subscription_status === 'trial' && Boolean(graceEndsAt && graceEndsAt > now));
+      let notificationSent = null;
       if (!customer.subscription_interest_at) {
         await service(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ subscription_interest_at: requestedAt, updated_at: now.toISOString() }) });
         const formattedGrace = graceEndsAt ? new Intl.DateTimeFormat('da-DK', { dateStyle: 'long' }).format(graceEndsAt) : 'den oplyste frist';
-        await Promise.all([
+        const notificationResults = await Promise.allSettled([
           notifyOwner(`Kunde ønsker aktivering af VisuPlanner: ${customer.display_name}`, `Kunde: ${customer.display_name}\nTavle: ${team.name}\nKontakt: ${customer.contact_name || ''}\nMail: ${customer.contact_email || team.recovery_email}\nRedigering mulig til: ${formattedGrace}\n\nKontakt kunden om pakke, faktura og aktivering.`),
           notifyCustomer(customer.contact_email || team.recovery_email, 'Vi har modtaget jeres anmodning om aktivering', `Hej${customer.contact_name ? ` ${customer.contact_name}` : ''}\n\nVi har modtaget jeres anmodning om aktivering af VisuPlanner. Vi behandler jeres anmodning hurtigst muligt.\n\n${graceCanEdit ? `I kan fortsætte med at redigere tavlen frem til ${formattedGrace}, mens anmodningen behandles.` : 'Redigeringen forbliver låst, indtil Techus Nord har behandlet anmodningen.'}\n\nVenlig hilsen\nTechus Nord`)
         ]);
+        notificationSent = notificationResults.every(item => item.status === 'fulfilled' && item.value === true);
+        if (!notificationSent) console.error('Aktiveringsanmodningen er gemt, men mindst én mail kunne ikke sendes.');
       }
-      return response.status(200).json({ ok: true, requested_at: requestedAt, grace_ends_at: graceEndsAt?.toISOString() || null, can_edit: graceCanEdit });
+      return response.status(200).json({ ok: true, requested_at: requestedAt, grace_ends_at: graceEndsAt?.toISOString() || null, can_edit: graceCanEdit, notification_sent: notificationSent });
     }
     return response.status(400).json({ error: 'Ukendt handling.' });
   } catch (error) {
