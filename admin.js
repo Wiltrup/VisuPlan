@@ -307,8 +307,9 @@ async function openDashboard() {
 
 async function copyFallback(result, successText) {
   if (result.inviteUrl && !result.mailSent) {
-    try { await navigator.clipboard.writeText(result.inviteUrl); } catch {}
-    alert(`${successText}\n\nMail er ikke sat op. Linket er kopieret:\n${result.inviteUrl}`);
+    let copied = false;
+    try { await navigator.clipboard.writeText(result.inviteUrl); copied = true; } catch {}
+    alert(`${successText}\n\nMailen kunne ikke sendes. ${copied ? 'Linket er kopieret til udklipsholderen.' : 'Kopiér linket nedenfor manuelt.'}\n${result.inviteUrl}`);
   }
 }
 
@@ -365,7 +366,7 @@ function bindActions() {
       const addressNote = action === 'create-board' && result.slugAdjusted
         ? ` Adressen blev ændret til visuplanner.dk${result.publicPath}, fordi ønsket var optaget eller reserveret.`
         : '';
-      status((messages[action] || 'Kundens aftale er opdateret.') + addressNote, 'success');
+      status(((action === 'create-board' || action === 'invite-customer-admin') && result.mailSent === false ? 'Oprettelsen er gemt, men mailen blev ikke sendt. Brug det viste engangslink.' : (messages[action] || 'Kundens aftale er opdateret.')) + addressNote, result.mailSent === false ? 'error' : 'success');
       await openDashboard();
     } catch (error) { status(error.message, 'error'); button.disabled = false; }
   });
