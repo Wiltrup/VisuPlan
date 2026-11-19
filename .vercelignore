@@ -1,0 +1,14 @@
+# Do not ship internal documentation, database migrations or obsolete root API copies.
+# Live serverless handlers are under /api; shared modules in /lib must remain available to them.
+/.github/
+/README.md
+/*.sql
+/activate-team.js
+/platform-admin.js
+/public-request.js
+/renewal-reminders.js
+/team-login.js
+/team-account.js
+/team-manifest.js
+/pexels-image.js
+/pexels-search.js
