@@ -21,7 +21,7 @@ async function sendReminder(customer, days) {
     method:'POST',
     headers:{ Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
     body:JSON.stringify({
-      from:'VisuPlanner <notifikation@visuplanner.dk>',
+      from:'VisuPlanner <service@techusnord.dk>',
       to:['service@techusnord.dk'],
       reply_to:'service@techusnord.dk',
       subject:`Årsfornyelse nærmer sig: ${customer.display_name}`,
@@ -50,7 +50,7 @@ async function sendTrialReminder(customer) {
     method:'POST',
     headers:{ Authorization:`Bearer ${key}`, 'Content-Type':'application/json' },
     body:JSON.stringify({
-      from:'VisuPlanner <notifikation@visuplanner.dk>',
+      from:'VisuPlanner <service@techusnord.dk>',
       to:[recipient],
       reply_to:'service@techusnord.dk',
       subject:'Jeres prøveperiode udløber snart',
