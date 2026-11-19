@@ -141,9 +141,6 @@ module.exports = async function handler(request, response) {
     }
     if (action === 'recover') {
       if (String(email || '').trim().toLowerCase() !== String(team.recovery_email || '').toLowerCase()) return response.status(200).json({ ok: true });
-      await service(`/rest/v1/team_invitations?team_slug=eq.${encodeURIComponent(team.slug)}&purpose=eq.password_reset&used_at=is.null`, secret, {
-        method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ used_at: new Date().toISOString() })
-      });
       const token = crypto.randomBytes(32).toString('base64url');
       const hash = crypto.createHash('sha256').update(token).digest('hex');
       await service('/rest/v1/team_invitations', secret, {
@@ -151,7 +148,22 @@ module.exports = async function handler(request, response) {
         body: JSON.stringify({ team_slug: team.slug, customer_id: team.customer_id, purpose: 'password_reset', token_hash: hash, contact_email: team.recovery_email, expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() })
       });
       const origin = 'https://visuplanner.dk';
-      await sendReset(team.recovery_email, team.name, `${origin}/aktiver?token=${encodeURIComponent(token)}`);
+      let mailSent = false;
+      try {
+        mailSent = await sendReset(team.recovery_email, team.name, `${origin}/aktiver?token=${encodeURIComponent(token)}`);
+      } catch (error) {
+        console.error('Nulstillingsmail kunne ikke leveres.', error.message);
+      }
+      if (!mailSent) {
+        await service(`/rest/v1/team_invitations?token_hash=eq.${hash}`, secret, {
+          method:'DELETE', headers:{ Prefer:'return=minimal' }
+        }).catch(error => console.error('Nulstillingslink kunne ikke ryddes op.', error.message));
+      } else {
+        // Preserve existing working reset links until a replacement is accepted by Resend.
+        await service(`/rest/v1/team_invitations?team_slug=eq.${encodeURIComponent(team.slug)}&purpose=eq.password_reset&used_at=is.null&token_hash=neq.${hash}`, secret, {
+          method:'PATCH', headers:{ Prefer:'return=minimal' }, body:JSON.stringify({ used_at:new Date().toISOString() })
+        });
+      }
       return response.status(200).json({ ok: true });
     }
     return response.status(400).json({ error: 'Ukendt handling.' });
