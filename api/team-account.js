@@ -67,9 +67,10 @@ module.exports = async function handler(request, response) {
       if (!customer) return response.status(404).json({ error: 'Kunden blev ikke fundet.' });
       const now = new Date();
       const requestedAt = customer.subscription_interest_at || now.toISOString();
-      const trialStartedAt = customer.trial_started_at ? new Date(customer.trial_started_at) : null;
-      const graceEndsAt = trialStartedAt ? new Date(trialStartedAt.getTime() + 25 * 86400000) : null;
-      const graceCanEdit = Boolean(graceEndsAt && graceEndsAt > now);
+      const trialEndsAt = customer.trial_ends_at ? new Date(customer.trial_ends_at) : null;
+      const validTrialEnd = Boolean(trialEndsAt && !Number.isNaN(trialEndsAt.getTime()));
+      const graceEndsAt = validTrialEnd ? new Date(trialEndsAt.getTime() + 7 * 86400000) : null;
+      const graceCanEdit = ['contracted', 'invoice_sent', 'active', 'overdue'].includes(customer.subscription_status) || (customer.subscription_status === 'trial' && Boolean(graceEndsAt && graceEndsAt > now));
       if (!customer.subscription_interest_at) {
         await service(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ subscription_interest_at: requestedAt, updated_at: now.toISOString() }) });
         const formattedGrace = graceEndsAt ? new Intl.DateTimeFormat('da-DK', { dateStyle: 'long' }).format(graceEndsAt) : 'den oplyste frist';
