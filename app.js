@@ -1518,7 +1518,7 @@ async function requestSubscription(button) {
     renderSubscriptionBanner();
     setEditorLockedState();
     setSettingsLockedState();
-    setStatus('Tak. Vi behandler jeres anmodning hurtigst muligt.', 'success');
+    setStatus(result.notification_sent === false ? 'Anmodningen er gemt, men mailen kunne ikke sendes. Kontakt service@techusnord.dk for at sikre, at vi har set den.' : 'Tak. Vi behandler jeres anmodning hurtigst muligt.', result.notification_sent === false ? 'error' : 'success');
   } catch (error) {
     renderSubscriptionBanner();
     setStatus(error.message, 'error');
