@@ -44,9 +44,11 @@ const dateTime = value => value ? new Intl.DateTimeFormat('da-DK', { dateStyle:'
 const inputDate = value => value ? String(value).slice(0, 10) : '';
 const daysUntil = value => value ? Math.ceil((new Date(value) - new Date()) / 86400000) : null;
 const fieldValue = (root, name) => root.querySelector(`[data-field="${name}"]`)?.value.trim() || '';
-const activationGraceEndsAt = customer => customer.subscription_interest_at && customer.trial_started_at
-  ? new Date(new Date(customer.trial_started_at).getTime() + 25 * 86400000).toISOString()
-  : null;
+const activationGraceEndsAt = customer => {
+  if (!customer.subscription_interest_at || !customer.trial_ends_at) return null;
+  const trialEnd = new Date(customer.trial_ends_at);
+  return Number.isNaN(trialEnd.getTime()) ? null : new Date(trialEnd.getTime() + 7 * 86400000).toISOString();
+};
 
 function planOptions(selected = 'intro3') {
   return Object.entries(planLabels).filter(([key]) => key !== 'legacy').map(([value, label]) => `<option value="${value}" ${selected === value ? 'selected' : ''}>${label}</option>`).join('');
@@ -124,9 +126,9 @@ function attentionHtml(customer) {
   const graceDays = daysUntil(graceEnd);
   let text = 'Kunden har bedt om kontakt om betaling og aktivering.';
   if (customer.subscription_status === 'trial' && customer.subscription_interest_at) text = graceDays === null
-    ? 'Aktivering er anmodet. Prøvens startdato mangler og bør kontrolleres.'
+    ? 'Aktivering er anmodet. Prøvens udløbsdato mangler og bør kontrolleres.'
     : graceDays < 0
-      ? 'Aktivering er anmodet, men fristen på dag 25 er udløbet.'
+      ? 'Aktivering er anmodet, men fristen på syv dage efter prøveperioden er udløbet.'
       : `Aktivering er anmodet. Redigering er mulig i ${graceDays} ${graceDays === 1 ? 'dag' : 'dage'} endnu – til ${date(graceEnd)}.`;
   if (!customer.subscription_interest_at && customer.subscription_status === 'trial') text = trialDays < 0 ? 'Prøveperioden er udløbet.' : `Prøveperioden udløber om ${trialDays} dage.`;
   if (!customer.subscription_interest_at && renewalDays !== null && renewalDays <= 45) text = renewalDays < 0 ? 'Årsfornyelsen er overskredet.' : `Årsfornyelsen nærmer sig om ${renewalDays} dage.`;
@@ -194,7 +196,7 @@ function customerCard(customer) {
   const graceEnd = activationGraceEndsAt(customer);
   const trialText = customer.subscription_status === 'trial'
     ? customer.subscription_interest_at
-      ? `Aktiveringsfrist: ${date(graceEnd)} (dag 25)`
+      ? `Aktiveringsfrist: ${date(graceEnd)} (7 dage efter prøvens udløb)`
       : `Prøve slutter: ${date(customer.trial_ends_at)}`
     : `Fornyelse: ${date(customer.subscription_renews_at)}`;
   return `<article class="customer-card" data-customer="${esc(customer.id)}">
