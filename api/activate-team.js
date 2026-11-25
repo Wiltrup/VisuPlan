@@ -1,3 +1,4 @@
+const { oneCalendarMonthAfter } = require('../lib/trial-period');
 const crypto = require('crypto');
 const { encryptCredential, saveTeamCredential, saveOfferCredential } = require('../lib/customer-admin-security');
 const { safeRoutes, publicPath } = require('../lib/board-routes');
@@ -88,7 +89,7 @@ module.exports = async function handler(request, response) {
     else await service(`/rest/v1/teams_registry?slug=eq.${encodeURIComponent(team.slug)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ onboarding_status: 'active', activated_at: nowIso, updated_at: nowIso }) });
 
     if (customer?.subscription_status === 'trial' && !customer.trial_started_at) {
-      await service(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ trial_started_at: nowIso, trial_ends_at: new Date(new Date(now).setUTCMonth(now.getUTCMonth() + 1)).toISOString(), updated_at: nowIso }) });
+      await service(`/rest/v1/customers?id=eq.${encodeURIComponent(customer.id)}`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ trial_started_at: nowIso, trial_ends_at: oneCalendarMonthAfter(now), updated_at: nowIso }) });
     }
     if (kind === 'team') await service(`/rest/v1/onboarding_requests?contact_email=eq.${encodeURIComponent(invite.contact_email)}&team_name=eq.${encodeURIComponent(team.name)}&status=eq.invited`, secret, { method: 'PATCH', headers: { Prefer: 'return=minimal' }, body: JSON.stringify({ status: 'activated' }) });
     const route = (await safeRoutes(service, secret, kind === 'team' ? `team_slug=eq.${encodeURIComponent(team.slug)}&select=*&limit=1` : `offer_id=eq.${encodeURIComponent(offer.id)}&select=*&limit=1`))?.[0];
