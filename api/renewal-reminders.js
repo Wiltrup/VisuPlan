@@ -58,6 +58,7 @@ async function sendTrialReminder(customer) {
         `Hej${customer.contact_name ? ` ${customer.contact_name}` : ''}`,
         '',
         'Jeres prøveperiode på VisuPlanner nærmer sig udløbsdatoen.',
+        `Prøveperioden udløber: ${new Intl.DateTimeFormat('da-DK', { dateStyle:'long' }).format(new Date(customer.trial_ends_at))}.`,
         '',
         'Ønsker I at fortsætte? Log ind i kundeadministrationen på VisuPlanner. Her kan I se prøveperiodens udløbsdato og vælge “Aktiver”. Techus Nord behandler derefter anmodningen.',
         '',
@@ -93,17 +94,17 @@ module.exports = async function handler(request, response) {
       renewalSent += 1;
     }
 
-    const dayTenThreshold = new Date(now.getTime() - 9 * 86400000);
-    const trials = await service(`/rest/v1/customers?archived_at=is.null&subscription_status=eq.trial&subscription_interest_at=is.null&trial_started_at=not.is.null&trial_started_at=lte.${encodeURIComponent(dayTenThreshold.toISOString())}&trial_ends_at=gt.${encodeURIComponent(now.toISOString())}&select=*&order=trial_ends_at.asc`, secret);
+    const weekBeforeExpiry = new Date(now.getTime() + 7 * 86400000);
+    const trials = await service(`/rest/v1/customers?archived_at=is.null&subscription_status=eq.trial&subscription_interest_at=is.null&trial_started_at=not.is.null&trial_ends_at=lte.${encodeURIComponent(weekBeforeExpiry.toISOString())}&trial_ends_at=gt.${encodeURIComponent(now.toISOString())}&select=*&order=trial_ends_at.asc`, secret);
     let trialSent = 0;
     for (const customer of trials || []) {
-      const existing = await service(`/rest/v1/customer_notifications?customer_id=eq.${encodeURIComponent(customer.id)}&notification_type=eq.trial_day_10&select=id&limit=1`, secret);
+      const periodDate = String(customer.trial_ends_at).slice(0, 10);
+      const existing = await service(`/rest/v1/customer_notifications?customer_id=eq.${encodeURIComponent(customer.id)}&notification_type=eq.trial_expiry_week&period_date=eq.${periodDate}&select=id&limit=1`, secret);
       if (existing?.length) continue;
       await sendTrialReminder(customer);
-      const periodDate = String(customer.trial_started_at).slice(0, 10);
       await service('/rest/v1/customer_notifications', secret, {
         method:'POST', headers:{ Prefer:'return=minimal' },
-        body:JSON.stringify({ customer_id:customer.id, notification_type:'trial_day_10', period_date:periodDate })
+        body:JSON.stringify({ customer_id:customer.id, notification_type:'trial_expiry_week', period_date:periodDate })
       });
       trialSent += 1;
     }
