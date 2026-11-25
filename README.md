@@ -1,5 +1,13 @@
 # VisuPlanner
 
+## Gældende prøveperiode og aktivering (november 2026)
+
+- Nye prøvekunder får **én kalendermåneds prøveperiode fra første tavleaktivering**, med de tavler der følger med valgt pakke.
+- Hvis kunden anmoder om fortsættelse, kan redigering fortsætte **7 dage efter prøvens faktiske udløbsdato** (ikke 25 dage efter start). Uden anmodning låses redigering ved prøveperiodens udløb; tavlen kan fortsat vises.
+- Kunden får én prøvepåmindelse **i den sidste uge før udløb**, hvis der endnu ikke er anmodet om fortsættelse. Den daglige kontrol og en registrering i `customer_notifications` forebygger gentagelser.
+- Admin kan manuelt sætte prøvens slutdato. Reglerne for teams, klubber og klubtilmeldinger er samlet i `supabase-v55-trial-grace.sql`; **kontrollér i Supabase, at denne migration er kørt**, før funktionen betragtes som verificeret i produktion.
+- Beskrivelserne fra v38-v53 nedenfor er historiske versionsnoter og beskriver ikke nødvendigvis gældende prøveperiode.
+
 ## v53 – kundeopdelte adresser og klubtilkøb
 
 Team- og klubtavler bruger nu samme korte adresseform under kundens navn, fx `/cfbb/team-2` og `/cfbb/solsikken`. Den sidste del er kun unik inden for den enkelte kunde, så andre kunder kan bruge de samme teamnavne. Eksisterende links bevares.
