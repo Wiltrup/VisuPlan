@@ -45,7 +45,7 @@ form.addEventListener('submit', async event => {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error);
     statusEl.className = 'finder-message success-message';
-    statusEl.textContent = data.reset ? 'Personalekoden er ændret. Du sendes videre…' : 'Tavlen er aktiveret. Jeres 14 dages prøveperiode starter nu.';
+    statusEl.textContent = data.reset ? 'Personalekoden er ændret. Du sendes videre…' : 'Tavlen er aktiveret. Prøveperioden varer én kalendermåned fra første aktivering.';
     setTimeout(() => { location.href = data.path || `/${data.slug}`; }, 1400);
   } catch (error) {
     statusEl.className = 'finder-message error-message';
